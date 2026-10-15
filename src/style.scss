@@ -1,0 +1,30 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #1e1e24;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+
+  canvas {
+    display: block;
+  }
+
+  // 右上角效能面板
+  .stats {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 60%);
+    color: #9fe8a0;
+    font: 12px/1.4 ui-monospace, Menlo, monospace;
+    // 面板不攔截滑鼠，避免擋到底下的 canvas 操作
+    pointer-events: none;
+  }
+}

@@ -1,0 +1,14 @@
+schema: spec-driven
+
+# Project context (shown to AI when creating artifacts)
+context: |
+  Tech stack: Vite 8, TypeScript 6, Three.js 0.186, SCSS (sass-embedded), no UI framework.
+  Full conventions: openspec/project.md (read it before writing artifacts).
+  OpenSpec documents and code comments are written in Traditional Chinese; identifiers and commit messages in English.
+  Workflow: Proposal -> Design -> Tasks -> Implementation -> Validation -> Engineering Evidence.
+  Templates: openspec/templates/. Evidence output: docs/Engineering Evidence/<topic>.md.
+
+# Per-artifact rules (optional)
+# rules:
+#   proposal:
+#     - Keep proposals under 500 words
