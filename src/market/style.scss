@@ -1,0 +1,365 @@
+// 夜市燈光：全螢幕場景 + 右側半透明燈光控制台
+
+$ink: #f5f1ff;
+$muted: rgb(245 241 255 / 62%);
+$panel: rgb(14 10 26 / 72%);
+$line: rgb(255 255 255 / 14%);
+$accent: #ff4fa3;
+$mobile: 760px;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #08060f;
+  color: $ink;
+  font-family: system-ui, -apple-system, 'PingFang TC', 'Noto Sans TC', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.app {
+  position: fixed;
+  inset: 0;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+// ── 左上標題：霓虹字效果（text-shadow 疊幾層同色光暈）──
+.title {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  left: 22px;
+  pointer-events: none;
+
+  h1 {
+    margin: 4px 0 2px;
+    color: #fff;
+    font-size: clamp(30px, 5vw, 46px);
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-shadow:
+      0 0 6px $accent,
+      0 0 18px $accent,
+      0 0 36px rgb(255 79 163 / 60%);
+  }
+
+  p {
+    margin: 0;
+    color: $muted;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+  }
+
+  &__back {
+    color: $muted;
+    font-size: 12px;
+    text-decoration: none;
+    pointer-events: auto;
+
+    &:hover {
+      color: $ink;
+    }
+  }
+}
+
+// ── 控制台 ──
+.console-toggle {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  right: 20px;
+  padding: 8px 14px;
+  border: 1px solid $line;
+  border-radius: 999px;
+  background: $panel;
+  font-size: 13px;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+
+  &[aria-expanded='true'] {
+    border-color: $accent;
+  }
+}
+
+.console {
+  position: absolute;
+  top: 64px;
+  right: 20px;
+  bottom: 20px;
+  width: 290px;
+  overflow-y: auto;
+  padding: 6px 16px 16px;
+  border: 1px solid $line;
+  border-radius: 16px;
+  background: $panel;
+  backdrop-filter: blur(14px);
+  // 細捲軸
+  scrollbar-width: thin;
+
+  section {
+    padding: 12px 0;
+    border-bottom: 1px solid $line;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  h2 {
+    margin: 0 0 8px;
+    color: $muted;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+  }
+
+  // 手機：從底部升起的面板，最多佔半個畫面
+  @media (max-width: $mobile) {
+    top: auto;
+    right: 10px;
+    left: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: auto;
+    max-height: 52%;
+  }
+}
+
+// 通用的小按鈕（情境、模式、串燈、開關）
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  button {
+    padding: 6px 12px;
+    border: 1px solid $line;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 4%);
+    font-size: 13px;
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      border-color 0.15s;
+
+    &:hover {
+      border-color: rgb(255 255 255 / 40%);
+    }
+
+    &[aria-pressed='true'] {
+      border-color: $accent;
+      background: rgb(255 79 163 / 22%);
+      box-shadow: 0 0 12px rgb(255 79 163 / 45%);
+    }
+  }
+}
+
+// 總電源
+.power {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid $line;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 4%);
+  font-weight: 700;
+  cursor: pointer;
+
+  &__dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #555;
+    transition:
+      background 0.2s,
+      box-shadow 0.2s;
+  }
+
+  &[aria-pressed='true'] .power__dot {
+    background: #4dff88;
+    box-shadow: 0 0 10px #4dff88;
+  }
+}
+
+// 攤位開關：每攤一顆，亮燈時色點發光
+.stalls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border: 1px solid $line;
+    border-radius: 10px;
+    background: transparent;
+    color: $muted;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #444;
+    }
+
+    &[aria-pressed='true'] {
+      color: $ink;
+
+      .dot {
+        background: var(--dot);
+        box-shadow: 0 0 8px var(--dot);
+      }
+    }
+  }
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.swatch {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: #888;
+  cursor: pointer;
+
+  &[aria-pressed='true'] {
+    border-color: $ink;
+    box-shadow: 0 0 10px rgb(255 255 255 / 50%);
+  }
+
+  // 攤位原色：彩色圓環
+  &--stall {
+    background: conic-gradient(#ff3b3b, #ffb627, #46e36b, #3fa7ff, #b06cff, #ff3b3b);
+  }
+
+  // 自訂顏色：原生顏色選擇器蓋滿圓形
+  &--custom {
+    overflow: hidden;
+    background: conic-gradient(from 90deg, #fff, #888, #fff);
+
+    input {
+      position: absolute;
+      inset: -6px;
+      width: calc(100% + 12px);
+      height: calc(100% + 12px);
+      border: 0;
+      padding: 0;
+      opacity: 0.9;
+      cursor: pointer;
+    }
+  }
+}
+
+// 各色票顏色
+@each $hex in ('#ff4fa3', '#ffb627', '#46e36b', '#3fa7ff', '#b06cff') {
+  .swatch[data-color='#{$hex}'] {
+    background: #{$hex};
+  }
+}
+
+.slider {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+  color: $muted;
+  font-size: 13px;
+
+  input {
+    width: 100%;
+    accent-color: $accent;
+  }
+}
+
+.console button:focus-visible,
+.console input:focus-visible,
+.console-toggle:focus-visible {
+  outline: 2px solid #7df9ff;
+  outline-offset: 2px;
+}
+
+// ── 滑鼠提示、訊息 ──
+.label {
+  position: fixed;
+  top: 0;
+  left: 0;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgb(10 8 20 / 85%);
+  font-size: 13px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.toast {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgb(10 8 20 / 88%);
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 0.2s;
+
+  &.is-visible {
+    opacity: 1;
+  }
+
+  @media (max-width: $mobile) {
+    top: 90px;
+    bottom: auto;
+  }
+}
+
+.fallback {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+}

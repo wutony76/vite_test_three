@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="開著玩具車逛 THREE LAB 小島：撞倒大字和保齡球瓶，開到發光圓台進入每一個 Three.js 範例。" />
+    <meta name="theme-color" content="#9fd8ef" />
+    <title>THREE LAB 小島｜開車逛作品</title>
+  </head>
+  <body>
+    <div class="app" data-ref="app">
+      <div class="stage" data-ref="stage"></div>
+
+      <header class="hud-title">
+        <strong>THREE LAB 小島</strong>
+        <span data-ref="knocked">撞倒 0 個</span>
+      </header>
+
+      <nav class="hud-buttons" aria-label="選項">
+        <button type="button" data-ref="sound" aria-pressed="true" title="聲音（L）">🔊</button>
+        <button type="button" data-ref="respawn" title="回到起點（R）">↺</button>
+        <button type="button" data-ref="resetObjects" title="把物件放回原位">▦</button>
+        <button type="button" data-ref="help" title="操作說明" aria-expanded="false">?</button>
+      </nav>
+
+      <!-- 操作說明 -->
+      <aside class="help" data-ref="helpPanel" hidden>
+        <h2>操作</h2>
+        <dl>
+          <dt><kbd>W A S D</kbd> / 方向鍵</dt><dd>駕駛</dd>
+          <dt><kbd>Shift</kbd></dt><dd>加速</dd>
+          <dt><kbd>Ctrl</kbd> / <kbd>B</kbd></dt><dd>煞車</dd>
+          <dt><kbd>Space</kbd></dt><dd>跳</dd>
+          <dt><kbd>Enter</kbd></dt><dd>進入作品</dd>
+          <dt><kbd>H</kbd></dt><dd>喇叭</dd>
+          <dt><kbd>R</kbd></dt><dd>回到起點</dd>
+          <dt><kbd>L</kbd></dt><dd>靜音</dd>
+          <dt>滑鼠拖曳 / 滾輪</dt><dd>旋轉 / 縮放鏡頭</dd>
+          <dt>觸控</dt><dd>按住拖曳開車、點一下跳</dd>
+        </dl>
+      </aside>
+
+      <!-- 開到作品區域時的卡片 -->
+      <article class="zone-card" data-ref="zoneCard" hidden aria-live="polite">
+        <p class="zone-card__eyebrow">作品</p>
+        <h2 data-ref="zoneTitle"></h2>
+        <p data-ref="zoneDescription"></p>
+        <a class="zone-card__go" data-ref="zoneLink">進入 <kbd>Enter</kbd></a>
+      </article>
+
+      <p class="toast" data-ref="toast" role="status" aria-live="polite"></p>
+
+      <!-- 觸控按鈕（只在觸控裝置顯示） -->
+      <div class="touch" data-ref="touch">
+        <button type="button" data-ref="touchJump">跳</button>
+        <button type="button" data-ref="touchBrake">煞車</button>
+        <button type="button" data-ref="touchBoost">加速</button>
+      </div>
+
+      <!-- 開始畫面：點擊後才開始（瀏覽器規定要使用者操作後才能播聲音） -->
+      <section class="intro" data-ref="intro">
+        <div class="intro__card">
+          <p class="intro__eyebrow">Three.js · cannon-es</p>
+          <h1>THREE LAB 小島</h1>
+          <p>開著玩具車逛逛小島。撞倒大字和保齡球瓶，開到發光的圓台上，按 <kbd>Enter</kbd> 進入每一個範例。</p>
+          <button type="button" class="intro__start" data-ref="start">開始駕駛</button>
+          <p class="intro__keys"><kbd>W A S D</kbd> 駕駛 · <kbd>Shift</kbd> 加速 · <kbd>Space</kbd> 跳</p>
+          <a class="intro__back" href="/web.html">← 範例列表</a>
+        </div>
+      </section>
+
+      <p class="fallback" data-ref="fallback" hidden>您的瀏覽器不支援 WebGL 2，無法顯示 3D 小島。</p>
+    </div>
+
+    <script type="module" src="/src/drive/main.ts"></script>
+  </body>
+</html>

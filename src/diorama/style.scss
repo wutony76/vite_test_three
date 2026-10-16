@@ -1,0 +1,460 @@
+// 3D 店面導覽：全螢幕場景 + 疊在上面的半透明 UI
+
+$ink: #f6f1e6;
+$muted: rgb(246 241 230 / 70%);
+$glass: rgb(12 14 30 / 55%);
+$glass-border: rgb(255 255 255 / 22%);
+$accent: #ff6b8b;
+$serif: 'Noto Serif TC', 'Songti TC', Georgia, serif;
+$sans: system-ui, -apple-system, 'PingFang TC', 'Noto Sans TC', sans-serif;
+$mobile: 640px;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #0b0f24;
+  color: $ink;
+  font-family: $sans;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.app {
+  position: fixed;
+  inset: 0;
+  // 白天時 UI 的玻璃底色稍微深一點，在亮背景上才看得清楚
+  --glass: #{$glass};
+
+  &.is-day {
+    --glass: rgb(20 24 40 / 62%);
+  }
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  // 觸控拖曳時不要捲動頁面或縮放網頁
+  touch-action: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+// ── 左上標題 ──
+.title {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top));
+  left: 24px;
+  pointer-events: none;
+  text-shadow: 0 2px 12px rgb(0 0 0 / 45%);
+
+  h1 {
+    margin: 4px 0 2px;
+    font-family: $serif;
+    font-size: clamp(30px, 5vw, 48px);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+
+  p {
+    margin: 0;
+    color: $muted;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+  }
+
+  &__back {
+    color: $muted;
+    font-size: 12px;
+    text-decoration: none;
+    pointer-events: auto;
+
+    &:hover {
+      color: $ink;
+    }
+  }
+
+  // 白天背景是淺色，標題改深色字才讀得清楚
+  .is-day & {
+    color: #1d2233;
+    text-shadow: 0 1px 8px rgb(255 255 255 / 60%);
+
+    p,
+    .title__back {
+      color: rgb(29 34 51 / 70%);
+    }
+  }
+}
+
+// ── 圖示按鈕 ──
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid $glass-border;
+  border-radius: 50%;
+  background: var(--glass);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+
+  svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &:hover:not(:disabled) {
+    border-color: rgb(255 255 255 / 55%);
+  }
+
+  &[aria-pressed='true'],
+  &[aria-expanded='true'] {
+    border-color: $ink;
+    background: $ink;
+    color: #14182c;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $accent;
+    outline-offset: 2px;
+  }
+}
+
+.toolbar {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top));
+  right: 20px;
+  display: flex;
+  gap: 8px;
+
+  // 日夜按鈕：晚上顯示太陽（按了變白天），白天顯示月亮
+  .icon-moon {
+    display: none;
+  }
+
+  .is-day & {
+    .icon-sun {
+      display: none;
+    }
+
+    .icon-moon {
+      display: block;
+    }
+  }
+
+  @media (max-width: $mobile) {
+    top: auto;
+    right: 50%;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    transform: translateX(50%);
+  }
+}
+
+.fullscreen {
+  position: absolute;
+  right: 20px;
+  bottom: max(20px, env(safe-area-inset-bottom));
+
+  @media (max-width: $mobile) {
+    top: max(20px, env(safe-area-inset-top));
+    bottom: auto;
+  }
+}
+
+// ── 導覽清單 ──
+.list {
+  position: absolute;
+  top: 76px;
+  right: 20px;
+  width: 260px;
+  max-height: calc(100% - 160px);
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid $glass-border;
+  border-radius: 16px;
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+
+  h2 {
+    margin: 0 0 8px;
+    font-family: $serif;
+    font-size: 18px;
+  }
+
+  ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  button {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 6px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+
+    span {
+      color: $muted;
+      font-variant-numeric: tabular-nums;
+    }
+
+    &:hover,
+    &[aria-current='true'] {
+      background: rgb(255 255 255 / 12%);
+    }
+
+    &:focus-visible {
+      outline: 2px solid $accent;
+    }
+  }
+
+  &__note {
+    margin: 12px 0 0;
+    color: $muted;
+    font-size: 11px;
+  }
+
+  @media (max-width: $mobile) {
+    top: auto;
+    right: 12px;
+    bottom: 76px;
+    left: 12px;
+    width: auto;
+    max-height: 55%;
+  }
+}
+
+// ── 指向標籤 ──
+.label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgb(10 10 20 / 72%);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  // 位置由 JS 用 transform 設定（不觸發版面重排，效能較好）
+  will-change: transform;
+}
+
+// ── 介紹卡 ──
+.card {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  width: min(360px, calc(100% - 48px));
+  padding: 20px 22px 16px;
+  border: 1px solid $glass-border;
+  border-radius: 18px;
+  background: rgb(18 12 16 / 78%);
+  backdrop-filter: blur(14px);
+  animation: card-in 0.25s ease-out;
+
+  h2 {
+    margin: 0 0 8px;
+    padding-right: 32px;
+    font-family: $serif;
+    font-size: 22px;
+  }
+
+  &__index {
+    margin: 0 0 4px;
+    color: $accent;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+  }
+
+  &__body {
+    margin: 0 0 12px;
+    color: rgb(246 241 230 / 88%);
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  &__meta {
+    margin: 0;
+    padding-top: 10px;
+    border-top: 1px solid rgb(255 255 255 / 14%);
+    color: $muted;
+    font-size: 12px;
+  }
+
+  &__close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 32px;
+    height: 32px;
+    border: 1px solid $glass-border;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  &__nav {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+
+    button {
+      padding: 6px 4px;
+      border: 0;
+      background: transparent;
+      color: $muted;
+      font-size: 13px;
+      cursor: pointer;
+
+      &:hover {
+        color: $ink;
+      }
+    }
+  }
+
+  button:focus-visible {
+    outline: 2px solid $accent;
+    outline-offset: 2px;
+  }
+
+  // 手機：底部滿版，工具列上方
+  @media (max-width: $mobile) {
+    right: 12px;
+    bottom: 76px;
+    left: 12px;
+    width: auto;
+  }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+// ── 開場進度 ──
+.loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(260px, 70%);
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+
+  &__track {
+    height: 2px;
+    margin-top: 10px;
+    overflow: hidden;
+    background: rgb(255 255 255 / 20%);
+  }
+
+  &__bar {
+    width: 0;
+    height: 100%;
+    background: $ink;
+  }
+}
+
+// ── 操作提示（第一次操作後淡出）──
+.hint {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  margin: 0;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--glass);
+  color: $muted;
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 0.6s;
+
+  &.is-hidden {
+    opacity: 0;
+  }
+
+  @media (max-width: $mobile) {
+    bottom: 80px;
+  }
+}
+
+.toast {
+  position: absolute;
+  top: 84px;
+  left: 50%;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgb(10 10 20 / 80%);
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 0.2s;
+
+  &.is-visible {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+
+  .hint,
+  .toast {
+    transition: none;
+  }
+}

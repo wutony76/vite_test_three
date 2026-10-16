@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Three.js 互動粒子網頁範例：捲動變形、滑鼠推開、點擊漣漪，兩萬顆粒子只要一次 draw call。" />
+    <meta name="theme-color" content="#07080f" />
+    <title>Particles｜Three.js 互動網頁範例</title>
+  </head>
+  <body>
+    <!-- 固定在背景的 3D 畫面 -->
+    <div class="scene" data-ref="scene" aria-hidden="true"></div>
+
+    <!-- 頂部捲動進度 -->
+    <div class="progress" aria-hidden="true"><div class="progress__bar" data-ref="progress"></div></div>
+
+    <header class="topbar">
+      <a href="/" class="topbar__logo">THREE<span>·</span>LAB</a>
+      <span class="topbar__hint">移動滑鼠 · 點一下 · 往下捲</span>
+    </header>
+
+    <!-- 右側段落導覽 -->
+    <nav class="dots" aria-label="段落導覽" data-ref="dots"></nav>
+
+    <main>
+      <section class="section section--center" data-section="0" aria-labelledby="s0">
+        <div class="panel">
+          <p class="eyebrow">Three.js Web Sample</p>
+          <h1 id="s0">兩萬顆粒子，<br />一次 draw call。</h1>
+          <p>移動滑鼠把它們推開，點一下產生漣漪，往下捲動看形狀變化。所有動畫都在 GPU 上即時計算。</p>
+          <button type="button" class="cta" data-ref="start">開始探索 ↓</button>
+        </div>
+      </section>
+
+      <section class="section section--left" data-section="1" aria-labelledby="s1">
+        <div class="panel">
+          <p class="eyebrow">01 · Morphing</p>
+          <h2 id="s1">一顆粒子，記住四個形狀</h2>
+          <p>每顆粒子同時存了球體、環面結、波浪、文字四組座標。捲動只改變一個數字 <code>uMorph</code>，Shader 就在形狀之間混合。</p>
+          <p class="note">每顆粒子出發的時間略有不同，所以變形時像一陣風吹過，而不是整齊的瞬移。</p>
+        </div>
+      </section>
+
+      <section class="section section--right" data-section="2" aria-labelledby="s2">
+        <div class="panel">
+          <p class="eyebrow">02 · GPU Animation</p>
+          <h2 id="s2">波浪由 GPU 每幀計算</h2>
+          <p>波浪的起伏寫在 vertex shader 裡，用 <code>sin</code> 和 <code>cos</code> 隨時間疊加。CPU 每幀只送出一個時間值，幾萬顆粒子由顯示卡同時計算。</p>
+          <p class="note">滑鼠推開和點擊漣漪也一樣：只傳位置，距離和力道由 Shader 自己算。</p>
+        </div>
+      </section>
+
+      <section class="section section--bottom" data-section="3" aria-labelledby="s3">
+        <div class="panel">
+          <p class="eyebrow">03 · Sampling</p>
+          <h2 id="s3">任何東西都能變成粒子</h2>
+          <p>把文字畫在看不見的 Canvas 上，收集有畫到的像素位置，就成了粒子的目標。換成中文、logo 或任何圖片都可以。</p>
+        </div>
+      </section>
+
+      <section class="section section--center" data-section="4" aria-labelledby="s4">
+        <div class="panel panel--wide">
+          <p class="eyebrow">More Samples</p>
+          <h2 id="s4">更多 Three.js 範例</h2>
+          <ul class="cards">
+            <li><a href="/drive.html"><strong>開車逛小島</strong><span>cannon-es 物理、撞倒物件、開進每個範例</span></a></li>
+            <li><a href="/lights.html"><strong>燈光互動網頁</strong><span>點光源、聚光燈、面光源、霓虹與光暈</span></a></li>
+            <li><a href="/market.html"><strong>夜市燈光</strong><span>霓虹燈、LED 燈條、面光源、跑馬燈</span></a></li>
+            <li><a href="/product.html"><strong>商品 3D 展示</strong><span>glTF 模型、切換配色、按需渲染</span></a></li>
+            <li><a href="/diorama.html"><strong>3D 店面導覽</strong><span>程式產生場景、日夜與下雨、Bloom</span></a></li>
+            <li><a href="/house.html"><strong>雞排與狸貓</strong><span>自訂造型、凹凸貼圖、角色動畫</span></a></li>
+            <li><a href="/cinema.html"><strong>電影院選位</strong><span>Raycaster、共用材質、訂位流程</span></a></li>
+          </ul>
+          <a class="back" href="/">← 回練習首頁</a>
+        </div>
+      </section>
+    </main>
+
+    <p class="fallback" data-ref="fallback" hidden>您的瀏覽器不支援 WebGL，3D 背景無法顯示，但內容仍可閱讀。</p>
+
+    <script type="module" src="/src/web/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="熱鬧夜市燈光範例：霓虹燈、LED 燈條、彩色串燈、跑馬燈，全部可以即時控制。" />
+    <meta name="theme-color" content="#08060f" />
+    <title>夜市燈光｜Three.js 燈光範例</title>
+  </head>
+  <body>
+    <div class="app" data-ref="app">
+      <div class="stage" data-ref="stage"></div>
+
+      <header class="title">
+        <a class="title__back" href="/web.html">← 範例列表</a>
+        <h1>夜市燈光</h1>
+        <p>NIGHT MARKET LIGHTS · 點攤位開關燈 · 拖曳環顧</p>
+      </header>
+
+      <button type="button" class="console-toggle" data-ref="consoleToggle" aria-expanded="true" aria-controls="console">燈光控制台</button>
+
+      <!-- 燈光控制台 -->
+      <aside class="console" id="console" data-ref="console" aria-label="燈光控制台">
+        <section>
+          <h2>情境</h2>
+          <div class="chips" data-ref="presets">
+            <button type="button" data-preset="open">開市熱鬧</button>
+            <button type="button" data-preset="party">派對</button>
+            <button type="button" data-preset="chill">微醺</button>
+            <button type="button" data-preset="close">收攤</button>
+          </div>
+        </section>
+
+        <section>
+          <button type="button" class="power" data-ref="power" aria-pressed="true">
+            <span class="power__dot"></span><span data-ref="powerLabel">總電源 開</span>
+          </button>
+        </section>
+
+        <section>
+          <h2>攤位招牌</h2>
+          <div class="stalls" data-ref="stalls"></div>
+        </section>
+
+        <section>
+          <h2>LED 燈條</h2>
+          <div class="chips" data-ref="modes">
+            <button type="button" data-mode="solid">單色</button>
+            <button type="button" data-mode="chase">跑馬燈</button>
+            <button type="button" data-mode="rainbow">彩虹</button>
+            <button type="button" data-mode="breathe">呼吸</button>
+            <button type="button" data-mode="sparkle">閃爍</button>
+          </div>
+          <div class="swatches" data-ref="colors">
+            <button type="button" data-color="stall" class="swatch swatch--stall" title="攤位原色" aria-label="攤位原色"></button>
+            <button type="button" data-color="#ff4fa3" class="swatch" title="粉紅" aria-label="粉紅"></button>
+            <button type="button" data-color="#ffb627" class="swatch" title="暖黃" aria-label="暖黃"></button>
+            <button type="button" data-color="#46e36b" class="swatch" title="綠" aria-label="綠"></button>
+            <button type="button" data-color="#3fa7ff" class="swatch" title="藍" aria-label="藍"></button>
+            <button type="button" data-color="#b06cff" class="swatch" title="紫" aria-label="紫"></button>
+            <label class="swatch swatch--custom" title="自訂顏色">
+              <input type="color" data-ref="customColor" value="#ff6b3d" aria-label="自訂燈條顏色" />
+            </label>
+          </div>
+          <label class="slider">速度 <input type="range" data-ref="speed" min="0.2" max="3" step="0.1" /></label>
+        </section>
+
+        <section>
+          <h2>頭頂串燈</h2>
+          <div class="chips" data-ref="bulbs">
+            <button type="button" data-bulbs="steady">常亮</button>
+            <button type="button" data-bulbs="twinkle">閃爍</button>
+            <button type="button" data-bulbs="chase">追逐</button>
+          </div>
+        </section>
+
+        <section>
+          <h2>整體</h2>
+          <label class="slider">環境光 <input type="range" data-ref="ambient" min="0" max="2" step="0.01" /></label>
+          <label class="slider">亮度 <input type="range" data-ref="dimmer" min="0" max="1.2" step="0.01" /></label>
+          <label class="slider">光暈 <input type="range" data-ref="bloom" min="0" max="2" step="0.01" /></label>
+          <label class="slider">霧氣 <input type="range" data-ref="haze" min="0" max="1" step="0.01" /></label>
+          <div class="chips">
+            <button type="button" data-ref="crowd" aria-pressed="true">人潮</button>
+            <button type="button" data-ref="sound" aria-pressed="false">環境音</button>
+            <button type="button" data-ref="fullscreen">全螢幕</button>
+          </div>
+        </section>
+      </aside>
+
+      <!-- 滑鼠指向攤位時的提示 -->
+      <div class="label" data-ref="label" aria-hidden="true" hidden></div>
+      <div class="toast" data-ref="toast" role="status" aria-live="polite"></div>
+      <p class="fallback" data-ref="fallback" hidden>您的瀏覽器不支援 WebGL 2，無法顯示 3D 夜市。</p>
+    </div>
+
+    <script type="module" src="/src/market/main.ts"></script>
+  </body>
+</html>

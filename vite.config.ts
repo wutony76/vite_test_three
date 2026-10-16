@@ -8,6 +8,13 @@ export default defineConfig({
       input: {
         main: 'index.html',
         cinema: 'cinema.html',
+        product: 'product.html',
+        diorama: 'diorama.html',
+        house: 'house.html',
+        web: 'web.html',
+        lights: 'lights.html',
+        market: 'market.html',
+        drive: 'drive.html',
       },
     },
   },

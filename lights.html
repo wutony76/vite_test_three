@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Three.js 燈光互動網頁範例：點光源、聚光燈、面光源、霓虹與光暈，捲動切換、滑鼠控制光源。" />
+    <meta name="theme-color" content="#07070b" />
+    <title>Lights｜Three.js 燈光互動網頁</title>
+  </head>
+  <body>
+    <div class="scene" data-ref="scene" aria-hidden="true"></div>
+    <div class="progress" aria-hidden="true"><div class="progress__bar" data-ref="progress"></div></div>
+
+    <header class="topbar">
+      <a href="/web.html" class="topbar__logo">THREE<span>·</span>LIGHTS</a>
+      <span class="topbar__hint">移動滑鼠控制光 · 點一下換顏色 · 往下捲</span>
+    </header>
+
+    <nav class="dots" aria-label="段落導覽" data-ref="dots"></nav>
+
+    <main>
+      <section class="section section--center" data-section="0" aria-labelledby="s0">
+        <div class="panel">
+          <p class="eyebrow">Three.js Lighting</p>
+          <h1 id="s0">移動滑鼠，<br />你就是光。</h1>
+          <p>一盞點光源跟著你的游標移動。往下捲動，看看五種光如何改變同一組雕塑。</p>
+          <button type="button" class="cta" data-ref="start">開始 ↓</button>
+        </div>
+      </section>
+
+      <section class="section section--left" data-section="1" aria-labelledby="s1">
+        <div class="panel">
+          <p class="eyebrow">01 · PointLight</p>
+          <h2 id="s1">點光源：像一顆燈泡</h2>
+          <p>從一個點往四面八方發光，離越遠越暗（<code>decay</code>）。紅、綠、藍三盞繞著雕塑轉，重疊的地方會混出黃、青、洋紅，正中間接近白色。</p>
+          <p class="note">滑鼠往右轉快、往左反轉 · 點一下換一組顏色</p>
+        </div>
+      </section>
+
+      <section class="section section--right" data-section="2" aria-labelledby="s2">
+        <div class="panel">
+          <p class="eyebrow">02 · SpotLight</p>
+          <h2 id="s2">聚光燈：只照一個圓錐</h2>
+          <p>像舞台燈，用 <code>angle</code> 決定照多大、<code>penumbra</code> 決定邊緣多柔。它會投射即時陰影，看看方塊和球的影子跟著照射點移動。</p>
+          <p class="note">滑鼠指哪裡，就照哪裡 · 點一下換顏色</p>
+        </div>
+      </section>
+
+      <section class="section section--left" data-section="3" aria-labelledby="s3">
+        <div class="panel">
+          <p class="eyebrow">03 · RectAreaLight</p>
+          <h2 id="s3">面光源：柔和的光</h2>
+          <p>從一整片長方形發光，像攝影棚的柔光箱或 LED 面板。光源面積越大，陰影邊緣越柔，鉻金屬上會映出一整塊方形的反光。</p>
+          <p class="note">滑鼠左右移動面板 · 點一下切換暖白 / 冷白 / 彩色</p>
+        </div>
+      </section>
+
+      <section class="section section--right" data-section="4" aria-labelledby="s4">
+        <div class="panel">
+          <p class="eyebrow">04 · Emissive + Bloom</p>
+          <h2 id="s4">霓虹：發光不等於照明</h2>
+          <p>霓虹光環本身用「自發光」材質，亮度超過 1 再經過 Bloom 後製，才有光暈。它其實不會照亮旁邊的東西，所以後面另外放了一盞同色的點光源，把顏色灑到牆和雕塑上。</p>
+          <p class="note">地面一圈追逐燈 · 點一下換霓虹顏色</p>
+        </div>
+      </section>
+
+      <section class="section section--center" data-section="5" aria-labelledby="s5">
+        <div class="panel panel--wide">
+          <p class="eyebrow">All Together</p>
+          <h2 id="s5">全部一起</h2>
+          <ul class="cards">
+            <li><a href="/market.html"><strong>夜市燈光</strong><span>霓虹燈、LED 燈條、面光源、跑馬燈</span></a></li>
+            <li><a href="/web.html"><strong>粒子互動網頁</strong><span>捲動變形、滑鼠推開、點擊漣漪</span></a></li>
+            <li><a href="/diorama.html"><strong>3D 店面導覽</strong><span>日夜與下雨、Bloom、熱點故事</span></a></li>
+            <li><a href="/product.html"><strong>商品 3D 展示</strong><span>glTF 模型、切換配色、按需渲染</span></a></li>
+          </ul>
+          <a class="back" href="/">← 回練習首頁</a>
+        </div>
+      </section>
+    </main>
+
+    <p class="fallback" data-ref="fallback" hidden>您的瀏覽器不支援 WebGL 2，3D 燈光無法顯示，但內容仍可閱讀。</p>
+
+    <script type="module" src="/src/lights/main.ts"></script>
+  </body>
+</html>

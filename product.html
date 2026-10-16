@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Daily Runner 經典休閒鞋 3D 商品檢視：360° 旋轉、切換配色、選擇尺寸。" />
+    <title>Daily Runner｜3D 商品展示</title>
+    <!-- 提早開始下載模型：瀏覽器解析 HTML 時就去抓，不用等 JS 執行到 loader 才開始 -->
+    <link rel="preload" href="/models/shoe/shoe.glb" as="fetch" type="model/gltf-binary" crossorigin />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__back" href="/">← 練習首頁</a>
+      <span class="topbar__brand" data-ref="brand"></span>
+    </header>
+
+    <main class="layout">
+      <!-- 左：3D 檢視器 -->
+      <section class="viewer" data-ref="viewer" aria-label="商品 3D 檢視">
+        <div class="viewer__canvas" data-ref="canvasHost"></div>
+
+        <!-- 載入中 / 錯誤 狀態 -->
+        <div class="viewer__overlay" data-ref="overlay">
+          <div class="viewer__loading" data-ref="loading">
+            <p>載入 3D 模型中… <span data-ref="progressText"></span></p>
+            <div class="progress"><div class="progress__bar" data-ref="progressBar"></div></div>
+          </div>
+          <div class="viewer__error" data-ref="error">
+            <p data-ref="errorText"></p>
+            <button type="button" class="btn" data-ref="retry">重新載入</button>
+          </div>
+        </div>
+
+        <div class="viewer__toolbar">
+          <button type="button" class="icon-btn" data-ref="autoRotate" aria-pressed="true" title="自動旋轉">⟳</button>
+          <button type="button" class="icon-btn" data-ref="reset" title="重設視角">⌂</button>
+          <button type="button" class="icon-btn" data-ref="fullscreen" title="全螢幕">⛶</button>
+        </div>
+        <p class="viewer__hint">拖曳旋轉 · 滾輪或雙指縮放</p>
+      </section>
+
+      <!-- 右：商品資訊 -->
+      <section class="info">
+        <h1 class="info__name" data-ref="name"></h1>
+        <p class="info__price" data-ref="price"></p>
+        <p class="info__desc" data-ref="desc"></p>
+
+        <fieldset class="option">
+          <legend>配色：<strong data-ref="variantLabel"></strong></legend>
+          <div class="swatches" data-ref="swatches"></div>
+        </fieldset>
+
+        <fieldset class="option">
+          <legend>尺寸</legend>
+          <div class="sizes" data-ref="sizes"></div>
+        </fieldset>
+
+        <button type="button" class="btn btn--primary" data-ref="addToCart">加入購物車</button>
+        <p class="info__message" data-ref="formMessage" role="alert"></p>
+
+        <p class="credit">
+          <a data-ref="creditLink" target="_blank" rel="noopener"></a>，
+          <a data-ref="licenseLink" target="_blank" rel="noopener"></a>
+        </p>
+      </section>
+    </main>
+
+    <!-- 提示訊息；aria-live：螢幕閱讀器會唸出內容變化 -->
+    <div class="toast" data-ref="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/src/product/main.ts"></script>
+  </body>
+</html>

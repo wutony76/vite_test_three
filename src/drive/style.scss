@@ -1,0 +1,374 @@
+// 開車逛小島：明亮玩具風 UI，圓角、粗字、柔和陰影
+
+$ink: #2b2b33;
+$paper: #fffaf0;
+$accent: #ff5a4e;
+$mobile: 760px;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #9fd8ef;
+  color: $ink;
+  font-family: 'Nunito', system-ui, -apple-system, 'PingFang TC', 'Noto Sans TC', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  // 觸控拖曳開車時不要選取文字、不要縮放
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button,
+a {
+  font: inherit;
+  color: inherit;
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid rgb(43 43 51 / 25%);
+  border-bottom-width: 3px;
+  border-radius: 6px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.85em;
+  font-weight: 800;
+}
+
+.app {
+  position: fixed;
+  inset: 0;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+
+  canvas {
+    display: block;
+  }
+}
+
+// 玩具風卡片的共同外觀
+%card {
+  border: 3px solid $ink;
+  border-radius: 18px;
+  background: $paper;
+  box-shadow: 0 6px 0 $ink;
+}
+
+.hud-title {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 14px;
+  pointer-events: none;
+  @extend %card;
+
+  strong {
+    font-size: 16px;
+    font-weight: 900;
+  }
+
+  span {
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 0.7;
+  }
+
+  // 手機：標題卡縮小，才不會擠到右上角的按鈕
+  @media (max-width: $mobile) {
+    padding: 6px 10px;
+
+    strong {
+      font-size: 13px;
+    }
+
+    span {
+      font-size: 11px;
+    }
+  }
+}
+
+.hud-buttons {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  right: 16px;
+  display: flex;
+  gap: 8px;
+
+  button {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 18px;
+    font-weight: 900;
+    cursor: pointer;
+    @extend %card;
+    box-shadow: 0 4px 0 $ink;
+    transition: transform 0.1s;
+
+    &:active {
+      box-shadow: 0 1px 0 $ink;
+      transform: translateY(3px);
+    }
+
+    &[aria-expanded='true'] {
+      background: #ffc83d;
+    }
+
+    @media (max-width: $mobile) {
+      width: 38px;
+      height: 38px;
+      font-size: 15px;
+    }
+  }
+
+  @media (max-width: $mobile) {
+    gap: 6px;
+  }
+}
+
+.help {
+  position: absolute;
+  top: 76px;
+  right: 16px;
+  width: 280px;
+  padding: 14px 18px;
+  @extend %card;
+
+  h2 {
+    margin: 0 0 8px;
+    font-size: 16px;
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 12px;
+    margin: 0;
+    font-size: 13px;
+  }
+
+  dt {
+    font-weight: 700;
+  }
+
+  dd {
+    margin: 0;
+    opacity: 0.75;
+  }
+}
+
+// ── 作品卡片：從下方彈出 ──
+.zone-card {
+  position: absolute;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  left: 50%;
+  width: min(380px, calc(100% - 32px));
+  padding: 16px 20px 18px;
+  text-align: center;
+  transform: translateX(-50%);
+  animation: pop 0.3s cubic-bezier(0.3, 1.6, 0.6, 1);
+  @extend %card;
+  border-color: var(--zone, $ink);
+  box-shadow: 0 6px 0 var(--zone, $ink);
+
+  &__eyebrow {
+    margin: 0;
+    color: var(--zone);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+  }
+
+  h2 {
+    margin: 4px 0;
+    font-size: 24px;
+    font-weight: 900;
+  }
+
+  p {
+    margin: 0 0 12px;
+    font-size: 14px;
+    opacity: 0.75;
+  }
+
+  &__go {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    border-radius: 999px;
+    background: var(--zone);
+    color: #fff;
+    font-weight: 900;
+    text-decoration: none;
+
+    kbd {
+      color: $ink;
+    }
+  }
+
+  @media (max-width: $mobile) {
+    bottom: 120px;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 30px) scale(0.9);
+  }
+}
+
+.toast {
+  position: absolute;
+  top: 90px;
+  left: 50%;
+  margin: 0;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 800;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 0.2s;
+  @extend %card;
+
+  &.is-visible {
+    opacity: 1;
+  }
+}
+
+// ── 觸控按鈕 ──
+.touch {
+  position: absolute;
+  right: 16px;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 10px;
+
+  button {
+    width: 64px;
+    height: 64px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 15px;
+    font-weight: 900;
+    @extend %card;
+    box-shadow: 0 4px 0 $ink;
+    touch-action: none;
+
+    &:active {
+      background: #ffc83d;
+      box-shadow: 0 1px 0 $ink;
+      transform: translateY(3px);
+    }
+  }
+}
+
+// ── 開始畫面 ──
+.intro {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(159 216 239 / 55%);
+  backdrop-filter: blur(4px);
+
+  &__card {
+    width: min(440px, 100%);
+    padding: 28px 28px 22px;
+    text-align: center;
+    @extend %card;
+  }
+
+  &__eyebrow {
+    margin: 0;
+    color: $accent;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+  }
+
+  h1 {
+    margin: 6px 0 10px;
+    font-size: clamp(30px, 6vw, 42px);
+    font-weight: 900;
+  }
+
+  p {
+    margin: 0 0 18px;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  &__start {
+    padding: 14px 40px;
+    border: 3px solid $ink;
+    border-radius: 999px;
+    background: $accent;
+    box-shadow: 0 5px 0 $ink;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: transform 0.1s;
+
+    &:hover {
+      transform: translateY(-2px);
+    }
+
+    &:active {
+      box-shadow: 0 1px 0 $ink;
+      transform: translateY(4px);
+    }
+  }
+
+  &__keys {
+    margin: 16px 0 6px !important;
+    font-size: 13px !important;
+    opacity: 0.75;
+  }
+
+  &__back {
+    font-size: 13px;
+    opacity: 0.6;
+  }
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #4fa3ff;
+  outline-offset: 3px;
+}
+
+.fallback {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zone-card {
+    animation: none;
+  }
+}

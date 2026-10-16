@@ -11,6 +11,7 @@
 - Build tool: Vite 8（`vite@^8.3.0`）
 - Language: TypeScript 6（`typescript@~6.0.2`，`tsc` 只做型別檢查，`noEmit`）
 - 3D: Three.js（`three@^0.186.1` + `@types/three`）
+- Physics: cannon-es（`cannon-es@^0.20.0`，drive 頁）
 - Styling: SCSS（`sass-embedded`）
 - Runtime/toolchain: Node.js 22.x（`22.22.2`）, npm
 - 無前端框架（未使用 Vue / React）
@@ -88,11 +89,18 @@
 - 多頁面（`vite.config.ts`）：
   - `index.html` → `src/main.ts`：方塊方陣練習（Raycaster、波浪動畫、效能面板）
   - `cinema.html` → `src/cinema/main.ts`：電影院選位（狀態共用材質、模擬訂位 API）
+  - `product.html` → `src/product/`：商品 3D 展示（GLTF + meshopt、KHR_materials_variants、按需渲染、RWD）
+  - `diorama.html` → `src/diorama/`：3D 店面導覽（程式產生場景、後製、日夜 / 雨、熱點故事）
+  - `house.html` → `src/house/`：diorama 的獨立改造版（雞排底座、狸貓）
+  - `web.html` → `src/web/`：互動粒子網頁（捲動變形、滑鼠推開、點擊漣漪、作品入口）
+  - `lights.html` → `src/lights/`：燈光互動網頁（五種光源、捲動切換、滑鼠控制、點擊換色）
+  - `drive.html` → `src/drive/`：開車逛小島（cannon-es 車輛物理、可撞物件、作品區域）
+  - `market.html` → `src/market/`：夜市燈光（霓虹、LED 燈條 + RectAreaLight、串燈、跑馬燈、控制台）
 - 詳見 `docs/Architecture/README.md`
 
 ## OpenSpec Progress
 
-- Current status: `add-cinema-seat-demo` 已完成驗證，待封存
+- Current status: `add-cinema-seat-demo`、`add-product-viewer`、`add-shop-diorama`、`add-web-particles`、`add-night-market-lights`、`add-web-lights`、`add-drive-world` 已完成驗證，待封存
 - Next step: 新功能先建立 proposal / design / tasks，實作完成後補 validation / engineering-evidence
 
 ## Open Questions (Fill as needed)
