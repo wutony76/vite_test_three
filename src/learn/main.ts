@@ -1,101 +1,70 @@
 import * as THREE from 'three';
-// FontLoader、TextGeometry 不在 three 核心裡，是附加功能（addons），要另外引入
-import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+// ── 渲染器：畫布大小 = 視窗大小，放進網頁 ──
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// ── 在貼圖上畫文字 ──
-// 做法：先在一張看不見的 Canvas 上用 2D 畫圖指令寫字，再把這張 Canvas 當成貼圖
-function createTextTexture(text: string) {
-  const canvas = document.createElement('canvas');
-  // 貼圖尺寸用 2 的次方（256、512、1024…），顯示卡處理起來最有效率
-  canvas.width = 512;
-  canvas.height = 512;
-  const ctx = canvas.getContext('2d')!;
+// ── 攝影機：從正上方往下看太陽系 ──
+const fov = 40;
+// 寬高比要跟畫布一致，不然畫面會被壓扁或拉長
+const aspect = window.innerWidth / window.innerHeight;
+const near = 0.1;
+const far = 1000;
+const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+camera.position.set(0, 50, 0);
+// 從正上方往下看時，「畫面的上方」要指定成 +z（預設的 +y 剛好是視線方向，會算不出朝向）
+camera.up.set(0, 0, 1);
+// ⚠️ lookAt 只在呼叫當下算一次朝向：之後再移動攝影機，它不會自動重新對準
+camera.lookAt(0, 0, 0);
 
-  // 背景：綠色
-  ctx.fillStyle = '#00c853';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+const scene = new THREE.Scene();
 
-  // 外框：讓方塊每一面的邊緣看得出來
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 16;
-  ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
-
-  // 文字：置中，分兩行（HAPPY / FAT）
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = 'bold 130px Arial, sans-serif';
-  const [line1, line2] = text.split(' ');
-  ctx.fillText(line1, canvas.width / 2, canvas.height / 2 - 75);
-  ctx.fillText(line2, canvas.width / 2, canvas.height / 2 + 75);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  // Canvas 畫的顏色是 sRGB，要告訴 Three.js，不然顏色會偏淡
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-const geometry = new THREE.BoxGeometry(1, 1, 1);
-// map：把貼圖貼到物體表面。BoxGeometry 的六個面都會貼上同一張圖
-const material = new THREE.MeshBasicMaterial({ map: createTextTexture('HAPPY FAT') });
-const cube = new THREE.Mesh(geometry, material);
-
-// 燈光：MeshPhongMaterial 會受光影響，沒有燈就是全黑
-scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-const light = new THREE.DirectionalLight(0xffffff, 2);
-light.position.set(3, 5, 5);
+// ── 光源：放在太陽中心，之後加入的地球、月亮會被它照亮 ──
+const color = 0xFFFFFF;
+const intensity = 500;
+const light = new THREE.PointLight(color, intensity);
 scene.add(light);
 
-const loader = new FontLoader();
-// 開頭的 / 代表 public/ 資料夾（字型檔在 public/fonts/）
-loader.load('/fonts/helvetiker_bold.typeface.json', function (font) {
+// ── 太陽 ──
+// 要一起旋轉的物體都放進這個陣列，animate 裡統一處理
+const objs: THREE.Object3D[] = [];
+const radius = 1;
+// 只切 6 段：低多邊形，看得出球在轉（改成 32、16 就是圓滑的球）
+const widthSegments = 6;
+const heightSegments = 6;
+const sphereGeometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+// emissive：自發光，不需要被照亮也是亮的（太陽本身就是光源）
+const sunMaterial = new THREE.MeshPhongMaterial({ emissive: 0xFFFF00 });
+const sunMesh = new THREE.Mesh(sphereGeometry, sunMaterial);
+sunMesh.scale.set(5, 5, 5); // 把太陽放大
 
-  // 尺寸要配合場景：方塊邊長 1、攝影機在 z = 5
-  // （官方範例的 size 200 是給攝影機在 z = 700 的大場景用的）
-  const textGeo = new TextGeometry('HAPPY.FAT.YOYO', {
-    font: font,
-    size: 0.6, // 字高
-    depth: 0.15, // 厚度
-    curveSegments: 12, // 曲線（例如 S、J 的弧）的細緻度
+const earthMaterial = new THREE.MeshPhongMaterial({ color: 0x2233FF, emissive: 0x112244 });
+const earthMesh = new THREE.Mesh(sphereGeometry, earthMaterial);
+earthMesh.position.x = 10;
 
-    // bevelThickness: 0.02, // 倒角深度
-    bevelThickness: 0.5, // 倒角深度
-    bevelSize: 0.01, // 倒角往外擴的大小
-    bevelEnabled: true
-  });
+scene.add(sunMesh);
+scene.add(earthMesh);
+objs.push(sunMesh);
+objs.push(earthMesh);
 
-  // 算出文字寬度，往左移一半 → 置中
-  textGeo.computeBoundingBox();
-  // ! 告訴 TypeScript：上一行剛算過，boundingBox 一定有值
-  const box = textGeo.boundingBox!;
-  const centerOffset = - 0.5 * (box.max.x - box.min.x);
 
-  const textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000, specular: 0xffffff });
 
-  const mesh = new THREE.Mesh(textGeo, textMaterial);
-  // 放在方塊上方
-  mesh.position.set(centerOffset, 1.2, 0);
-
-  scene.add(mesh);
+// ── 視窗縮放：更新攝影機比例與畫布大小 ──
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-
-
-
-scene.add(cube);
-camera.position.z = 5;
-renderer.setAnimationLoop(animate);
-
+// ── 動畫：放在最後，所有東西都建立好了才開始跑 ──
+// （如果在 camera、scene 建立之前就開始，animate 每秒會報錯 60 次）
 function animate(time: number) {
-  // console.log(time);
-  cube.rotation.x = time / 1000;
-  cube.rotation.y = time / 1000;
+  // time 是毫秒 → 換成秒，每秒轉 1 弧度（約 57°）
+  const seconds = time / 1000;
+  objs.forEach((obj) => {
+    obj.rotation.y = seconds;
+  });
   renderer.render(scene, camera);
 }
+renderer.setAnimationLoop(animate);
