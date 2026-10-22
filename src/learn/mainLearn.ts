@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 // 坦克的建立方式放在 tank.ts（同一個資料夾用 ./ 開頭）
 import { createTank } from './tank';
+// 砲彈系統
+import { Shells } from './shells';
 // 滑鼠控制視角：附加功能，要另外引入
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
@@ -109,7 +111,7 @@ controls.maxPolarAngle = Math.PI / 2;
 controls.update();
 
 // TANK
-const { tank, drive } = createTank();
+const { tank, drive, cannon } = createTank();
 // ── 影子 ③：戰車投射陰影 ──
 // traverse 會走過 tank 底下的每一個物件（車身、輪子、履帶板、砲塔、砲管…）
 // tank.ts 裡砲塔、砲管沒有設定 castShadow，這裡一次全部打開
@@ -122,16 +124,39 @@ scene.add(tank);
 const SPEED = 0.8;
 
 
-
-
 // ACTIONS
 const tankPosition = new THREE.Vector2();
 const tankTarget = new THREE.Vector2();
 // const trackPos = new THREE.Vector3();
 // const trackTangent = new THREE.Vector3();
 
+// ── 砲彈：按空白鍵發射 ──
+// 落地高度 = 地板的高度
+const shells = new Shells(scene, floorMesh.position.y);
+// 後座力：發射時砲管往後縮，再慢慢彈回原位
+const CANNON_REST_Z = cannon.position.z; // 砲管原本的位置
+let recoil = 0;
+
+window.addEventListener('keydown', (event) => {
+  if (event.code !== 'Space') return;
+  // 空白鍵預設會捲動網頁 → 擋掉
+  event.preventDefault();
+  if (shells.fire(cannon)) recoil = 0.5;
+});
+
+// 記錄上一幀的時間，用來算 dt（兩幀之間經過幾秒）
+let lastTime = 0;
+
 function animate(time: number) {
+  // dt：距離上一幀的秒數；切換分頁回來時可能很大 → 上限 0.1 秒，避免砲彈瞬間飛走
+  const dt = Math.min((time - lastTime) / 1000, 0.1);
+  lastTime = time;
+
   drive((time / 1000) * SPEED);
+  shells.update(dt);
+  // 後座力每秒恢復，砲管彈回原位
+  recoil = Math.max(0, recoil - dt * 2);
+  cannon.position.z = CANNON_REST_Z - recoil;
   // 開啟阻尼時，每一幀都要更新，慣性效果才會運作
   controls.update();
 
