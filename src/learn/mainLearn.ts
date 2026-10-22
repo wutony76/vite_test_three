@@ -7,6 +7,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
+// ── 影子 ①：渲染器總開關（預設關閉，因為陰影很吃效能）──
+renderer.shadowMap.enabled = true;
+// PCF：陰影邊緣稍微柔和，不會一格一格的
+renderer.shadowMap.type = THREE.PCFShadowMap;
 document.body.appendChild(renderer.domElement);
 
 
@@ -17,9 +21,36 @@ scene.background = new THREE.Color(0xDCE0E6);
 const light_color = 0xFFFFFF;
 const light_intensity = 3;
 const light = new THREE.DirectionalLight(light_color, light_intensity);
-light.position.set(0, 20, 10);
+// 影子會落在光的「反方向」：光從左前上方照 → 影子往右後方拉長
+// 攝影機在右前方 (7, 5, 5.5)，這樣影子剛好落在畫面看得到的一側，不會被戰車擋住
+// （原本 (0, 20, 10) 幾乎從正上方照，影子會縮在戰車正下方）
+light.position.set(-6, 14, 10);
+// ── 影子 ②：這盞燈會投射陰影（環境光沒有方向，不能產生陰影）──
+light.castShadow = true;
+// 平行光的陰影只在一個方形範圍內計算（預設約 ±5 公尺）
+// 戰車會沿著路徑在 x -10 ~ 10、z -5 ~ 10 之間移動 → 範圍要包住整條路
+light.shadow.camera.left = -15;
+light.shadow.camera.right = 15;
+light.shadow.camera.top = 15;
+light.shadow.camera.bottom = -15;
+light.shadow.camera.near = 1;
+light.shadow.camera.far = 50;
+// 陰影貼圖解析度：越大邊緣越清楚（但越吃效能）；範圍越大需要的解析度越高
+light.shadow.mapSize.set(2048, 2048);
+// 避免物體表面出現條紋狀的「自己遮自己」（shadow acne）
+light.shadow.bias = -0.0005;
+// 陰影邊緣的柔和程度：數字越大邊緣越模糊（像陰天、柔光箱的影子）
+// 只有 PCFShadowMap 有效；1 = 預設（很銳利），常用 3 ~ 8
+light.shadow.radius = 6;
+// 影子的透明度（濃淡）：0 = 完全看不到、1 = 最深（預設）
+// 只影響影子本身，不會讓整個場景變亮或變暗
+light.shadow.intensity = 0.6;
 scene.add(light);
-scene.add(new THREE.AmbientLight(light_color, 1));
+// 環境光：從四面八方均勻照亮，「連影子裡面也會被照亮」
+// 太亮（原本 1）影子會被沖淡看不出來 → 調暗一點，影子才明顯
+// 環境光：從四面八方均勻照亮，決定場景整體的基本亮度
+// （影子的濃淡改用上面的 light.shadow.intensity 控制，不用靠調暗環境光）
+scene.add(new THREE.AmbientLight(light_color, 0.6));
 console.log('scene', scene);
 
 // CAMERA
@@ -37,10 +68,15 @@ camera.lookAt(0, 1, 0);
 
 //  floor
 const floorGeometry = new THREE.PlaneGeometry(100, 100);
-const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
+// MeshBasicMaterial 不受光影響、也接收不到陰影 → 改用會受光影響的 MeshPhongMaterial
+const floorMaterial = new THREE.MeshPhongMaterial({ color: 0x888888 });
 const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
-floorMesh.position.y = -0.5;
+// 履帶最底部在 y ≈ -0.13（輪子下緣 0 - 履帶間隙 0.08 - 履帶板一半厚度 0.05）
+// 地板放在這裡，戰車才是「壓在地上」；原本 -0.5 會讓戰車浮空，影子會和戰車分開
+floorMesh.position.y = -0.13;
 floorMesh.rotation.x = -Math.PI / 2;
+// ── 影子 ④：地板接收陰影 ──
+floorMesh.receiveShadow = true;
 scene.add(floorMesh);
 
 
@@ -73,7 +109,13 @@ controls.maxPolarAngle = Math.PI / 2;
 controls.update();
 
 // TANK
-const { tank, drive, turret } = createTank();
+const { tank, drive } = createTank();
+// ── 影子 ③：戰車投射陰影 ──
+// traverse 會走過 tank 底下的每一個物件（車身、輪子、履帶板、砲塔、砲管…）
+// tank.ts 裡砲塔、砲管沒有設定 castShadow，這裡一次全部打開
+tank.traverse((child) => {
+  child.castShadow = true;
+});
 scene.add(tank);
 
 // 每秒前進幾公尺（輪子和履帶都會依這個速度一起動）
