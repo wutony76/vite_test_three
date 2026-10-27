@@ -15,6 +15,7 @@ export default defineConfig({
         lights: 'lights.html',
         market: 'market.html',
         drive: 'drive.html',
+        world: 'world.html',
       },
     },
   },

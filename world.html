@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WORLD</title>
+    <style>
+      /* 清掉瀏覽器預設的 body margin（約 8px），少了它 canvas 周圍會有白邊、還會撐出捲軸 */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        /* 隱藏捲軸：全螢幕 3D 場景不需要捲動，canvas 若剛好等於視窗大小，小數像素誤差也可能冒出捲軸 */
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <!-- <script type="module" src="/src/learn/main.ts"></script> -->
+    <script type="module" src="/src/world/main.ts"></script>
+  </body>
+</html>
