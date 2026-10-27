@@ -1,6 +1,9 @@
 
 varying vec2 vUv;
 
+// 由 JavaScript 每幀傳入，單位是秒
+uniform float uTime;
+
  float hash(vec2 p) {
     return fract(
       sin(dot(p, vec2(127.1, 311.7))) * 43758.5453
@@ -47,7 +50,8 @@ void main() {
   }
 
   // 產生不規則數值。noise 回傳 0~1，減 0.5 後有的像素變亮、有的變暗
-  float n = noise(vUv * 5.0);
+  // 加上 uTime 讓取樣位置跟著時間移動，噪聲才會流動
+  float n = noise(vUv * 5.0 + vec2(uTime * 0.15, uTime * 0.05));
    //color += (n - 0.5) * 0.35;
    color += (n - 0.5) * 0.35;
 

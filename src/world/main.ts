@@ -40,6 +40,9 @@ const backgroundCamera = new THREE.OrthographicCamera(
 backgroundCamera.position.z = 1;
 const backgroundGeometry = new THREE.PlaneGeometry(2, 2);
 const backgroundMaterial = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+  },
   vertexShader: gradientVertexShader,
   fragmentShader: gradientFragmentShader,
   depthTest: false,
@@ -54,7 +57,9 @@ backgroundScene.add(backgroundMesh);
 
 
 
-function render(_time: number) {
+function render(time: number) {
+  // setAnimationLoop 給的 time 是毫秒，shader 裡用秒比較好讀
+  backgroundMaterial.uniforms.uTime.value = time * 0.001;
   // autoClear 關掉後要自己在每幀開頭清一次，否則上一幀的殘影會疊上來
   renderer.clear();
   renderer.render(backgroundScene, backgroundCamera);
