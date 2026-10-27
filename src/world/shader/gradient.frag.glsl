@@ -52,12 +52,10 @@ void main() {
   // 產生不規則數值。noise 回傳 0~1，減 0.5 後有的像素變亮、有的變暗
   // 加上 uTime 讓取樣位置跟著時間移動，噪聲才會流動
   float n = noise(vUv * 5.0 + vec2(uTime * 0.15, uTime * 0.05));
-   //color += (n - 0.5) * 0.35;
    color += (n - 0.5) * 0.35;
 
   // 用噪聲擾動原本的漸層
   // float t = vUv.y + (n - 0.5) * 0.5;
-
   // 混合兩種顏色
   // color = mix(topColor, middleColor, smoothstep(0.2, 0.8, t));
 
