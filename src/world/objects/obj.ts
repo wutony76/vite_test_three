@@ -51,7 +51,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
 
 // 綠色球：用來觀察燈光效果
 function createBall() {
-  const geometry = new THREE.SphereGeometry(1, 32, 32);
+  const geometry = new THREE.SphereGeometry(1, 16, 16);
   const material = new THREE.MeshPhongMaterial({
     // 光的顏色會跟材質顏色「相乘」：純綠 0x00ff00 的紅、藍都是 0，
     // 打黃光、紫光上去都只剩綠色（或全黑），所以這裡刻意混一點紅、藍，
