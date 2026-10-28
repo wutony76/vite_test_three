@@ -29,11 +29,26 @@ const scene = new THREE.Scene();
 
 
 // CAMERA
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+// 第一個參數是 FOV（垂直視角，單位度）：數字越小越像望遠鏡頭，物體在畫面上越大
+// 75 偏廣角，球顯得小、邊緣還會被拉長變形；改 20 像望遠鏡頭，不用移動鏡頭就能讓球放大到塞滿畫面
+const camera = new THREE.PerspectiveCamera(20, window.innerWidth / window.innerHeight, 0.1, 1000);
 // 從球的上方偏側邊往下看：上半部吃黃色主光、下緣露出紫色補光
 // 數值是用 OrbitControls 轉到滿意角度後，從 console 印出來抄回來的
 camera.position.set(1.85, 4.06, -0.56);
 camera.lookAt(0, 0, 0);
+
+// 平移畫面：把取景框往上挪，畫面內容整體就往下移，不改鏡頭角度和透視
+// 和移動 controls.target 不同，OrbitControls 旋轉時球還是繞著球心轉
+// 0.5 = 往下移 50% 的畫面高度，越大球越往下
+const VIEW_SHIFT_Y = 0.5;
+function applyViewOffset() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  // 參數：完整畫面寬高、取景框的 x / y 偏移、取景框寬高
+  // y 偏移給負數 = 取景框往上 → 內容往下
+  camera.setViewOffset(w, h, 0, -h * VIEW_SHIFT_Y, w, h);
+}
+applyViewOffset();
 
 
 // WORLD...SHADER.RENDER
@@ -122,6 +137,8 @@ renderer.setAnimationLoop(render);
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
+  // 偏移量是用像素算的，視窗尺寸變了要重算，否則下移的比例會跑掉
+  // setViewOffset 內部會自己呼叫 updateProjectionMatrix
+  applyViewOffset();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
