@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // 有些模型會用 meshopt 壓縮幾何資料，少了解碼器就讀不出來；沒壓縮的模型掛著也不影響
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { createKetchup } from './ketchup';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -15,7 +16,12 @@ const USE_MODEL = false;
 // 模型縮放後「最長邊」的長度：2 = 跟原本半徑 1 的球一樣大，鏡頭和燈光都不用重調
 const MODEL_SIZE = 2;
 
-export function createObjs() {
+type CreateObjsOptions = {
+  // 環境貼圖：給番茄醬這類光滑材質反射用
+  envMap: THREE.Texture;
+};
+
+export function createObjs({ envMap }: CreateObjsOptions) {
   const all = new THREE.Object3D();
 
   if (USE_MODEL) {
@@ -24,7 +30,16 @@ export function createObjs() {
     all.add(createBall());
   }
 
-  return { all };
+  // 番茄醬緞帶：繞著中間的物件流動
+  const ketchup = createKetchup(envMap);
+  all.add(ketchup.object);
+
+  /** 每幀呼叫：time 單位是秒，讓會動的物件更新動畫 */
+  function update(time: number) {
+    ketchup.update(time);
+  }
+
+  return { all, update };
 }
 
 // 綠色球：用來觀察燈光效果

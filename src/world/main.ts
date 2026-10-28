@@ -5,6 +5,8 @@ import gradientVertexShader from './shader/gradient.vert.glsl?raw';
 import gradientFragmentShader from './shader/gradient.frag.glsl?raw';
 
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+// RoomEnvironment：three.js 內建的「虛擬攝影棚」，拿來當反射用的環境，不用另外下載 HDR 圖
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createObjs } from './objects/obj';
 
 // RENDERER
@@ -24,6 +26,28 @@ document.body.appendChild(renderer.domElement);
 
 // SCENE
 const scene = new THREE.Scene();
+
+// 環境貼圖：給光滑的材質「有東西可以反射」
+// 番茄醬用了 clearcoat（清漆層），越側面越像鏡子；少了環境，鏡子照到一片虛空 → 邊緣和凹折處變成死黑
+// PMREMGenerator 把環境預先處理成不同粗糙度的模糊版本，粗糙的表面才會反射出柔和的光
+// 為什麼不用 scene.environment？它會套用到場景裡「所有」材質，連綠球（Phong）都會被照亮一大截，
+// 所以只產生貼圖，交給需要的物件自己掛上
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+// RoomEnvironment 是中性的灰白色攝影棚，醬汁的側面反射出灰白，跟粉紅、紫色背景混在一起會看起來灰綠
+// 所以把攝影棚裡每個物件的顏色乘上紅色：反射出來的就是紅色，暗部才會像醬汁
+// 反射會蓋滿整條醬汁、決定整體色調，所以這裡維持紅色；想要的橙色交給 ketchup.ts 的 emissive，只在暗部透出來
+const ENV_TINT = new THREE.Color(0x9a2010);
+const roomEnvironment = new RoomEnvironment();
+roomEnvironment.traverse((object) => {
+  const mesh = object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial | THREE.MeshStandardMaterial>;
+  if (!mesh.isMesh) return;
+  // 攝影棚裡的物件共用材質，先 clone 再改色，避免改到別的地方
+  mesh.material = mesh.material.clone();
+  mesh.material.color.multiply(ENV_TINT);
+  // 攝影棚的「燈」是靠 emissive 發光的面板，也要一起染色，不然反射裡還是會有白光
+  if ('emissive' in mesh.material) mesh.material.emissive.multiply(ENV_TINT);
+});
+const envMap = pmremGenerator.fromScene(roomEnvironment, 0.04).texture;
 // scene.background = new THREE.Color(0xDCE0E6);
 // scene.background = new THREE.Color(0xff00ff);
 
@@ -41,6 +65,7 @@ camera.lookAt(0, 0, 0);
 // 和移動 controls.target 不同，OrbitControls 旋轉時球還是繞著球心轉
 // 0.5 = 往下移 50% 的畫面高度，越大球越往下
 const VIEW_SHIFT_Y = 0.5;
+// const VIEW_SHIFT_Y = 0.5;
 function applyViewOffset() {
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -95,7 +120,7 @@ scene.add(hemisphereLight);
 
 
 // WORLD...OBJECTS
-const { all } = createObjs();
+const { all, update: updateObjs } = createObjs({ envMap });
 scene.add(all);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -123,6 +148,8 @@ controls.addEventListener('end', () => {
 function render(time: number) {
   // setAnimationLoop 給的 time 是毫秒，shader 裡用秒比較好讀
   backgroundMaterial.uniforms.uTime.value = time * 0.001;
+  // 番茄醬等會動的物件
+  updateObjs(time * 0.001);
   // enableDamping 開啟時每幀都要 update，否則放開滑鼠後不會有慣性滑動
   controls.update();
   // autoClear 關掉後要自己在每幀開頭清一次，否則上一幀的殘影會疊上來
