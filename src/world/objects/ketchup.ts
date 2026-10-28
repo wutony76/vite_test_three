@@ -118,7 +118,8 @@ function createKetchupMaterial(envMap: THREE.Texture) {
 function createTubeGeometry(curve: KetchupCurve) {
   // 參數：路徑、沿路徑切幾段、管子半徑、管子圓周切幾段、頭尾是否接起來
   // 段數切細一點，下面 shader 推動頂點時表面才會平滑，不會一格一格
-  const geometry = new THREE.TubeGeometry(curve, 400, TUBE_RADIUS, 24, true);
+  // const geometry = new THREE.TubeGeometry(curve, 400, TUBE_RADIUS, 24, true);
+  const geometry = new THREE.TubeGeometry(curve, 25, TUBE_RADIUS, 8, true);
 
   // aProgress：每個頂點在管子上走到哪裡（0 ~ 1），shader 用它算「哪一段該鼓起來」
   // TubeGeometry 的 uv.x 剛好就是沿管子的進度，複製一份成自訂屬性
