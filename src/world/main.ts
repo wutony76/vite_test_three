@@ -163,25 +163,30 @@ gui.add(ring, 'offsetZ', -2, 2, 0.01).name('位置 Z RING_OFFSET_Z').onChange(ke
 
 // 直接在畫面上拖曳緞帶：沿著跟螢幕平行的平面移動
 // 拖曳時把新位置寫回 ring，面板上的數字才會跟著變，放開時一樣印 console
-enableViewPlaneDrag({
-  target: ketchupRing.object,
-  pickable: ketchupRing.object,
-  camera,
-  domElement: renderer.domElement,
-  controls,
-  onDrag: () => {
-    // 取到小數第 2 位再套回去：面板、畫面、console 印出來的數字才會完全一致
-    const round = (value: number) => Math.round(value * 100) / 100;
-    const { x, y, z } = ketchupRing.object.position;
-    ring.offsetX = round(x);
-    ring.offsetY = round(y);
-    ring.offsetZ = round(z);
-    ketchupRing.apply();
-    // 數值是程式改的、不是在面板上改的，面板不會自己重畫，要手動叫它更新顯示
-    gui.controllersRecursive().forEach((controller) => controller.updateDisplay());
-  },
-  onDragEnd: logKetchupRing,
-});
+// 開關：false = 關閉，滑鼠只會旋轉鏡頭；之後要再調位置改成 true 就好
+const KETCHUP_DRAG_ENABLED = true;
+
+if (KETCHUP_DRAG_ENABLED) {
+  enableViewPlaneDrag({
+    target: ketchupRing.object,
+    pickable: ketchupRing.object,
+    camera,
+    domElement: renderer.domElement,
+    controls,
+    onDrag: () => {
+      // 取到小數第 2 位再套回去：面板、畫面、console 印出來的數字才會完全一致
+      const round = (value: number) => Math.round(value * 100) / 100;
+      const { x, y, z } = ketchupRing.object.position;
+      ring.offsetX = round(x);
+      ring.offsetY = round(y);
+      ring.offsetZ = round(z);
+      ketchupRing.apply();
+      // 數值是程式改的、不是在面板上改的，面板不會自己重畫，要手動叫它更新顯示
+      gui.controllersRecursive().forEach((controller) => controller.updateDisplay());
+    },
+    onDragEnd: logKetchupRing,
+  });
+}
 
 function logKetchupRing() {
   console.log(

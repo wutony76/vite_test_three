@@ -8,13 +8,20 @@ const ORBIT_RADIUS = 0.96;
 // 管子粗細（半徑）
 const TUBE_RADIUS = 0.12;
 // 上下起伏的「最大」高度：隨機起伏再怎麼疊加都不會超過這個值
-const WAVE_HEIGHT = 0.15;
+// const WAVE_HEIGHT = 0.03;
+const WAVE_HEIGHT = 0;
 // 隨機種子：換一個數字就會得到一條不同的起伏曲線；同一個數字每次重新整理都長一樣
 const WAVE_SEED = 7;
 // 整條緞帶繞球自轉的速度（弧度 / 秒）
 const SPIN_SPEED = 0.15;
 // 醬汁表面流動、蠕動的速度倍率：1 = 原速，0.5 = 慢一半，0 = 完全靜止
 const FLOW_SPEED = 0.5;
+// 醬汁表面浮動的幅度（沿表面往外推多少）：
+// BLOB_AMOUNT   = 一團一團往前流的鼓包，越大鼓得越明顯
+// WOBBLE_AMOUNT = 表面細微的蠕動
+// 兩個加起來不要超過管子半徑的一半，不然最細處會凹到快斷掉
+const BLOB_AMOUNT = 0.03;
+const WOBBLE_AMOUNT = 0.012;
 // 環境反射強度（見材質的 envMapIntensity）
 const ENV_INTENSITY = 0.4;
 // 緞帶整圈的擺放角度：
@@ -22,7 +29,7 @@ const ENV_INTENSITY = 0.4;
 // RING_YAW  = 翻起來之後，整圈面向哪個方位（繞 y 軸轉）
 // 用「度」來寫比較直覺：數值可以直接從控制面板抄過來
 const RING_TILT = THREE.MathUtils.degToRad(131);
-const RING_YAW = THREE.MathUtils.degToRad(108);
+const RING_YAW = THREE.MathUtils.degToRad(107);
 // 整圈的位置（世界座標）：三個都是 0 = 圈圈中心對準球心
 // 可以在畫面上直接拖曳緞帶來調整（見 main.ts 的 enableViewPlaneDrag）
 const RING_OFFSET_X = -0.44;
@@ -184,7 +191,7 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
                      * sin(position.z * 7.0 + uTime * 2.1);
         // 沿法線（管子表面朝外的方向）推動：正值變粗、負值變細
         // 管子半徑 ${TUBE_RADIUS}，推動量控制在半徑的一半以內，才不會細到斷掉
-        transformed += objectNormal * (blob * 0.05 + wobble * 0.02);`,
+        transformed += objectNormal * (blob * ${BLOB_AMOUNT.toFixed(4)} + wobble * ${WOBBLE_AMOUNT.toFixed(4)});`,
       );
   };
 
