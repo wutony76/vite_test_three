@@ -19,9 +19,11 @@ const MODEL_SIZE = 2;
 type CreateObjsOptions = {
   // 環境貼圖：給番茄醬這類光滑材質反射用
   envMap: THREE.Texture;
+  // 攝影機：噴濺要知道「畫面上方」在哪個方向
+  camera: THREE.Camera;
 };
 
-export function createObjs({ envMap }: CreateObjsOptions) {
+export function createObjs({ envMap, camera }: CreateObjsOptions) {
   const all = new THREE.Object3D();
 
   if (USE_MODEL) {
@@ -31,7 +33,7 @@ export function createObjs({ envMap }: CreateObjsOptions) {
   }
 
   // 番茄醬緞帶：繞著中間的物件流動
-  const ketchup = createKetchup(envMap);
+  const ketchup = createKetchup({ envMap, camera });
   all.add(ketchup.object);
 
   /** 每幀呼叫：time 單位是秒，讓會動的物件更新動畫 */
@@ -39,7 +41,12 @@ export function createObjs({ envMap }: CreateObjsOptions) {
     ketchup.update(time);
   }
 
-  return { all, update };
+  // 緞帶擺放參數也往外交出去，讓 main.ts 的控制面板可以調整
+  return {
+    all,
+    update,
+    ketchupRing: { object: ketchup.ringObject, settings: ketchup.ringSettings, apply: ketchup.applyRingSettings },
+  };
 }
 
 // 綠色球：用來觀察燈光效果

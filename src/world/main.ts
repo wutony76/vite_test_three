@@ -8,6 +8,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // RoomEnvironment：three.js 內建的「虛擬攝影棚」，拿來當反射用的環境，不用另外下載 HDR 圖
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createObjs } from './objects/obj';
+// lil-gui：three.js 內建的小型控制面板，拖拉滑桿就能即時調整數值，不用改程式碼重新整理
+import GUI from 'three/addons/libs/lil-gui.module.min.js';
+import { enableViewPlaneDrag } from './debug/viewPlaneDrag';
 
 // RENDERER
 /**
@@ -55,7 +58,7 @@ const envMap = pmremGenerator.fromScene(roomEnvironment, 0.04).texture;
 // CAMERA
 // 第一個參數是 FOV（垂直視角，單位度）：數字越小越像望遠鏡頭，物體在畫面上越大
 // 75 偏廣角，球顯得小、邊緣還會被拉長變形；改 20 像望遠鏡頭，不用移動鏡頭就能讓球放大到塞滿畫面
-const camera = new THREE.PerspectiveCamera(20, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(14.5, window.innerWidth / window.innerHeight, 0.1, 1000);
 // 從球的上方偏側邊往下看：上半部吃黃色主光、下緣露出紫色補光
 // 數值是用 OrbitControls 轉到滿意角度後，從 console 印出來抄回來的
 camera.position.set(1.85, 4.06, -0.56);
@@ -64,7 +67,7 @@ camera.lookAt(0, 0, 0);
 // 平移畫面：把取景框往上挪，畫面內容整體就往下移，不改鏡頭角度和透視
 // 和移動 controls.target 不同，OrbitControls 旋轉時球還是繞著球心轉
 // 0.5 = 往下移 50% 的畫面高度，越大球越往下
-const VIEW_SHIFT_Y = 0.5;
+const VIEW_SHIFT_Y = 0.9;
 // const VIEW_SHIFT_Y = 0.5;
 function applyViewOffset() {
   const w = window.innerWidth;
@@ -120,7 +123,7 @@ scene.add(hemisphereLight);
 
 
 // WORLD...OBJECTS
-const { all, update: updateObjs } = createObjs({ envMap });
+const { all, update: updateObjs, ketchupRing } = createObjs({ envMap, camera });
 scene.add(all);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -143,6 +146,53 @@ controls.addEventListener('end', () => {
     `controls.target.set(${t.x.toFixed(2)}, ${t.y.toFixed(2)}, ${t.z.toFixed(2)});`
   );
 });
+
+
+// DEBUG...番茄醬緞帶的控制面板
+// 調整到滿意後，把 console 印出來的那幾行貼回 ketchup.ts 最上面的常數
+const gui = new GUI({ title: '番茄醬緞帶' });
+const ring = ketchupRing.settings;
+// onChange：拖拉中每一格都即時套用，馬上看到效果
+// onFinishChange：放開滑鼠才印 console，拖拉過程不會洗版
+gui.add(ring, 'radius', 0.8, 2, 0.01).name('半徑 ORBIT_RADIUS').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+gui.add(ring, 'tiltDegrees', -180, 180, 1).name('傾斜 RING_TILT (°)').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+gui.add(ring, 'yawDegrees', -180, 180, 1).name('方位 RING_YAW (°)').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+gui.add(ring, 'offsetX', -2, 2, 0.01).name('位置 X RING_OFFSET_X').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+gui.add(ring, 'offsetY', -2, 2, 0.01).name('高度 RING_OFFSET_Y').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+gui.add(ring, 'offsetZ', -2, 2, 0.01).name('位置 Z RING_OFFSET_Z').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+
+// 直接在畫面上拖曳緞帶：沿著跟螢幕平行的平面移動
+// 拖曳時把新位置寫回 ring，面板上的數字才會跟著變，放開時一樣印 console
+enableViewPlaneDrag({
+  target: ketchupRing.object,
+  pickable: ketchupRing.object,
+  camera,
+  domElement: renderer.domElement,
+  controls,
+  onDrag: () => {
+    // 取到小數第 2 位再套回去：面板、畫面、console 印出來的數字才會完全一致
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const { x, y, z } = ketchupRing.object.position;
+    ring.offsetX = round(x);
+    ring.offsetY = round(y);
+    ring.offsetZ = round(z);
+    ketchupRing.apply();
+    // 數值是程式改的、不是在面板上改的，面板不會自己重畫，要手動叫它更新顯示
+    gui.controllersRecursive().forEach((controller) => controller.updateDisplay());
+  },
+  onDragEnd: logKetchupRing,
+});
+
+function logKetchupRing() {
+  console.log(
+    `const ORBIT_RADIUS = ${ring.radius.toFixed(2)};\n` +
+    `const RING_TILT = THREE.MathUtils.degToRad(${ring.tiltDegrees});\n` +
+    `const RING_YAW = THREE.MathUtils.degToRad(${ring.yawDegrees});\n` +
+    `const RING_OFFSET_X = ${ring.offsetX.toFixed(2)};\n` +
+    `const RING_OFFSET_Y = ${ring.offsetY.toFixed(2)};\n` +
+    `const RING_OFFSET_Z = ${ring.offsetZ.toFixed(2)};`
+  );
+}
 
 
 function render(time: number) {
