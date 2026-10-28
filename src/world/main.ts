@@ -126,6 +126,25 @@ scene.add(hemisphereLight);
 const { all, update: updateObjs, ketchupRing } = createObjs({ envMap, camera });
 scene.add(all);
 
+// 讓鏡頭沿著番茄醬流動的方向轉：把旋轉軸換成「緞帶圈圈的中心軸」
+// OrbitControls 是繞著 camera.up 轉的（預設是世界的 +Y，也就是正上方）
+// 緞帶整圈被翻起來、轉了方位，醬汁是繞著緞帶自己的軸在流，不是繞世界的 +Y
+// 少了這段，鏡頭從上往下看時，左右拖動會變成整個畫面原地打轉，看起來像座標系歪掉
+// 注意：OrbitControls 只在「建立時」讀一次 camera.up，所以一定要在 new OrbitControls 之前設定
+const ORBIT_ALONG_KETCHUP = true;
+
+if (ORBIT_ALONG_KETCHUP) {
+  const ringObject = ketchupRing.object;
+  ringObject.updateMatrixWorld(true);
+  // 緞帶是繞著自己的 y 軸自轉（流動），把這個軸換算成世界座標
+  const ringAxis = new THREE.Vector3(0, 1, 0).applyQuaternion(ringObject.getWorldQuaternion(new THREE.Quaternion()));
+  // 同一條軸有兩個方向，挑「偏向上方」的那個；選到朝下的，畫面會上下顛倒
+  if (ringAxis.y < 0) ringAxis.negate();
+  camera.up.copy(ringAxis);
+  // up 變了要重新 lookAt，畫面的「上」才會跟著新的軸
+  camera.lookAt(0, 0, 0);
+}
+
 const controls = new OrbitControls(camera, renderer.domElement);
 // 旋轉中心對準球心，球才會固定在畫面正中間
 controls.target.set(0, 0, 0);
@@ -135,6 +154,22 @@ controls.minDistance = 4;
 controls.maxDistance = 100;
 // controls.maxPolarAngle = Math.PI / 2;
 controls.update();
+
+// 鎖住目前的畫面：拖動時只能左右繞著球轉，俯視的高度、距離、中心點都固定
+// 想恢復自由轉動（例如要重新找角度），改成 false
+const LOCK_CAMERA_VIEW = true;
+
+if (LOCK_CAMERA_VIEW) {
+  // 極角（polar angle）= 攝影機和正上方的夾角，決定「從多高往下看」
+  // 把最小、最大都設成目前的值 → 上下拖動沒有空間可以轉，只剩左右（方位角）能轉
+  const currentPolarAngle = controls.getPolarAngle();
+  controls.minPolarAngle = currentPolarAngle;
+  controls.maxPolarAngle = currentPolarAngle;
+  // 關掉滾輪縮放：距離固定，球在畫面上的大小不會變
+  controls.enableZoom = false;
+  // 關掉右鍵平移：旋轉中心固定在球心，構圖不會被拖歪
+  controls.enablePan = false;
+}
 
 // 放開滑鼠（旋轉、縮放、平移結束）時印出鏡頭位置，方便把喜歡的角度抄回程式碼
 // 用 'end' 而不是 'change'：change 拖曳中每幀都會觸發，console 會被洗版
@@ -164,7 +199,7 @@ gui.add(ring, 'offsetZ', -2, 2, 0.01).name('位置 Z RING_OFFSET_Z').onChange(ke
 // 直接在畫面上拖曳緞帶：沿著跟螢幕平行的平面移動
 // 拖曳時把新位置寫回 ring，面板上的數字才會跟著變，放開時一樣印 console
 // 開關：false = 關閉，滑鼠只會旋轉鏡頭；之後要再調位置改成 true 就好
-const KETCHUP_DRAG_ENABLED = true;
+const KETCHUP_DRAG_ENABLED = false;
 
 if (KETCHUP_DRAG_ENABLED) {
   enableViewPlaneDrag({
