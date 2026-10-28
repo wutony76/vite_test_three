@@ -102,8 +102,8 @@ class KetchupCurve extends THREE.Curve<THREE.Vector3> {
  */
 function createKetchupMaterial(envMap: THREE.Texture) {
   return new THREE.MeshPhysicalMaterial({
-    // color: 0xe83055,
     color: 0xe83055,
+    // color: 0xfffb8f,
     // 粗糙度低 = 表面滑順、高光集中，像濕潤的醬汁
     roughness: 0.15,
     // 清漆層：在表面再疊一層透明的亮面，醬汁「油亮」的感覺主要靠它
