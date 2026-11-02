@@ -11,23 +11,31 @@ import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // 為什麼不用 viewPlaneDrag？那個是在「跟螢幕平行的平面」上移動，
 // 拿來拖房子會離開球面、飄在空中或陷進地裡；這裡要的是貼著球面走
 
+export type SurfaceDragTarget = {
+  // 可以「被點到」的物件（例如某一棟房子）
+  object: THREE.Object3D;
+  // 按下時物件目前的地表法線（ground 座標系的單位向量）
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
 type SurfaceDragOptions = {
-  // 可以「被點到」的物件（例如房子）
-  pickable: THREE.Object3D;
+  // 畫面上每一棟都能點、能拖；點到哪一棟，後續的拖曳就移動那一棟
+  targets: SurfaceDragTarget[];
   // 地表：球心在它的原點，算出來的法線也是它的座標系
   ground: THREE.Object3D;
   groundRadius: number;
-  // 按下時物件目前的地表法線（ground 座標系的單位向量）
-  getNormal: () => THREE.Vector3;
   camera: THREE.Camera;
   domElement: HTMLElement;
   // 拖曳時要暫停 OrbitControls，不然拖物件的同時畫面也會跟著轉
   controls: OrbitControls;
-  onDrag: (normal: THREE.Vector3) => void;
-  onDragEnd?: () => void;
+  // 按下的當下就通知，讓控制面板先切到這一棟，不必等放開
+  onDragStart?: (target: SurfaceDragTarget) => void;
+  onDrag: (normal: THREE.Vector3, target: SurfaceDragTarget) => void;
+  onDragEnd?: (target: SurfaceDragTarget) => void;
 };
 
-export function enableSurfaceDrag({ pickable, ground, groundRadius, getNormal, camera, domElement, controls, onDrag, onDragEnd }: SurfaceDragOptions) {
+export function enableSurfaceDrag({ targets, ground, groundRadius, camera, domElement, controls, onDragStart, onDrag, onDragEnd }: SurfaceDragOptions) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   // 射線換到 ground 的座標系：球心就是原點，算球面交點比較單純
@@ -39,7 +47,8 @@ export function enableSurfaceDrag({ pickable, ground, groundRadius, getNormal, c
   // 按下時「滑鼠所在的地表點」→「物件所在的地表點」的旋轉
   // 拖曳時一直套用它，物件才不會「跳」到滑鼠正下方，而是維持按下時的相對位置
   const grabOffset = new THREE.Quaternion();
-  let dragging = false;
+  // 這次按下點到的那一棟；null = 目前沒在拖
+  let active: SurfaceDragTarget | null = null;
 
   /** 把滑鼠的像素座標換成 -1 ~ 1 的標準化座標，射線要用這種座標 */
   function updatePointer(event: PointerEvent) {
@@ -60,19 +69,31 @@ export function enableSurfaceDrag({ pickable, ground, groundRadius, getNormal, c
     return target.normalize();
   }
 
-  function isOverTarget() {
-    return raycaster.intersectObject(pickable, true).length > 0;
+  /** 射線由近到遠，第一個屬於 targets 的物件就是滑鼠底下的那一棟 */
+  function findTarget() {
+    const hits = raycaster.intersectObjects(targets.map((target) => target.object), true);
+    for (const hit of hits) {
+      let node: THREE.Object3D | null = hit.object;
+      while (node) {
+        const found = targets.find((target) => target.object === node);
+        if (found) return found;
+        node = node.parent;
+      }
+    }
+    return null;
   }
 
   function onPointerDown(event: PointerEvent) {
     if (event.button !== 0) return;
     updatePointer(event);
-    if (!isOverTarget()) return;
+    const target = findTarget();
+    if (!target) return;
 
     getPointerNormal(pointerNormal);
-    grabOffset.setFromUnitVectors(pointerNormal, getNormal());
+    grabOffset.setFromUnitVectors(pointerNormal, target.getNormal());
 
-    dragging = true;
+    active = target;
+    onDragStart?.(target);
     controls.enabled = false;
     // 指標捕捉：拖到畫面外、或滑過其他元素，放開時還是會收到 pointerup
     domElement.setPointerCapture(event.pointerId);
@@ -81,22 +102,23 @@ export function enableSurfaceDrag({ pickable, ground, groundRadius, getNormal, c
 
   function onPointerMove(event: PointerEvent) {
     updatePointer(event);
-    if (!dragging) {
+    if (!active) {
       // 沒在拖曳時，滑過物件就把游標變成手掌，提示「這個可以拖」
-      domElement.style.cursor = isOverTarget() ? 'grab' : '';
+      domElement.style.cursor = findTarget() ? 'grab' : '';
       return;
     }
     getPointerNormal(pointerNormal);
-    onDrag(newNormal.copy(pointerNormal).applyQuaternion(grabOffset));
+    onDrag(newNormal.copy(pointerNormal).applyQuaternion(grabOffset), active);
   }
 
   function onPointerUp(event: PointerEvent) {
-    if (!dragging) return;
-    dragging = false;
+    if (!active) return;
+    const target = active;
+    active = null;
     controls.enabled = true;
     domElement.releasePointerCapture(event.pointerId);
     domElement.style.cursor = '';
-    onDragEnd?.();
+    onDragEnd?.(target);
   }
 
   // capture: true → 比 OrbitControls 先收到按下事件

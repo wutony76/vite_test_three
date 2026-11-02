@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // 有些模型會用 meshopt 壓縮幾何資料，少了解碼器就讀不出來；沒壓縮的模型掛著也不影響
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { createKetchup } from './ketchup';
-import { createHouse } from './house';
+import { createHouse, type HouseSettings } from './house';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -47,8 +47,76 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   // 房子：house.ts 裡的長方體，種在綠球（地表）上
   // 要用緞帶的軸來決定種在哪，所以放在緞帶建立之後
   // 加成綠球的「子物件」而不是 all 的：兩者綁成一體，之後綠球怎麼移動、旋轉，房子都會跟著走
-  const house = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
-  ground.add(house.object);
+  const mainHall = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
+  ground.add(mainHall.object);
+
+  // Rroject
+  const projectRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
+  // 第二棟用面板調過的數值，跟第一棟分開，不改 house.ts 的預設
+  Object.assign(projectRoom.settings, {
+    angleFromTopDegrees: 10,
+    azimuthDegrees: 88,
+    spinDegrees: 89,
+    sink: 0.035,
+    scale: 0.17,
+    width: 0.9,
+    height: 1.3,
+    depth: 1.1,
+    color: '#eab380',
+  });
+  projectRoom.applySettings();
+  ground.add(projectRoom.object);
+
+  // BG
+  const bgRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
+  Object.assign(bgRoom.settings, {
+    angleFromTopDegrees: 34,
+    azimuthDegrees: -84,
+    spinDegrees: 84,
+    sink: 0.02,
+    scale: 0.11,
+    width: 1.3,
+    height: 0.6,
+    depth: 1.1,
+    color: '#1cab5a',
+  });
+  bgRoom.applySettings();
+  ground.add(bgRoom.object);
+
+  // TW
+  const twRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
+  Object.assign(twRoom.settings, {
+    angleFromTopDegrees: 26,
+    azimuthDegrees: -80,
+    spinDegrees: 29,
+    sink: 0.03,
+    scale: 0.17,
+    width: 0.8,
+    height: 0.8,
+    depth: 0.8,
+    color: '#8280ea',
+  });
+  twRoom.applySettings();
+  ground.add(twRoom.object);
+
+
+  const Gamehall = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
+  Object.assign(Gamehall.settings, {
+    angleFromTopDegrees: 38,
+    azimuthDegrees: 49,
+    spinDegrees: 74,
+    sink: 0.03,
+    scale: 0.17,
+    width: 1.3,
+    height: 0.7,
+    depth: 1.3,
+    color: '#9fe571',
+  });
+  Gamehall.applySettings();
+  ground.add(Gamehall.object);
+
+
+
 
   /** 每幀呼叫：time 單位是秒，讓會動的物件更新動畫 */
   function update(time: number) {
@@ -56,20 +124,42 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   }
 
   // 緞帶擺放參數也往外交出去，讓 main.ts 的控制面板可以調整
+  // houses：畫面上每一棟。點到哪一棟，面板就顯示那一棟的設定
   return {
     all,
     update,
     ketchupRing: { object: ketchup.ringObject, settings: ketchup.ringSettings, apply: ketchup.applyRingSettings },
     // ground、groundRadius：滑鼠拖曳房子時，要知道是在哪顆球的表面上滑
-    house: {
-      object: house.object,
-      settings: house.settings,
-      apply: house.applySettings,
-      getNormal: house.getNormal,
-      setNormal: house.setNormal,
-      ground,
-      groundRadius: GROUND_RADIUS,
-    },
+    ground,
+    groundRadius: GROUND_RADIUS,
+    houses: [
+      exposeHouse('mainHall', mainHall),
+      exposeHouse('projectRoom', projectRoom),
+      exposeHouse('bgRoom', bgRoom),
+      exposeHouse('twRoom', twRoom),
+      exposeHouse('Gamehall', Gamehall),
+    ],
+  };
+}
+
+export type WorldHouse = {
+  label: string;
+  object: THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhongMaterial>;
+  settings: HouseSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+/** 把 createHouse 的回傳整理成面板、射線選取都能用的同一種形狀 */
+function exposeHouse(label: string, house: ReturnType<typeof createHouse>): WorldHouse {
+  return {
+    label,
+    object: house.object,
+    settings: house.settings,
+    apply: house.applySettings,
+    getNormal: house.getNormal,
+    setNormal: house.setNormal,
   };
 }
 
@@ -99,12 +189,11 @@ function getGroundAxes(ringObject: THREE.Object3D, camera: THREE.Camera) {
 function createBall() {
   const geometry = new THREE.SphereGeometry(GROUND_RADIUS, 16, 16);
   const material = new THREE.MeshPhongMaterial({
-    // 光的顏色會跟材質顏色「相乘」：純綠 0x00ff00 的紅、藍都是 0，
-    // 打黃光、紫光上去都只剩綠色（或全黑），所以這裡刻意混一點紅、藍，
-    // 讓 main.ts 的黃色主光、紫色補光都有通道可以反射出來
-    color: 0x66ff99,
+    // 光的顏色會跟材質顏色「相乘」：純綠的紅、藍都是 0，打黃光、紫光上去會變橄欖或全黑
+    // 所以混進青和一點紅，顏色才跟背景、房子的粉彩同一掛，不會搶成一塊螢光綠
+    color: 0x7ee8b8,
     // 光澤度：數值越大高光點越小越亮（像塑膠、瓷器），預設 30 偏霧面
-    shininess: 80,
+    shininess: 36,
   });
   return new THREE.Mesh(geometry, material);
 }

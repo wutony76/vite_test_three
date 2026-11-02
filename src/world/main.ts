@@ -7,7 +7,7 @@ import gradientFragmentShader from './shader/gradient.frag.glsl?raw';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // RoomEnvironment：three.js 內建的「虛擬攝影棚」，拿來當反射用的環境，不用另外下載 HDR 圖
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { createObjs } from './objects/obj';
+import { createObjs, type WorldHouse } from './objects/obj';
 // lil-gui：three.js 內建的小型控制面板，拖拉滑桿就能即時調整數值，不用改程式碼重新整理
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { enableViewPlaneDrag } from './debug/viewPlaneDrag';
@@ -106,25 +106,26 @@ backgroundScene.add(backgroundMesh);
 // LIGHTS
 // MeshPhongMaterial 等材質要靠光源算顏色，場景沒有光的話物件會整個變黑
 
-// 平行光：模擬太陽，有方向，Phong 的明暗和高光主要靠它
-// 用暖黃色當主光，亮面會偏暖、比較通透，不像白光那麼平
-const directionalLight = new THREE.DirectionalLight(0xffdd55, 1.2);
+// 平行光：這一盞就是太陽，有方向，Phong 的明暗和高光主要靠它
+// 不再加第二盞平行光當「另一個太陽」：
+//   ① 兩盞各照一半，交界那一圈兩邊都照不到，會切出一條暗帶
+//   ② 每盞都會打出自己的高光，房子上會多一顆刺眼的亮點
+// 想要溫暖就把它調成蜂蜜色，不要另開一盞。太黃（接近橘色）會把青、綠乘成橄欖色
+const directionalLight = new THREE.DirectionalLight(0xffd98a, 2);
 directionalLight.position.set(-5, 8, 2);
 scene.add(directionalLight);
 
-// 補光：用半球光（HemisphereLight）取代「環境光 + 紫色平行光」
+// 補光：用半球光（HemisphereLight）把暗部托起來，不負責當第二個太陽
 // 半球光依表面朝向混色：朝上的面拿天空色、朝下的面拿地面色，中間平滑過渡
-// 為什麼不用平行光當補光？
-//   ① 平行光只照亮朝向它的半邊，主光和補光交界那一圈兩邊都照不到 → 出現一條死黑的暗帶
-//   ② 平行光有鏡面反射，暗部會冒出一顆刺眼的粉紅亮點
-// 半球光每個面都有顏色、也不產生高光，剛好解決這兩個問題
-// 地面色綠色通道給 0，乘上材質後才會是乾淨的紫，不會混成灰藍
-const hemisphereLight = new THREE.HemisphereLight(0x222200, 0xff00ff, 4.5);
+// 為什麼不用平行光當補光？理由跟上面一樣：暗帶、第二顆高光
+// 天空、地面都用淺的暖色，暗部才會是暖的，不會被青色補光把太陽的暖意抵銷
+// 強度壓在 1 以下，亮面仍然是太陽在主導
+const hemisphereLight = new THREE.HemisphereLight(0xfff3d4, 0xffc9a8, 0.5);
 scene.add(hemisphereLight);
 
 
 // WORLD...OBJECTS
-const { all, update: updateObjs, ketchupRing, house } = createObjs({ envMap, camera });
+const { all, update: updateObjs, ketchupRing, houses, ground, groundRadius } = createObjs({ envMap, camera });
 
 scene.add(all);
 
@@ -188,7 +189,49 @@ controls.addEventListener('end', () => {
 // DEBUG...番茄醬緞帶的控制面板
 // 調整到滿意後，把 console 印出來的那幾行貼回 ketchup.ts 最上面的常數
 const gui = new GUI({ title: '控制面板' });
-// 緞帶、房子各自一個分組，面板才分得出哪個滑桿調哪個物件
+// 整體、緞帶、房子各自一個分組，面板才分得出哪個滑桿調哪個物件
+// 整體放最上面：太陽和補光會乘上每一棟、地表的顏色，先調這組才看得出整體暖不暖
+const lightFolder = gui.addFolder('整體');
+const groundMaterial = ground instanceof THREE.Mesh && !Array.isArray(ground.material)
+  ? ground.material as THREE.MeshPhongMaterial
+  : null;
+const lightSettings = {
+  sunColor: `#${directionalLight.color.getHexString()}`,
+  sunIntensity: directionalLight.intensity,
+  skyColor: `#${hemisphereLight.color.getHexString()}`,
+  groundLightColor: `#${hemisphereLight.groundColor.getHexString()}`,
+  fillIntensity: hemisphereLight.intensity,
+  // 沒有綠球（改載模型）時不提供這一格
+  surfaceColor: groundMaterial ? `#${groundMaterial.color.getHexString()}` : '',
+};
+lightFolder.addColor(lightSettings, 'sunColor').name('太陽顏色').onChange(applyLights).onFinishChange(logLights);
+lightFolder.add(lightSettings, 'sunIntensity', 0, 4, 0.05).name('太陽強度').onChange(applyLights).onFinishChange(logLights);
+lightFolder.addColor(lightSettings, 'skyColor').name('朝上補光').onChange(applyLights).onFinishChange(logLights);
+lightFolder.addColor(lightSettings, 'groundLightColor').name('朝下補光').onChange(applyLights).onFinishChange(logLights);
+lightFolder.add(lightSettings, 'fillIntensity', 0, 2, 0.05).name('補光強度').onChange(applyLights).onFinishChange(logLights);
+if (groundMaterial) {
+  lightFolder.addColor(lightSettings, 'surfaceColor').name('地表顏色').onChange(applyLights).onFinishChange(logLights);
+}
+
+/** 把面板上的顏色、強度寫回三盞光和地表。拖拉中每一格都會跑 */
+function applyLights() {
+  directionalLight.color.set(lightSettings.sunColor);
+  directionalLight.intensity = lightSettings.sunIntensity;
+  hemisphereLight.color.set(lightSettings.skyColor);
+  hemisphereLight.groundColor.set(lightSettings.groundLightColor);
+  hemisphereLight.intensity = lightSettings.fillIntensity;
+  if (groundMaterial && lightSettings.surfaceColor) groundMaterial.color.set(lightSettings.surfaceColor);
+}
+
+function logLights() {
+  const hex = (color: string) => `0x${color.replace('#', '')}`;
+  console.log(
+    `const directionalLight = new THREE.DirectionalLight(${hex(lightSettings.sunColor)}, ${lightSettings.sunIntensity});\n` +
+    `const hemisphereLight = new THREE.HemisphereLight(${hex(lightSettings.skyColor)}, ${hex(lightSettings.groundLightColor)}, ${lightSettings.fillIntensity});` +
+    (lightSettings.surfaceColor ? `\ncolor: ${hex(lightSettings.surfaceColor)},` : '')
+  );
+}
+
 const ringFolder = gui.addFolder('番茄醬緞帶');
 const ring = ketchupRing.settings;
 // onChange：拖拉中每一格都即時套用，馬上看到效果
@@ -201,19 +244,49 @@ ringFolder.add(ring, 'offsetY', -2, 2, 0.01).name('高度 RING_OFFSET_Y').onChan
 ringFolder.add(ring, 'offsetZ', -2, 2, 0.01).name('位置 Z RING_OFFSET_Z').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
 
 // DEBUG...房子的控制面板
-// 調整到滿意後，把 console 印出來的那幾行貼回 house.ts 最上面的常數
-// addFolder：在同一個面板裡開一個可收合的分組，不另開一個面板（兩個面板會疊在同一個角落）
+// 調整到滿意後，把 console 印出來的那幾行貼回對應房子的設定
+// 點到哪一棟，這個分組（番茄醬緞帶的下方）就改顯示那一棟的滑桿
 const houseFolder = gui.addFolder('房子');
-const houseSettings = house.settings;
-houseFolder.add(houseSettings, 'angleFromTopDegrees', 0, 180, 1).name('離頂端 HOUSE_ANGLE_FROM_TOP (°)').onChange(house.apply).onFinishChange(logHouse);
-houseFolder.add(houseSettings, 'azimuthDegrees', -180, 180, 1).name('方位 HOUSE_AZIMUTH (°)').onChange(house.apply).onFinishChange(logHouse);
-houseFolder.add(houseSettings, 'spinDegrees', -180, 180, 1).name('自轉 HOUSE_SPIN (°)').onChange(house.apply).onFinishChange(logHouse);
-houseFolder.add(houseSettings, 'sink', -0.1, 0.3, 0.005).name('下沉 HOUSE_SINK').onChange(house.apply).onFinishChange(logHouse);
-houseFolder.add(houseSettings, 'scale', 0.01, 0.5, 0.01).name('縮放 HOUSE_SCALE').onChange(house.apply).onFinishChange(logHouse);
-houseFolder.add(houseSettings, 'width', 0.1, 5, 0.1).name('寬 HOUSE_WIDTH').onChange(house.apply).onFinishChange(logHouse);
-houseFolder.add(houseSettings, 'height', 0.1, 5, 0.1).name('高 HOUSE_HEIGHT').onChange(house.apply).onFinishChange(logHouse);
-houseFolder.add(houseSettings, 'depth', 0.1, 5, 0.1).name('深 HOUSE_DEPTH').onChange(house.apply).onFinishChange(logHouse);
-houseFolder.addColor(houseSettings, 'color').name('顏色 HOUSE_COLOR').onChange(house.apply).onFinishChange(logHouse);
+// 一開始先顯示第一棟，還沒點過房子時面板也有東西可調
+let selectedHouse = houses[0];
+
+function bindHousePanel(entry: WorldHouse) {
+  // 已經是這一棟就不要拆掉滑桿重建：拖曳中每一格都會碰面板，重建會讓數字閃一下
+  const alreadyShowing = entry === selectedHouse && houseFolder.controllers.length > 0;
+  selectedHouse = entry;
+  highlightHouse(entry);
+  if (alreadyShowing) return;
+
+  houseFolder.title(`房子 · ${entry.label}`);
+  // 打開分組，點完房子就看得到下方這排滑桿
+  houseFolder.open();
+  for (const controller of [...houseFolder.controllers]) controller.destroy();
+
+  const settings = entry.settings;
+  const apply = () => entry.apply();
+  houseFolder.add(settings, 'angleFromTopDegrees', 0, 180, 1).name('離頂端 HOUSE_ANGLE_FROM_TOP (°)').onChange(apply).onFinishChange(logHouse);
+  houseFolder.add(settings, 'azimuthDegrees', -180, 180, 1).name('方位 HOUSE_AZIMUTH (°)').onChange(apply).onFinishChange(logHouse);
+  houseFolder.add(settings, 'spinDegrees', -180, 180, 1).name('自轉 HOUSE_SPIN (°)').onChange(apply).onFinishChange(logHouse);
+  houseFolder.add(settings, 'sink', -0.1, 0.3, 0.005).name('下沉 HOUSE_SINK').onChange(apply).onFinishChange(logHouse);
+  houseFolder.add(settings, 'scale', 0.01, 0.5, 0.01).name('縮放 HOUSE_SCALE').onChange(apply).onFinishChange(logHouse);
+  houseFolder.add(settings, 'width', 0.1, 5, 0.1).name('寬 HOUSE_WIDTH').onChange(apply).onFinishChange(logHouse);
+  houseFolder.add(settings, 'height', 0.1, 5, 0.1).name('高 HOUSE_HEIGHT').onChange(apply).onFinishChange(logHouse);
+  houseFolder.add(settings, 'depth', 0.1, 5, 0.1).name('深 HOUSE_DEPTH').onChange(apply).onFinishChange(logHouse);
+  houseFolder.addColor(settings, 'color').name('顏色 HOUSE_COLOR').onChange(apply).onFinishChange(logHouse);
+}
+
+/** 選中的那一棟自己發光，才分得出面板上的數字是哪一棟的 */
+function highlightHouse(entry: WorldHouse) {
+  for (const house of houses) {
+    const material = house.object.material;
+    const active = house === entry;
+    material.emissive.set(active ? house.settings.color : 0x000000);
+    // 只要能認出選中的是哪一棟；太亮會把那一棟洗白，其他棟看起來更暗
+    material.emissiveIntensity = active ? 0.16 : 1;
+  }
+}
+
+bindHousePanel(houses[0]);
 
 // 直接在畫面上拖曳房子：沿著綠球表面滑動
 // 開關：false = 關閉，點到房子也只會旋轉鏡頭
@@ -221,15 +294,18 @@ const HOUSE_DRAG_ENABLED = true;
 
 if (HOUSE_DRAG_ENABLED) {
   enableSurfaceDrag({
-    pickable: house.object,
-    ground: house.ground,
-    groundRadius: house.groundRadius,
-    getNormal: house.getNormal,
+    targets: houses,
+    ground,
+    groundRadius,
     camera,
     domElement: renderer.domElement,
     controls,
-    onDrag: (normal) => {
-      house.setNormal(normal);
+    onDragStart: (target) => {
+      const entry = houses.find((house) => house.object === target.object);
+      if (entry) bindHousePanel(entry);
+    },
+    onDrag: (normal, target) => {
+      target.setNormal(normal);
       // 數值是程式改的、不是在面板上改的，面板不會自己重畫，要手動叫它更新顯示
       houseFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
@@ -238,7 +314,9 @@ if (HOUSE_DRAG_ENABLED) {
 }
 
 function logHouse() {
+  const houseSettings = selectedHouse.settings;
   console.log(
+    `// ${selectedHouse.label}\n` +
     `const HOUSE_WIDTH = ${houseSettings.width.toFixed(2)};\n` +
     `const HOUSE_HEIGHT = ${houseSettings.height.toFixed(2)};\n` +
     `const HOUSE_DEPTH = ${houseSettings.depth.toFixed(2)};\n` +

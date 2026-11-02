@@ -69,7 +69,8 @@ export function createHouse({ groundRadius, up, front }: CreateHouseOptions) {
     // 讓 main.ts 的黃色主光、紫色補光都有通道可以反射出來
     color: settings.color,
     // 光澤度：數值越大高光點越小越亮（像塑膠、瓷器），預設 30 偏霧面
-    shininess: 80,
+    // 80 的高光很小，高光以外的牆面會顯得發暗；降一點，房子的顏色才出得來
+    shininess: 36,
   });
   const mesh = new THREE.Mesh(createBoxGeometry(settings), material);
 
