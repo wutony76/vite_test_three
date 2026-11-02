@@ -11,6 +11,7 @@ import { createObjs } from './objects/obj';
 // lil-gui：three.js 內建的小型控制面板，拖拉滑桿就能即時調整數值，不用改程式碼重新整理
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { enableViewPlaneDrag } from './debug/viewPlaneDrag';
+import { enableSurfaceDrag } from './debug/surfaceDrag';
 
 // RENDERER
 /**
@@ -123,7 +124,8 @@ scene.add(hemisphereLight);
 
 
 // WORLD...OBJECTS
-const { all, update: updateObjs, ketchupRing } = createObjs({ envMap, camera });
+const { all, update: updateObjs, ketchupRing, house } = createObjs({ envMap, camera });
+
 scene.add(all);
 
 // 讓鏡頭沿著番茄醬流動的方向轉：把旋轉軸換成「緞帶圈圈的中心軸」
@@ -185,16 +187,69 @@ controls.addEventListener('end', () => {
 
 // DEBUG...番茄醬緞帶的控制面板
 // 調整到滿意後，把 console 印出來的那幾行貼回 ketchup.ts 最上面的常數
-const gui = new GUI({ title: '番茄醬緞帶' });
+const gui = new GUI({ title: '控制面板' });
+// 緞帶、房子各自一個分組，面板才分得出哪個滑桿調哪個物件
+const ringFolder = gui.addFolder('番茄醬緞帶');
 const ring = ketchupRing.settings;
 // onChange：拖拉中每一格都即時套用，馬上看到效果
 // onFinishChange：放開滑鼠才印 console，拖拉過程不會洗版
-gui.add(ring, 'radius', 0.8, 2, 0.01).name('半徑 ORBIT_RADIUS').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
-gui.add(ring, 'tiltDegrees', -180, 180, 1).name('傾斜 RING_TILT (°)').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
-gui.add(ring, 'yawDegrees', -180, 180, 1).name('方位 RING_YAW (°)').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
-gui.add(ring, 'offsetX', -2, 2, 0.01).name('位置 X RING_OFFSET_X').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
-gui.add(ring, 'offsetY', -2, 2, 0.01).name('高度 RING_OFFSET_Y').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
-gui.add(ring, 'offsetZ', -2, 2, 0.01).name('位置 Z RING_OFFSET_Z').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+ringFolder.add(ring, 'radius', 0.8, 2, 0.01).name('半徑 ORBIT_RADIUS').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+ringFolder.add(ring, 'tiltDegrees', -180, 180, 1).name('傾斜 RING_TILT (°)').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+ringFolder.add(ring, 'yawDegrees', -180, 180, 1).name('方位 RING_YAW (°)').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+ringFolder.add(ring, 'offsetX', -2, 2, 0.01).name('位置 X RING_OFFSET_X').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+ringFolder.add(ring, 'offsetY', -2, 2, 0.01).name('高度 RING_OFFSET_Y').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+ringFolder.add(ring, 'offsetZ', -2, 2, 0.01).name('位置 Z RING_OFFSET_Z').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+
+// DEBUG...房子的控制面板
+// 調整到滿意後，把 console 印出來的那幾行貼回 house.ts 最上面的常數
+// addFolder：在同一個面板裡開一個可收合的分組，不另開一個面板（兩個面板會疊在同一個角落）
+const houseFolder = gui.addFolder('房子');
+const houseSettings = house.settings;
+houseFolder.add(houseSettings, 'angleFromTopDegrees', 0, 180, 1).name('離頂端 HOUSE_ANGLE_FROM_TOP (°)').onChange(house.apply).onFinishChange(logHouse);
+houseFolder.add(houseSettings, 'azimuthDegrees', -180, 180, 1).name('方位 HOUSE_AZIMUTH (°)').onChange(house.apply).onFinishChange(logHouse);
+houseFolder.add(houseSettings, 'spinDegrees', -180, 180, 1).name('自轉 HOUSE_SPIN (°)').onChange(house.apply).onFinishChange(logHouse);
+houseFolder.add(houseSettings, 'sink', -0.1, 0.3, 0.005).name('下沉 HOUSE_SINK').onChange(house.apply).onFinishChange(logHouse);
+houseFolder.add(houseSettings, 'scale', 0.01, 0.5, 0.01).name('縮放 HOUSE_SCALE').onChange(house.apply).onFinishChange(logHouse);
+houseFolder.add(houseSettings, 'width', 0.1, 5, 0.1).name('寬 HOUSE_WIDTH').onChange(house.apply).onFinishChange(logHouse);
+houseFolder.add(houseSettings, 'height', 0.1, 5, 0.1).name('高 HOUSE_HEIGHT').onChange(house.apply).onFinishChange(logHouse);
+houseFolder.add(houseSettings, 'depth', 0.1, 5, 0.1).name('深 HOUSE_DEPTH').onChange(house.apply).onFinishChange(logHouse);
+houseFolder.addColor(houseSettings, 'color').name('顏色 HOUSE_COLOR').onChange(house.apply).onFinishChange(logHouse);
+
+// 直接在畫面上拖曳房子：沿著綠球表面滑動
+// 開關：false = 關閉，點到房子也只會旋轉鏡頭
+const HOUSE_DRAG_ENABLED = true;
+
+if (HOUSE_DRAG_ENABLED) {
+  enableSurfaceDrag({
+    pickable: house.object,
+    ground: house.ground,
+    groundRadius: house.groundRadius,
+    getNormal: house.getNormal,
+    camera,
+    domElement: renderer.domElement,
+    controls,
+    onDrag: (normal) => {
+      house.setNormal(normal);
+      // 數值是程式改的、不是在面板上改的，面板不會自己重畫，要手動叫它更新顯示
+      houseFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
+    },
+    onDragEnd: logHouse,
+  });
+}
+
+function logHouse() {
+  console.log(
+    `const HOUSE_WIDTH = ${houseSettings.width.toFixed(2)};\n` +
+    `const HOUSE_HEIGHT = ${houseSettings.height.toFixed(2)};\n` +
+    `const HOUSE_DEPTH = ${houseSettings.depth.toFixed(2)};\n` +
+    `const HOUSE_SCALE = ${houseSettings.scale.toFixed(2)};\n` +
+    `const HOUSE_COLOR = '${houseSettings.color}';\n` +
+    `const HOUSE_ANGLE_FROM_TOP = THREE.MathUtils.degToRad(${houseSettings.angleFromTopDegrees});\n` +
+    `const HOUSE_AZIMUTH = THREE.MathUtils.degToRad(${houseSettings.azimuthDegrees});\n` +
+    `const HOUSE_SPIN = THREE.MathUtils.degToRad(${houseSettings.spinDegrees});\n` +
+    `const HOUSE_SINK = ${houseSettings.sink.toFixed(3)};`
+  );
+}
 
 // 直接在畫面上拖曳緞帶：沿著跟螢幕平行的平面移動
 // 拖曳時把新位置寫回 ring，面板上的數字才會跟著變，放開時一樣印 console
