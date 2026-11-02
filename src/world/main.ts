@@ -288,6 +288,49 @@ function highlightHouse(entry: WorldHouse) {
 
 bindHousePanel(houses[0]);
 
+// 選中那棟的名字：用 HTML 畫在畫面上，而不是貼在 3D 房子上
+// 房子會跟著地球傾斜，3D 文字也會跟著歪、變小；HTML 永遠正對螢幕、大小固定，才是「2D 的名字」
+const houseLabel = document.createElement('div');
+houseLabel.style.cssText = [
+  'position: fixed',
+  'top: 0',
+  'left: 0',
+  'z-index: 1',
+  'padding: 5px 12px',
+  'border-radius: 999px',
+  'background: rgb(20 16 28 / 78%)',
+  'color: #fff',
+  'font: 700 14px/1.2 "PingFang TC", "Noto Sans TC", sans-serif',
+  'white-space: nowrap',
+  'pointer-events: none',
+].join(';');
+document.body.appendChild(houseLabel);
+// 屋頂的位置：每幀拿來投影到螢幕，重複利用避免一直 new
+const labelAnchor = new THREE.Vector3();
+
+/** 把選中房子的屋頂中心投影到螢幕，名字就浮在它正上方 */
+function updateHouseLabel() {
+  houseLabel.textContent = selectedHouse.label;
+  // 幾何的原點在底部，屋頂在自己的 +Y、還沒乘縮放的高度；localToWorld 會把縮放和地球的旋轉算進去
+  labelAnchor.set(0, selectedHouse.settings.height, 0);
+  // 父層（綠球）的矩陣可能還沒更新，少了這行拖曳當下名字會晚一幀
+  selectedHouse.object.updateWorldMatrix(true, false);
+  selectedHouse.object.localToWorld(labelAnchor);
+  // project 用的是含 setViewOffset 的投影矩陣，算出來的位置才跟畫面上的房子對得齊
+  labelAnchor.project(camera);
+  // z 超出 -1 ~ 1：在鏡頭後面，或被近／遠裁切切掉
+  if (labelAnchor.z < -1 || labelAnchor.z > 1) {
+    houseLabel.style.visibility = 'hidden';
+    return;
+  }
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = rect.left + (labelAnchor.x * 0.5 + 0.5) * rect.width;
+  const y = rect.top + (-labelAnchor.y * 0.5 + 0.5) * rect.height;
+  houseLabel.style.visibility = 'visible';
+  // 先移到屋頂的螢幕座標，再往上移一個標籤的高度，名字才不會壓在屋頂上
+  houseLabel.style.transform = `translate(${x}px, ${y}px) translate(-50%, calc(-100% - 8px))`;
+}
+
 // 直接在畫面上拖曳房子：沿著綠球表面滑動
 // 開關：false = 關閉，點到房子也只會旋轉鏡頭
 const HOUSE_DRAG_ENABLED = true;
@@ -375,6 +418,8 @@ function render(time: number) {
   updateObjs(time * 0.001);
   // enableDamping 開啟時每幀都要 update，否則放開滑鼠後不會有慣性滑動
   controls.update();
+  // 拖曳、旋轉鏡頭時房子在畫面上的位置每幀都在變，名字要跟著重算
+  updateHouseLabel();
   // autoClear 關掉後要自己在每幀開頭清一次，否則上一幀的殘影會疊上來
   renderer.clear();
   renderer.render(backgroundScene, backgroundCamera);
