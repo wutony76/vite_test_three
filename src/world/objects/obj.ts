@@ -70,14 +70,15 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   // BG
   const bgRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   Object.assign(bgRoom.settings, {
-    angleFromTopDegrees: 34,
+    // 離頂端拉近一點，才會坐在看得見的坡上，不會滑到地平線外面
+    angleFromTopDegrees: 28,
     azimuthDegrees: -84,
     spinDegrees: 84,
     sink: 0.02,
-    scale: 0.11,
-    width: 1.3,
-    height: 0.6,
-    depth: 1.1,
+    scale: 0.14,
+    width: 1.2,
+    height: 0.9,
+    depth: 1.05,
     color: '#1cab5a',
   });
   bgRoom.applySettings();
@@ -86,14 +87,15 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   // TW
   const twRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   Object.assign(twRoom.settings, {
-    angleFromTopDegrees: 26,
+    angleFromTopDegrees: 22,
     azimuthDegrees: -80,
     spinDegrees: 29,
     sink: 0.03,
-    scale: 0.17,
-    width: 0.8,
-    height: 0.8,
-    depth: 0.8,
+    scale: 0.15,
+    // 不要正方體：正方體種在斜坡上會像骰子倒著，拉高一點才像一棟小房子
+    width: 0.75,
+    height: 1.15,
+    depth: 0.75,
     color: '#8280ea',
   });
   twRoom.applySettings();
@@ -102,14 +104,15 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
 
   const Gamehall = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   Object.assign(Gamehall.settings, {
-    angleFromTopDegrees: 38,
+    // 38° 會掉到畫面右緣外面，收到坡上才跟其他棟是同一座
+    angleFromTopDegrees: 24,
     azimuthDegrees: 49,
     spinDegrees: 74,
     sink: 0.03,
-    scale: 0.17,
-    width: 1.3,
-    height: 0.7,
-    depth: 1.3,
+    scale: 0.15,
+    width: 1.25,
+    height: 0.95,
+    depth: 1.15,
     color: '#9fe571',
   });
   Gamehall.applySettings();
@@ -187,13 +190,16 @@ function getGroundAxes(ringObject: THREE.Object3D, camera: THREE.Camera) {
 
 // 綠色球：用來觀察燈光效果
 function createBall() {
-  const geometry = new THREE.SphereGeometry(GROUND_RADIUS, 16, 16);
+  // 鏡頭很近，16×16 的地平線會變成一截截折線，跟柔的天空對起來特別硬
+  // 64×48 在這個距離看起來是圓的；只這一顆球，段數高一點還負擔得起
+  const geometry = new THREE.SphereGeometry(GROUND_RADIUS, 64, 48);
   const material = new THREE.MeshPhongMaterial({
     // 光的顏色會跟材質顏色「相乘」：純綠的紅、藍都是 0，打黃光、紫光上去會變橄欖或全黑
     // 所以混進青和一點紅，顏色才跟背景、房子的粉彩同一掛，不會搶成一塊螢光綠
     color: 0x7ee8b8,
     // 光澤度：數值越大高光點越小越亮（像塑膠、瓷器），預設 30 偏霧面
-    shininess: 36,
+    // 高光收小一點：球的正面以前會亮成一顆白點，壓在底部的紅上面很搶
+    shininess: 14,
   });
   return new THREE.Mesh(geometry, material);
 }

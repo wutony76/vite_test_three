@@ -105,10 +105,12 @@ function createKetchupMaterial(envMap: THREE.Texture) {
     color: 0xe83055,
     // color: 0xfffb8f,
     // 粗糙度低 = 表面滑順、高光集中，像濕潤的醬汁
-    roughness: 0.15,
+    // 粗糙度低 = 表面滑順、高光集中。太陽很強時 0.15 會在畫面下緣亮成一顆白點，所以略為霧一點
+    roughness: 0.42,
     // 清漆層：在表面再疊一層透明的亮面，醬汁「油亮」的感覺主要靠它
-    clearcoat: 1,
-    clearcoatRoughness: 0.1,
+    // 不要全開：全開時下緣那條醬會亮過房子
+    clearcoat: 0.2,
+    clearcoatRoughness: 0.55,
     // 環境貼圖：讓側面、凹折處反射出柔和的環境光，不會變成死黑
     envMap,
     // 環境反射的強度：越大暗部越亮，但太大醬汁會泛白、黃光紫光的氣氛也會被沖淡

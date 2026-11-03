@@ -68,7 +68,8 @@ camera.lookAt(0, 0, 0);
 // 平移畫面：把取景框往上挪，畫面內容整體就往下移，不改鏡頭角度和透視
 // 和移動 controls.target 不同，OrbitControls 旋轉時球還是繞著球心轉
 // 0.5 = 往下移 50% 的畫面高度，越大球越往下
-const VIEW_SHIFT_Y = 0.9;
+// 0.9 底部會留一大條醬汁；再往上抬，主廳又會被畫面切掉。0.84 讓醬汁留在下緣，房子還看得到頭
+const VIEW_SHIFT_Y = 0.84;
 // const VIEW_SHIFT_Y = 0.5;
 function applyViewOffset() {
   const w = window.innerWidth;

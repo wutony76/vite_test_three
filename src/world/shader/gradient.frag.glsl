@@ -47,8 +47,9 @@ vec3 hexToRgb(int hex) {
 
 void main() {
   vec3 topColor = hexToRgb(0x65e4e6);
-  vec3 middleColor = hexToRgb(0xca0065);
-  vec3 bottomColor = hexToRgb(0x5c096d);
+  // 中段、底部不要用很飽和的紅：球的下方會露出這一截，太紅會把畫面從下面切斷
+  vec3 middleColor = hexToRgb(0xe08aaa);
+  vec3 bottomColor = hexToRgb(0xc46d9a);
 
   vec3 color;
 
@@ -64,11 +65,10 @@ void main() {
   float split = 0.31;
 
   if (y > split) {
-    float t = (y - split) / (1.0 - split);
-    // t = smoothstep(0.0, 0.6, t);
+    float t = smoothstep(0.0, 1.0, (y - split) / (1.0 - split));
     color = mix(middleColor, topColor, t);
   } else {
-    float t = y / split;
+    float t = smoothstep(0.0, 1.0, y / split);
     color = mix(bottomColor, middleColor, t);
   }
 
