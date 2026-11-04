@@ -199,6 +199,8 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   };
 
   const mesh = new THREE.Mesh(geometry, material);
+  // 雞塊、薯條掛在緞帶自己身上：mesh 繞 y 軸轉的時候，它們會跟著醬一起繞，不用另外算位置
+  const riders = createRiders(mesh);
 
   // 為什麼要多包一層 pivot？
   // 「擺放角度」和「自轉」要分開：pivot 負責把整圈翻起來、轉到想要的方位，
@@ -258,6 +260,14 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   if (splash) root.add(splash.object);
 
   let lastTime: number | null = null;
+  // 每幀重算配料位置用的暫存，避免一直 new 新的向量
+  const riderInverse = new THREE.Matrix4();
+  const riderWorld = new THREE.Vector3();
+  const riderOffset = new THREE.Vector3();
+  const riderTangent = new THREE.Vector3();
+  const riderLocalDir = new THREE.Vector3();
+  const riderSurface = new THREE.Vector3();
+  const RIDER_Y_AXIS = new THREE.Vector3(0, 1, 0);
 
   /** 每幀呼叫：time 單位是秒 */
   function update(time: number) {
@@ -265,14 +275,199 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     uniforms.uTime.value = time * FLOW_SPEED;
     // 整條緞帶繞自己的軸（翻起來之後的 y 軸）慢慢轉，看起來像醬汁在繞著球跑
     mesh.rotation.y = time * SPIN_SPEED;
-
-    // 醬滴是「每幀往前推一點」的模擬，需要的是兩幀之間的時間差，而不是總時間
-    // 上限 0.1 秒：切到別的分頁再切回來時，時間差可能好幾秒，醬滴會一口氣飛出畫面
+    // 配料貼在醬的外側，沿著醬慢慢漂。不看鏡頭，旋轉畫面時才不會跟著滑
     const deltaTime = lastTime === null ? 0 : Math.min(time - lastTime, 0.1);
     lastTime = time;
+    mesh.updateWorldMatrix(true, false);
+    riderInverse.copy(mesh.matrixWorld).invert();
+    for (const rider of riders) {
+      // 每塊速度不一樣，而且會快一下、停一下、偶爾退一點，像在流動的液體裡
+      const surge = 0.35 + 0.65 * Math.sin(time * 0.45 + rider.driftPhase);
+      rider.progress = THREE.MathUtils.euclideanModulo(rider.progress + deltaTime * rider.drift * surge, 1);
+      rider.yaw += deltaTime * rider.yawSpeed;
+    }
+    // 快的追上慢的時把彼此推開，不要從身上穿過去
+    separateRiders(riders);
+    for (const rider of riders) {
+      const along = rider.progress * Math.PI * 2;
+      rider.center.set(Math.cos(along) * ORBIT_RADIUS, 0, Math.sin(along) * ORBIT_RADIUS);
+      // 扣掉沿管子的分量，食物才貼在表面上，而不是懸在管子前面
+      riderTangent.set(-Math.sin(along), 0, Math.cos(along)).transformDirection(mesh.matrixWorld);
+      riderWorld.copy(rider.center).applyMatrix4(mesh.matrixWorld);
+      riderOffset.copy(riderWorld);
+      riderOffset.addScaledVector(riderTangent, -riderOffset.dot(riderTangent));
+      if (riderOffset.lengthSq() < 1e-8) riderOffset.copy(riderWorld);
+      riderOffset.normalize();
+      riderLocalDir.copy(riderOffset).transformDirection(riderInverse);
+      riderSurface.copy(rider.center).addScaledVector(riderLocalDir, TUBE_RADIUS);
+      const swell = sauceSwell(rider.progress, riderSurface, uniforms.uTime.value);
+      // 兩層慢起伏疊在一起：一下浮出多一點，一下再沉回去。幅度小，底部仍留在醬裡
+      const bob =
+        Math.sin(time * 0.9 + rider.phase) * 0.007 +
+        Math.sin(time * 0.27 + rider.driftPhase) * 0.004;
+      // 中心在醬面裡面，上半露在外側。鏡頭怎麼轉，這一面都不變
+      rider.mesh.position.copy(riderWorld).addScaledVector(riderOffset, TUBE_RADIUS + swell + rider.lift + bob);
+      rider.mesh.position.applyMatrix4(riderInverse);
+      rider.mesh.quaternion.setFromUnitVectors(RIDER_Y_AXIS, riderLocalDir);
+      rider.mesh.rotateY(rider.yaw);
+      if (!rider.nugget) rider.mesh.rotateX(rider.tilt);
+    }
+
+    // 醬滴是「每幀往前推一點」的模擬。時間差在上面算過，切分頁回來時已壓在 0.1 秒內
     splash?.update(deltaTime);
   }
 
   // ringObject：整圈緞帶（pivot），給「在畫面上直接拖曳」用
   return { object: root, update, ringObject: pivot, ringSettings, applyRingSettings };
+}
+
+/**
+ * 醬面鼓起的高度，公式和管子 shader 裡的 blob、wobble 相同
+ * 配料跟著這個高度走，表面縮進去時才不會懸在空中
+ */
+// 沿著圈圈，兩塊中心至少要隔開「各自佔的長度」。圈長 = 半徑 × 2π
+const RING_LENGTH = ORBIT_RADIUS * Math.PI * 2;
+
+/**
+ * 沿著醬把疊在一起的食物推開
+ * 走捷徑（較短的那段弧），所以頭尾相接的地方也算得到
+ */
+function separateRiders(riders: Rider[]) {
+  for (let pass = 0; pass < 4; pass++) {
+    for (let i = 0; i < riders.length; i++) {
+      for (let j = i + 1; j < riders.length; j++) {
+        const a = riders[i];
+        const b = riders[j];
+        let delta = b.progress - a.progress;
+        if (delta > 0.5) delta -= 1;
+        if (delta < -0.5) delta += 1;
+        const gap = Math.abs(delta) * RING_LENGTH;
+        // 再留一點空隙，碰到時是挨著，不是卡進彼此裡面
+        const need = a.reach + b.reach + 0.012;
+        if (gap >= need) continue;
+        const push = (need - gap) / RING_LENGTH / 2;
+        const sign = delta >= 0 ? 1 : -1;
+        a.progress = THREE.MathUtils.euclideanModulo(a.progress - sign * push, 1);
+        b.progress = THREE.MathUtils.euclideanModulo(b.progress + sign * push, 1);
+      }
+    }
+  }
+}
+
+function sauceSwell(progress: number, surface: THREE.Vector3, uTime: number) {
+  const blob = Math.sin(progress * Math.PI * 2 * 7 - uTime * 2);
+  const wobble =
+    Math.sin(surface.x * 9 + uTime * 1.7) *
+    Math.sin(surface.y * 11 - uTime * 1.3) *
+    Math.sin(surface.z * 7 + uTime * 2.1);
+  return blob * BLOB_AMOUNT + wobble * WOBBLE_AMOUNT;
+}
+
+type Rider = {
+  mesh: THREE.Mesh;
+  // 管子中心線上的點（緞帶自己的座標）。每幀再往「離開球心」推到醬的表面
+  center: THREE.Vector3;
+  // 目前漂到整圈的哪裡（0~1）。每幀會往前走，不是釘在固定刻度
+  progress: number;
+  // 沿著圈圈佔多長。兩塊中心近過這個和，就會疊在一起
+  reach: number;
+  // 沿著醬漂的速度（整圈進度 / 秒）。每塊不一樣，間距才會一直變
+  drift: number;
+  driftPhase: number;
+  yawSpeed: number;
+  // 負值 = 中心在表面裡面，底部埋進醬裡
+  lift: number;
+  nugget: boolean;
+  // 每塊自己的轉向，每幀重設朝向之後再疊上去，才不會越轉越多
+  yaw: number;
+  tilt: number;
+  phase: number;
+};
+
+/**
+ * 方塊朝向醬的那一側塗暗。頂點顏色會和材質顏色相乘，埋進醬裡的邊就比較深
+ */
+function darkenSunkSide(geometry: THREE.BufferGeometry) {
+  const position = geometry.getAttribute('position');
+  const color = new Float32Array(position.count * 3);
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < position.count; i++) {
+    const y = position.getY(i);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  for (let i = 0; i < position.count; i++) {
+    // 0 = 朝外的亮面，1 = 埋進醬裡的暗面
+    const sunk = 1 - THREE.MathUtils.smoothstep(position.getY(i), minY, maxY);
+    const shade = 1 - sunk * 0.78;
+    color[i * 3] = shade;
+    color[i * 3 + 1] = shade;
+    color[i * 3 + 2] = shade;
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(color, 3));
+}
+
+/**
+ * 少量雞塊（正方體）和薯條（細長方體），散在緞帶外緣
+ * 數量少、用固定種子：每次重新整理都在同樣的位置，不會越加越多
+ */
+function createRiders(parent: THREE.Object3D) {
+  const random = createRandom(11);
+  const riders: Rider[] = [];
+  // 3 塊雞塊、4 根薯條。順序打亂。有的挨在一起，有的中間空一大段，不要每段都差一點點
+  const kinds = ['nugget', 'nugget', 'nugget', 'fry', 'fry', 'fry', 'fry'];
+  for (let i = kinds.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [kinds[i], kinds[j]] = [kinds[j], kinds[i]];
+  }
+  let angle = random() * Math.PI * 2;
+
+  kinds.forEach((kind) => {
+    const nugget = kind === 'nugget';
+    const clustered = random() < 0.4;
+    // 最近也要超過兩塊食物的長度，不然一放上去就穿在一起
+    angle += clustered ? 0.16 + random() * 0.2 : 0.9 + random() * 1.5;
+    // 正方體 = 雞塊；細長的長方體 = 薯條。尺寸是上一版的一半
+    const geometry = nugget
+      ? new THREE.BoxGeometry(0.04, 0.04, 0.04)
+      : new THREE.BoxGeometry(0.014, 0.06, 0.014);
+    // 靠近醬的那一面變暗。本地的 -Y 朝向管子，埋進去的那邊才有沉下去的顏色
+    darkenSunkSide(geometry);
+    const material = new THREE.MeshPhongMaterial({
+      // 雞塊偏深褐、薯條偏亮黃。自發光拉高，才不會被醬的高光染成同一種紅
+      color: nugget ? 0xa85a20 : 0xfff2b0,
+      emissive: nugget ? 0x7a4010 : 0xffc850,
+      emissiveIntensity: 0.65,
+      shininess: 12,
+      vertexColors: true,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+
+    // 一開始的位置。之後每幀會沿著圈圈改這個點
+    const center = new THREE.Vector3(Math.cos(angle) * ORBIT_RADIUS, 0, Math.sin(angle) * ORBIT_RADIUS);
+    mesh.position.copy(center);
+
+    parent.add(mesh);
+    riders.push({
+      mesh,
+      center,
+      progress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
+      // 有的幾乎停在醬裡，有的漂得比較快，才不會永遠保持同樣的間距
+      // 薯條較長，轉到順著圈時比較容易碰到旁邊那塊
+      reach: nugget ? 0.032 : 0.038,
+      drift: 0.006 + random() * 0.04,
+      driftPhase: random() * Math.PI * 2,
+      yawSpeed: (random() - 0.5) * 0.4,
+      // 負得比半高少一點：大部分埋在醬的外側，只留一截露出來
+      lift: nugget ? -0.016 : -0.026,
+      nugget,
+      yaw: random() * Math.PI * 2,
+      // 薯條只微微傾斜。斜太多時兩端會翹出醬面，整根看起來浮在空中
+      tilt: nugget ? 0 : 0.12 + random() * 0.18,
+      phase: random() * Math.PI * 2,
+    });
+  });
+
+  return riders;
 }
