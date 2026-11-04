@@ -132,6 +132,8 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     all,
     update,
     ketchupRing: { object: ketchup.ringObject, settings: ketchup.ringSettings, apply: ketchup.applyRingSettings },
+    // 食物數量：面板上的滑桿改這個，再叫 apply 把多出來或少掉的塊數補上
+    ketchupFood: { settings: ketchup.foodSettings, apply: () => ketchup.setFoodCount(ketchup.foodSettings.count) },
     // ground、groundRadius：滑鼠拖曳房子時，要知道是在哪顆球的表面上滑
     ground,
     groundRadius: GROUND_RADIUS,

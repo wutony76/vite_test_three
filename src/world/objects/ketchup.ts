@@ -37,6 +37,10 @@ const RING_OFFSET_Y = 0.38;
 const RING_OFFSET_Z = 0.13;
 // 噴濺效果開關：false = 不建立醬滴、也不跑噴濺的模擬，效能完全不受影響
 const SPLASH_ENABLED = false;
+// 雞塊加薯條的總數。控制面板可以改，這裡是一打開畫面時的數量
+const FOOD_COUNT = 7;
+// 滑桿上限。形狀和材質是共用的，不會每一塊都做一份新的
+const FOOD_COUNT_MAX = 150;
 
 /**
  * 簡單的「可重現亂數」（mulberry32）：同一個 seed 每次產生的數列都一樣
@@ -200,7 +204,20 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
 
   const mesh = new THREE.Mesh(geometry, material);
   // 雞塊、薯條掛在緞帶自己身上：mesh 繞 y 軸轉的時候，它們會跟著醬一起繞，不用另外算位置
-  const riders = createRiders(mesh);
+  // 用 let：控制面板改數量時會換掉這份清單，update 每幀讀到的才是新的
+  let riders = createRiders(mesh, FOOD_COUNT);
+  const foodSettings = { count: FOOD_COUNT };
+
+  /** 把食物數量改成 count。多的從尾巴拿掉，少的只補新的，已經在漂的不會被重新洗牌 */
+  function setFoodCount(count: number) {
+    const next = THREE.MathUtils.clamp(Math.round(count), 0, FOOD_COUNT_MAX);
+    while (riders.length > next) {
+      const removed = riders.pop();
+      if (removed) disposeRider(removed);
+    }
+    while (riders.length < next) riders.push(createRider(mesh, riders.length));
+    foodSettings.count = next;
+  }
 
   // 為什麼要多包一層 pivot？
   // 「擺放角度」和「自轉」要分開：pivot 負責把整圈翻起來、轉到想要的方位，
@@ -329,7 +346,8 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   }
 
   // ringObject：整圈緞帶（pivot），給「在畫面上直接拖曳」用
-  return { object: root, update, ringObject: pivot, ringSettings, applyRingSettings };
+  // foodSettings：食物數量，給控制面板的滑桿用
+  return { object: root, update, ringObject: pivot, ringSettings, applyRingSettings, foodSettings, setFoodCount };
 }
 
 /**
@@ -343,24 +361,29 @@ const RING_LENGTH = ORBIT_RADIUS * Math.PI * 2;
  * 沿著醬把疊在一起的食物推開
  * 走捷徑（較短的那段弧），所以頭尾相接的地方也算得到
  */
+// 依進度排序後重複使用，數量很大時不要每幀重新配置陣列
+const separateOrder: Rider[] = [];
+
 function separateRiders(riders: Rider[]) {
+  const count = riders.length;
+  if (count < 2) return;
+  separateOrder.length = 0;
+  for (let i = 0; i < count; i++) separateOrder.push(riders[i]);
+  // 只推開相鄰的兩塊。數量到幾千時，如果每塊都跟其他所有塊比，畫面會卡住
   for (let pass = 0; pass < 4; pass++) {
-    for (let i = 0; i < riders.length; i++) {
-      for (let j = i + 1; j < riders.length; j++) {
-        const a = riders[i];
-        const b = riders[j];
-        let delta = b.progress - a.progress;
-        if (delta > 0.5) delta -= 1;
-        if (delta < -0.5) delta += 1;
-        const gap = Math.abs(delta) * RING_LENGTH;
-        // 再留一點空隙，碰到時是挨著，不是卡進彼此裡面
-        const need = a.reach + b.reach + 0.012;
-        if (gap >= need) continue;
-        const push = (need - gap) / RING_LENGTH / 2;
-        const sign = delta >= 0 ? 1 : -1;
-        a.progress = THREE.MathUtils.euclideanModulo(a.progress - sign * push, 1);
-        b.progress = THREE.MathUtils.euclideanModulo(b.progress + sign * push, 1);
-      }
+    separateOrder.sort((a, b) => a.progress - b.progress);
+    for (let i = 0; i < count; i++) {
+      const a = separateOrder[i];
+      const b = separateOrder[(i + 1) % count];
+      let delta = b.progress - a.progress;
+      // 最後一塊的下一塊是繞回開頭，差距要加一整圈
+      if (delta < 0) delta += 1;
+      const gap = delta * RING_LENGTH;
+      const need = a.reach + b.reach + 0.012;
+      if (gap >= need) continue;
+      const push = (need - gap) / RING_LENGTH / 2;
+      a.progress = THREE.MathUtils.euclideanModulo(a.progress - push, 1);
+      b.progress = THREE.MathUtils.euclideanModulo(b.progress + push, 1);
     }
   }
 }
@@ -423,70 +446,144 @@ function darkenSunkSide(geometry: THREE.BufferGeometry) {
   geometry.setAttribute('color', new THREE.BufferAttribute(color, 3));
 }
 
-/**
- * 少量雞塊（正方體）和薯條（細長方體），散在緞帶外緣
- * 數量少、用固定種子：每次重新整理都在同樣的位置，不會越加越多
- */
-function createRiders(parent: THREE.Object3D) {
-  const random = createRandom(11);
-  const riders: Rider[] = [];
-  // 3 塊雞塊、4 根薯條。順序打亂。有的挨在一起，有的中間空一大段，不要每段都差一點點
-  const kinds = ['nugget', 'nugget', 'nugget', 'fry', 'fry', 'fry', 'fry'];
-  for (let i = kinds.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [kinds[i], kinds[j]] = [kinds[j], kinds[i]];
-  }
-  let angle = random() * Math.PI * 2;
+function disposeRider(rider: Rider) {
+  // 形狀和材質是所有同類食物共用的，拿掉一塊時不能一起丟掉
+  rider.mesh.removeFromParent();
+}
 
-  kinds.forEach((kind) => {
-    const nugget = kind === 'nugget';
-    const clustered = random() < 0.4;
-    // 最近也要超過兩塊食物的長度，不然一放上去就穿在一起
-    angle += clustered ? 0.16 + random() * 0.2 : 0.9 + random() * 1.5;
-    // 正方體 = 雞塊；細長的長方體 = 薯條。尺寸是上一版的一半
-    const geometry = nugget
-      ? new THREE.BoxGeometry(0.04, 0.04, 0.04)
-      : new THREE.BoxGeometry(0.014, 0.06, 0.014);
-    // 靠近醬的那一面變暗。本地的 -Y 朝向管子，埋進去的那邊才有沉下去的顏色
-    darkenSunkSide(geometry);
-    const material = new THREE.MeshPhongMaterial({
-      // 雞塊偏深褐、薯條偏亮黃。自發光拉高，才不會被醬的高光染成同一種紅
-      color: nugget ? 0xa85a20 : 0xfff2b0,
-      emissive: nugget ? 0x7a4010 : 0xffc850,
+let nuggetGeometry: THREE.BoxGeometry | null = null;
+let fryGeometry: THREE.BoxGeometry | null = null;
+let nuggetMaterial: THREE.MeshPhongMaterial | null = null;
+let fryMaterial: THREE.MeshPhongMaterial | null = null;
+
+function sharedFoodGeometry(nugget: boolean) {
+  if (nugget) {
+    if (!nuggetGeometry) {
+      nuggetGeometry = new THREE.BoxGeometry(0.04, 0.04, 0.04);
+      darkenSunkSide(nuggetGeometry);
+    }
+    return nuggetGeometry;
+  }
+  if (!fryGeometry) {
+    fryGeometry = new THREE.BoxGeometry(0.014, 0.06, 0.014);
+    darkenSunkSide(fryGeometry);
+  }
+  return fryGeometry;
+}
+
+function sharedFoodMaterial(nugget: boolean) {
+  if (nugget) {
+    if (!nuggetMaterial) {
+      nuggetMaterial = new THREE.MeshPhongMaterial({
+        // 雞塊偏深褐。自發光拉高，才不會被醬的高光染成同一種紅
+        color: 0xa85a20,
+        emissive: 0x7a4010,
+        emissiveIntensity: 0.65,
+        shininess: 12,
+        vertexColors: true,
+      });
+    }
+    return nuggetMaterial;
+  }
+  if (!fryMaterial) {
+    fryMaterial = new THREE.MeshPhongMaterial({
+      // 薯條偏亮黃
+      color: 0xfff2b0,
+      emissive: 0xffc850,
       emissiveIntensity: 0.65,
       shininess: 12,
       vertexColors: true,
     });
-    const mesh = new THREE.Mesh(geometry, material);
+  }
+  return fryMaterial;
+}
 
-    // 一開始的位置。之後每幀會沿著圈圈改這個點
-    const center = new THREE.Vector3(Math.cos(angle) * ORBIT_RADIUS, 0, Math.sin(angle) * ORBIT_RADIUS);
-    mesh.position.copy(center);
-
-    parent.add(mesh);
-    riders.push({
-      mesh,
-      center,
-      progress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
-      // 有的幾乎停在醬裡，有的漂得比較快，才不會永遠保持同樣的間距
-      // 薯條較長，轉到順著圈時比較容易碰到旁邊那塊
-      reach: nugget ? 0.032 : 0.038,
-      drift: 0.006 + random() * 0.04,
-      driftPhase: random() * Math.PI * 2,
-      yawSpeed: (random() - 0.5) * 0.4,
-      // 一開始就有的在上緣、有的在下緣，之後各自慢慢換邊
-      climb: (random() - 0.5) * 0.9,
-      climbSpeed: 0.12 + random() * 0.16,
-      climbRate: 0.28 + random() * 0.4,
-      // 負得比半高少一點：大部分埋在醬的外側，只留一截露出來
-      lift: nugget ? -0.016 : -0.026,
-      nugget,
-      yaw: random() * Math.PI * 2,
-      // 薯條只微微傾斜。斜太多時兩端會翹出醬面，整根看起來浮在空中
-      tilt: nugget ? 0 : 0.12 + random() * 0.18,
-      phase: random() * Math.PI * 2,
-    });
-  });
-
+/**
+ * 少量雞塊（正方體）和薯條（細長方體），散在緞帶外緣
+ * 每一塊用自己的編號當種子：加數量時只多出新的，原來那幾塊位置不變
+ */
+function createRiders(parent: THREE.Object3D, count: number) {
+  const riders: Rider[] = [];
+  for (let index = 0; index < count; index++) riders.push(createRider(parent, index));
   return riders;
+}
+
+/**
+ * 前 7 塊沿用原來的亂數順序，畫面才不會因為加了滑桿而整批換位置
+ * 第 8 塊以後各自用編號當種子，加數量時不會牽動前面那些
+ */
+function riderSpec(index: number) {
+  if (index < FOOD_COUNT) {
+    const random = createRandom(11);
+    const kinds = ['nugget', 'nugget', 'nugget', 'fry', 'fry', 'fry', 'fry'];
+    for (let i = kinds.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [kinds[i], kinds[j]] = [kinds[j], kinds[i]];
+    }
+    let angle = random() * Math.PI * 2;
+    let spec: ReturnType<typeof oneSpec> | null = null;
+    for (let i = 0; i <= index; i++) {
+      const nugget = kinds[i] === 'nugget';
+      const clustered = random() < 0.4;
+      // 最近也要超過兩塊食物的長度，不然一放上去就穿在一起
+      angle += clustered ? 0.16 + random() * 0.2 : 0.9 + random() * 1.5;
+      spec = oneSpec(nugget, angle, random);
+    }
+    return spec!;
+  }
+  const random = createRandom(11 + index * 97);
+  const nugget = index % 7 < 3;
+  const angle = random() * Math.PI * 2;
+  return oneSpec(nugget, angle, random);
+}
+
+function oneSpec(nugget: boolean, angle: number, random: () => number) {
+  return {
+    nugget,
+    angle,
+    drift: 0.006 + random() * 0.04,
+    driftPhase: random() * Math.PI * 2,
+    yawSpeed: (random() - 0.5) * 0.4,
+    climb: (random() - 0.5) * 0.9,
+    climbSpeed: 0.12 + random() * 0.16,
+    climbRate: 0.28 + random() * 0.4,
+    yaw: random() * Math.PI * 2,
+    tilt: nugget ? 0 : 0.12 + random() * 0.18,
+    phase: random() * Math.PI * 2,
+  };
+}
+
+function createRider(parent: THREE.Object3D, index: number): Rider {
+  const spec = riderSpec(index);
+  const { nugget, angle } = spec;
+  // 正方體 = 雞塊；細長的長方體 = 薯條。形狀共用，數量很大時才不會每一塊都做一份
+  const mesh = new THREE.Mesh(sharedFoodGeometry(nugget), sharedFoodMaterial(nugget));
+
+  // 一開始的位置。之後每幀會沿著圈圈改這個點
+  const center = new THREE.Vector3(Math.cos(angle) * ORBIT_RADIUS, 0, Math.sin(angle) * ORBIT_RADIUS);
+  mesh.position.copy(center);
+  parent.add(mesh);
+
+  return {
+    mesh,
+    center,
+    progress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
+    // 有的幾乎停在醬裡，有的漂得比較快，才不會永遠保持同樣的間距
+    // 薯條較長，轉到順著圈時比較容易碰到旁邊那塊
+    reach: nugget ? 0.032 : 0.038,
+    drift: spec.drift,
+    driftPhase: spec.driftPhase,
+    yawSpeed: spec.yawSpeed,
+    // 一開始就有的在上緣、有的在下緣，之後各自慢慢換邊
+    climb: spec.climb,
+    climbSpeed: spec.climbSpeed,
+    climbRate: spec.climbRate,
+    // 負得比半高少一點：大部分埋在醬的外側，只留一截露出來
+    lift: nugget ? -0.016 : -0.026,
+    nugget,
+    yaw: spec.yaw,
+    // 薯條只微微傾斜。斜太多時兩端會翹出醬面，整根看起來浮在空中
+    tilt: spec.tilt,
+    phase: spec.phase,
+  };
 }

@@ -126,7 +126,7 @@ scene.add(hemisphereLight);
 
 
 // WORLD...OBJECTS
-const { all, update: updateObjs, ketchupRing, houses, ground, groundRadius } = createObjs({ envMap, camera });
+const { all, update: updateObjs, ketchupRing, ketchupFood, houses, ground, groundRadius } = createObjs({ envMap, camera });
 
 scene.add(all);
 
@@ -243,6 +243,10 @@ ringFolder.add(ring, 'yawDegrees', -180, 180, 1).name('方位 RING_YAW (°)').on
 ringFolder.add(ring, 'offsetX', -2, 2, 0.01).name('位置 X RING_OFFSET_X').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
 ringFolder.add(ring, 'offsetY', -2, 2, 0.01).name('高度 RING_OFFSET_Y').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
 ringFolder.add(ring, 'offsetZ', -2, 2, 0.01).name('位置 Z RING_OFFSET_Z').onChange(ketchupRing.apply).onFinishChange(logKetchupRing);
+// 食物數量：0 就是醬上什麼都不放。拖拉時立刻增減，放開才把數字印到 console
+ringFolder.add(ketchupFood.settings, 'count', 0, 150, 1).name('食物數量').onChange(ketchupFood.apply).onFinishChange(() => {
+  console.log(`const FOOD_COUNT = ${ketchupFood.settings.count};`);
+});
 
 // DEBUG...房子的控制面板
 // 調整到滿意後，把 console 印出來的那幾行貼回對應房子的設定
