@@ -267,6 +267,8 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   const riderTangent = new THREE.Vector3();
   const riderLocalDir = new THREE.Vector3();
   const riderSurface = new THREE.Vector3();
+  const riderBinormal = new THREE.Vector3();
+  const riderDir = new THREE.Vector3();
   const RIDER_Y_AXIS = new THREE.Vector3(0, 1, 0);
 
   /** 每幀呼叫：time 單位是秒 */
@@ -285,6 +287,9 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
       const surge = 0.35 + 0.65 * Math.sin(time * 0.45 + rider.driftPhase);
       rider.progress = THREE.MathUtils.euclideanModulo(rider.progress + deltaTime * rider.drift * surge, 1);
       rider.yaw += deltaTime * rider.yawSpeed;
+      // 順著流的時候，有一段往醬的上緣、有一段往下緣。碰到邊緣就停，換向之後再漂回來
+      const heading = Math.sin(time * rider.climbRate + rider.driftPhase) >= 0 ? 1 : -1;
+      rider.climb = THREE.MathUtils.clamp(rider.climb + deltaTime * rider.climbSpeed * heading, -0.7, 0.7);
     }
     // 快的追上慢的時把彼此推開，不要從身上穿過去
     separateRiders(riders);
@@ -298,7 +303,13 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
       riderOffset.addScaledVector(riderTangent, -riderOffset.dot(riderTangent));
       if (riderOffset.lengthSq() < 1e-8) riderOffset.copy(riderWorld);
       riderOffset.normalize();
-      riderLocalDir.copy(riderOffset).transformDirection(riderInverse);
+      // 沿管子轉一點：正值往畫面上方的醬緣，負值往下方。還是貼在管子上，不會離醬
+      riderBinormal.crossVectors(riderTangent, riderOffset);
+      if (riderBinormal.lengthSq() < 1e-8) riderBinormal.set(0, 1, 0);
+      else riderBinormal.normalize();
+      if (riderBinormal.dot(camera.up) < 0) riderBinormal.negate();
+      riderDir.copy(riderOffset).multiplyScalar(Math.cos(rider.climb)).addScaledVector(riderBinormal, Math.sin(rider.climb)).normalize();
+      riderLocalDir.copy(riderDir).transformDirection(riderInverse);
       riderSurface.copy(rider.center).addScaledVector(riderLocalDir, TUBE_RADIUS);
       const swell = sauceSwell(rider.progress, riderSurface, uniforms.uTime.value);
       // 兩層慢起伏疊在一起：一下浮出多一點，一下再沉回去。幅度小，底部仍留在醬裡
@@ -306,7 +317,7 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
         Math.sin(time * 0.9 + rider.phase) * 0.007 +
         Math.sin(time * 0.27 + rider.driftPhase) * 0.004;
       // 中心在醬面裡面，上半露在外側。鏡頭怎麼轉，這一面都不變
-      rider.mesh.position.copy(riderWorld).addScaledVector(riderOffset, TUBE_RADIUS + swell + rider.lift + bob);
+      rider.mesh.position.copy(riderWorld).addScaledVector(riderDir, TUBE_RADIUS + swell + rider.lift + bob);
       rider.mesh.position.applyMatrix4(riderInverse);
       rider.mesh.quaternion.setFromUnitVectors(RIDER_Y_AXIS, riderLocalDir);
       rider.mesh.rotateY(rider.yaw);
@@ -375,6 +386,10 @@ type Rider = {
   drift: number;
   driftPhase: number;
   yawSpeed: number;
+  // 繞著管子偏離外側中線的角度。正值往上緣，負值往下緣
+  climb: number;
+  climbSpeed: number;
+  climbRate: number;
   // 負值 = 中心在表面裡面，底部埋進醬裡
   lift: number;
   nugget: boolean;
@@ -459,6 +474,10 @@ function createRiders(parent: THREE.Object3D) {
       drift: 0.006 + random() * 0.04,
       driftPhase: random() * Math.PI * 2,
       yawSpeed: (random() - 0.5) * 0.4,
+      // 一開始就有的在上緣、有的在下緣，之後各自慢慢換邊
+      climb: (random() - 0.5) * 0.9,
+      climbSpeed: 0.12 + random() * 0.16,
+      climbRate: 0.28 + random() * 0.4,
       // 負得比半高少一點：大部分埋在醬的外側，只留一截露出來
       lift: nugget ? -0.016 : -0.026,
       nugget,
