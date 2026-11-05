@@ -60,13 +60,17 @@ export type IntroBallEase = (typeof INTRO_BALL_EASE_OPTIONS)[number];
 export function createObjs({ envMap, camera }: CreateObjsOptions) {
   const all = new THREE.Object3D();
 
-  // 地表：房子要種在它上面，所以先留著參照
+  // 地表：綠球 + 房子共用同一個 pivot（球心在原點），入場時整組移動、縮放
+  // 房子不能掛在球 mesh 底下當子物件：Three.js 很難把子 mesh 的影子投到父 mesh（球面接不到影）
   // 用模型時沒有綠球，就退回種在 all 上
   let ground: THREE.Object3D = all;
+  let groundSurface: THREE.Mesh | null = null;
   if (USE_MODEL) {
     loadModel(all);
   } else {
-    ground = createBall();
+    ground = new THREE.Object3D();
+    groundSurface = createBall();
+    ground.add(groundSurface);
     all.add(ground);
   }
 
@@ -76,7 +80,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
 
   // 房子：house.ts 裡的長方體，種在綠球（地表）上
   // 要用緞帶的軸來決定種在哪，所以放在緞帶建立之後
-  // 加成綠球的「子物件」而不是 all 的：兩者綁成一體，之後綠球怎麼移動、旋轉，房子都會跟著走
+  // 加成 ground pivot 的子物件（跟綠球同層）：球怎麼移動、縮放，房子都會跟著走，且影子能落在球面上
   const mainHall = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   ground.add(mainHall.object);
 
@@ -314,10 +318,12 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     ketchupRing: { object: ketchup.ringObject, settings: ketchup.ringSettings, apply: ketchup.applyRingSettings },
     // 食物數量：面板上的滑桿改這個，再叫 apply 把多出來或少掉的塊數補上
     ketchupFood: { settings: ketchup.foodSettings, apply: () => ketchup.setFoodCount(ketchup.foodSettings.count) },
-    // ground、groundRadius：滑鼠拖曳房子時，要知道是在哪顆球的表面上滑
+    // ground、groundSurface、groundRadius：拖曳與地表材質；ground 是 pivot，groundSurface 才是綠球 mesh
     ground,
+    groundSurface,
     groundRadius: GROUND_RADIUS,
     isHouseGrown,
+    isIntroComplete: () => introDone,
     introSettings,
     replayIntro,
     houses: [
@@ -440,7 +446,10 @@ function createBall() {
     // 高光收小一點：球的正面以前會亮成一顆白點，壓在底部的紅上面很搶
     shininess: 14,
   });
-  return new THREE.Mesh(geometry, material);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.receiveShadow = true;
+  mesh.castShadow = false;
+  return mesh;
 }
 
 // 炸雞模型：載入是非同步的，先把空的 all 交給場景，載完再把模型塞進去

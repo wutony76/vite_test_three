@@ -22,10 +22,10 @@ import { playHouseTransition, playSceneLoad, transitionSettings } from './houseT
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // 關掉自動清畫面：一幀要畫兩個場景（背景 + 主場景），
 // 少了這行，第二次 render 前會把畫面清空，背景漸層就被擦成黑色
 renderer.autoClear = false;
-// renderer.shadowMap.type = THREE.PCFShadowMap; // PCF：陰影邊緣稍微柔和，不會一格一格的
 document.body.appendChild(renderer.domElement);
 
 
@@ -113,17 +113,45 @@ backgroundScene.add(backgroundMesh);
 //   ① 兩盞各照一半，交界那一圈兩邊都照不到，會切出一條暗帶
 //   ② 每盞都會打出自己的高光，房子上會多一顆刺眼的亮點
 // 想要溫暖就把它調成蜂蜜色，不要另開一盞。太黃（接近橘色）會把青、綠乘成橄欖色
-const directionalLight = new THREE.DirectionalLight(0xffd98a, 2);
+const directionalLight = new THREE.DirectionalLight(0xffd98a, 0.7);
 directionalLight.position.set(-5, 8, 2);
+// 太陽也投影：手電筒光錐只罩一部分，房子在球面上的影主要靠這盞才看得見
+directionalLight.castShadow = true;
+directionalLight.shadow.mapSize.set(2048, 2048);
+directionalLight.shadow.camera.near = 0.5;
+directionalLight.shadow.camera.far = 24;
+const sunShadowSpan = 5;
+directionalLight.shadow.camera.left = -sunShadowSpan;
+directionalLight.shadow.camera.right = sunShadowSpan;
+directionalLight.shadow.camera.top = sunShadowSpan;
+directionalLight.shadow.camera.bottom = -sunShadowSpan;
+directionalLight.shadow.bias = -0.00012;
+directionalLight.shadow.normalBias = 0.022;
+directionalLight.shadow.camera.updateProjectionMatrix();
 scene.add(directionalLight);
+scene.add(directionalLight.target);
 
 // 補光：用半球光（HemisphereLight）把暗部托起來，不負責當第二個太陽
 // 半球光依表面朝向混色：朝上的面拿天空色、朝下的面拿地面色，中間平滑過渡
 // 為什麼不用平行光當補光？理由跟上面一樣：暗帶、第二顆高光
 // 天空、地面都用淺的暖色，暗部才會是暖的，不會被青色補光把太陽的暖意抵銷
 // 強度壓在 1 以下，亮面仍然是太陽在主導
-const hemisphereLight = new THREE.HemisphereLight(0xfff3d4, 0xffc9a8, 0.5);
+const hemisphereLight = new THREE.HemisphereLight(0xfff3d4, 0xffc9a8, 1.5);
 scene.add(hemisphereLight);
+
+// 手電筒：聚光燈跟著鏡頭；只有這盞負責打影子，太陽仍管整體明暗
+const flashlight = new THREE.SpotLight(0xe2de79, 21.5, 40, THREE.MathUtils.degToRad(26), 0.42, 2);
+flashlight.castShadow = true;
+flashlight.shadow.mapSize.set(2048, 2048);
+flashlight.shadow.camera.near = 0.4;
+flashlight.shadow.camera.far = 40;
+flashlight.shadow.bias = -0.00015;
+flashlight.shadow.normalBias = 0.025;
+scene.add(flashlight);
+scene.add(flashlight.target);
+
+const flashlightAim = new THREE.Vector3();
+const flashlightDir = new THREE.Vector3();
 
 
 // WORLD...OBJECTS
@@ -134,13 +162,25 @@ const {
   ketchupFood,
   houses,
   ground,
+  groundSurface,
   groundRadius,
   isHouseGrown,
+  isIntroComplete,
   introSettings,
   replayIntro,
 } = createObjs({ envMap, camera });
 
 scene.add(all);
+enableMeshShadows(all);
+
+/** 手電筒照到的物件要投影、被照到的面要接影 */
+function enableMeshShadows(root: THREE.Object3D) {
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    node.castShadow = true;
+    node.receiveShadow = true;
+  });
+}
 
 // 讓鏡頭沿著番茄醬流動的方向轉：把旋轉軸換成「緞帶圈圈的中心軸」
 // OrbitControls 是繞著 camera.up 轉的（預設是世界的 +Y，也就是正上方）
@@ -205,9 +245,10 @@ const gui = new GUI({ title: '控制面板' });
 // 整體、緞帶、房子各自一個分組，面板才分得出哪個滑桿調哪個物件
 // 整體放最上面：太陽和補光會乘上每一棟、地表的顏色，先調這組才看得出整體暖不暖
 const lightFolder = gui.addFolder('整體');
-const groundMaterial = ground instanceof THREE.Mesh && !Array.isArray(ground.material)
-  ? ground.material as THREE.MeshPhongMaterial
-  : null;
+const groundMaterial =
+  groundSurface && !Array.isArray(groundSurface.material)
+    ? (groundSurface.material as THREE.MeshPhongMaterial)
+    : null;
 const lightSettings = {
   sunColor: `#${directionalLight.color.getHexString()}`,
   sunIntensity: directionalLight.intensity,
@@ -217,11 +258,27 @@ const lightSettings = {
   // 沒有綠球（改載模型）時不提供這一格
   surfaceColor: groundMaterial ? `#${groundMaterial.color.getHexString()}` : '',
 };
+const flashSettings = {
+  enabled: true,
+  color: `#${flashlight.color.getHexString()}`,
+  intensity: flashlight.intensity,
+  angleDegrees: THREE.MathUtils.radToDeg(flashlight.angle),
+  penumbra: flashlight.penumbra,
+  distance: flashlight.distance,
+  aimAtTarget: true,
+};
+lightFolder.add(flashSettings, 'enabled').name('手電筒').onChange(applyFlashlight);
+lightFolder.addColor(flashSettings, 'color').name('手電筒顏色').onChange(applyFlashlight).onFinishChange(logFlashlight);
+lightFolder.add(flashSettings, 'intensity', 0, 40, 0.5).name('手電筒強度').onChange(applyFlashlight).onFinishChange(logFlashlight);
+lightFolder.add(flashSettings, 'angleDegrees', 8, 60, 1).name('光錐角度 (°)').onChange(applyFlashlight).onFinishChange(logFlashlight);
+lightFolder.add(flashSettings, 'penumbra', 0, 1, 0.02).name('光錐柔邊').onChange(applyFlashlight).onFinishChange(logFlashlight);
+lightFolder.add(flashSettings, 'distance', 5, 80, 1).name('照射距離').onChange(applyFlashlight).onFinishChange(logFlashlight);
+lightFolder.add(flashSettings, 'aimAtTarget').name('對準旋轉中心').onChange(applyFlashlight);
 lightFolder.addColor(lightSettings, 'sunColor').name('太陽顏色').onChange(applyLights).onFinishChange(logLights);
 lightFolder.add(lightSettings, 'sunIntensity', 0, 4, 0.05).name('太陽強度').onChange(applyLights).onFinishChange(logLights);
 lightFolder.addColor(lightSettings, 'skyColor').name('朝上補光').onChange(applyLights).onFinishChange(logLights);
 lightFolder.addColor(lightSettings, 'groundLightColor').name('朝下補光').onChange(applyLights).onFinishChange(logLights);
-lightFolder.add(lightSettings, 'fillIntensity', 0, 2, 0.05).name('補光強度').onChange(applyLights).onFinishChange(logLights);
+lightFolder.add(lightSettings, 'fillIntensity', 0, 3, 0.05).name('補光強度').onChange(applyLights).onFinishChange(logLights);
 if (groundMaterial) {
   lightFolder.addColor(lightSettings, 'surfaceColor').name('地表顏色').onChange(applyLights).onFinishChange(logLights);
 }
@@ -244,6 +301,55 @@ function logLights() {
     (lightSettings.surfaceColor ? `\ncolor: ${hex(lightSettings.surfaceColor)},` : '')
   );
 }
+
+function isFlashlightActive() {
+  return flashSettings.enabled && isIntroComplete();
+}
+
+function applyFlashlight() {
+  const on = isFlashlightActive();
+  flashlight.visible = on;
+  flashlight.castShadow = on;
+  if (!on) {
+    flashlight.intensity = 0;
+    return;
+  }
+  flashlight.color.set(flashSettings.color);
+  flashlight.intensity = flashSettings.intensity;
+  flashlight.angle = THREE.MathUtils.degToRad(flashSettings.angleDegrees);
+  flashlight.penumbra = flashSettings.penumbra;
+  flashlight.distance = flashSettings.distance;
+  flashlight.shadow.camera.far = flashSettings.distance;
+}
+
+function updateFlashlight() {
+  applyFlashlight();
+  if (!isFlashlightActive()) return;
+  flashlight.position.copy(camera.position);
+  if (flashSettings.aimAtTarget) {
+    flashlightAim.copy(controls.target);
+  } else {
+    camera.getWorldDirection(flashlightDir);
+    flashlightAim.copy(camera.position).addScaledVector(flashlightDir, 6);
+  }
+  flashlight.target.position.copy(flashlightAim);
+}
+
+function logFlashlight() {
+  const hex = (color: string) => `0x${color.replace('#', '')}`;
+  console.log(
+    `// 手電筒\n` +
+      `enabled: ${flashSettings.enabled},\n` +
+      `color: ${hex(flashSettings.color)},\n` +
+      `intensity: ${flashSettings.intensity.toFixed(1)},\n` +
+      `angleDegrees: ${flashSettings.angleDegrees.toFixed(0)},\n` +
+      `penumbra: ${flashSettings.penumbra.toFixed(2)},\n` +
+      `distance: ${flashSettings.distance.toFixed(0)},\n` +
+      `aimAtTarget: ${flashSettings.aimAtTarget}`,
+  );
+}
+
+applyFlashlight();
 
 const introFolder = gui.addFolder('入場動畫');
 introFolder.add(introSettings, 'emptyHold', 0, 2, 0.05).name('空景等待 (秒)').onFinishChange(logIntro);
@@ -488,6 +594,9 @@ function render(time: number) {
   updateObjs(time * 0.001);
   // enableDamping 開啟時每幀都要 update，否則放開滑鼠後不會有慣性滑動
   controls.update();
+  updateFlashlight();
+  // 入場會動 ground pivot，陰影貼圖要用最新的世界矩陣
+  all.updateMatrixWorld(true);
   // 拖曳、旋轉鏡頭時房子在畫面上的位置每幀都在變，名字要跟著重算
   updateHouseLabel();
   // autoClear 關掉後要自己在每幀開頭清一次，否則上一幀的殘影會疊上來

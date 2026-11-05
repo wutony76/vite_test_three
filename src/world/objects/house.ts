@@ -48,7 +48,7 @@ type CreateHouseOptions = {
 /**
  * 建立房子，並種在球面上
  * 回傳的 settings 改完之後呼叫 applySettings() 就會套用，給控制面板用
- * 前提：房子要加成「球的子物件」，且球心在父層的原點，這裡算的位置才會剛好落在球面上
+ * 前提：房子要加成 ground pivot 的子物件（與綠球 mesh 同層），且球心在 pivot 原點，位置才會落在球面上
  */
 export function createHouse({ groundRadius, up, front }: CreateHouseOptions) {
   const settings: HouseSettings = {
@@ -73,6 +73,8 @@ export function createHouse({ groundRadius, up, front }: CreateHouseOptions) {
     shininess: 36,
   });
   const mesh = new THREE.Mesh(createBoxGeometry(settings), material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
 
   // 暫存的向量、旋轉：applySettings 拖滑桿時每一格都會跑，重複利用避免一直 new
   const Y_AXIS = new THREE.Vector3(0, 1, 0);
