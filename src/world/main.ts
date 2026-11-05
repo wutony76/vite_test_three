@@ -7,11 +7,12 @@ import gradientFragmentShader from './shader/gradient.frag.glsl?raw';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // RoomEnvironment：three.js 內建的「虛擬攝影棚」，拿來當反射用的環境，不用另外下載 HDR 圖
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { createObjs, type WorldHouse } from './objects/obj';
+import { createObjs, INTRO_BALL_EASE_OPTIONS, type WorldHouse } from './objects/obj';
 // lil-gui：three.js 內建的小型控制面板，拖拉滑桿就能即時調整數值，不用改程式碼重新整理
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { enableViewPlaneDrag } from './debug/viewPlaneDrag';
 import { enableSurfaceDrag } from './debug/surfaceDrag';
+import { playHouseTransition, playSceneLoad, transitionSettings } from './houseTransition';
 
 // RENDERER
 /**
@@ -126,7 +127,18 @@ scene.add(hemisphereLight);
 
 
 // WORLD...OBJECTS
-const { all, update: updateObjs, ketchupRing, ketchupFood, houses, ground, groundRadius } = createObjs({ envMap, camera });
+const {
+  all,
+  update: updateObjs,
+  ketchupRing,
+  ketchupFood,
+  houses,
+  ground,
+  groundRadius,
+  isHouseGrown,
+  introSettings,
+  replayIntro,
+} = createObjs({ envMap, camera });
 
 scene.add(all);
 
@@ -233,6 +245,43 @@ function logLights() {
   );
 }
 
+const introFolder = gui.addFolder('入場動畫');
+introFolder.add(introSettings, 'emptyHold', 0, 2, 0.05).name('空景等待 (秒)').onFinishChange(logIntro);
+introFolder.add(introSettings, 'ballSeconds', 0.3, 8, 0.05).name('綠球跑進 (秒)').onFinishChange(logIntro);
+introFolder.add(introSettings, 'ballMoveEase', [...INTRO_BALL_EASE_OPTIONS]).name('綠球位移 tween').onFinishChange(logIntro);
+introFolder.add(introSettings, 'ballScaleEase', [...INTRO_BALL_EASE_OPTIONS]).name('綠球縮放 tween').onFinishChange(logIntro);
+introFolder.add(introSettings, 'ballScaleLag', 0, 1.5, 0.02).name('綠球縮放延遲 (秒)').onFinishChange(logIntro);
+introFolder.add(introSettings, 'ballStartScale', 0.05, 0.5, 0.01).name('綠球起始縮放').onFinishChange(logIntro);
+introFolder.add(introSettings, 'ballOvershoot', 0, 5, 0.1).name('綠球回彈 (outBack)').onFinishChange(logIntro);
+introFolder.add(introSettings, 'houseSeconds', 0.3, 3, 0.05).name('房子長出 (秒)').onFinishChange(logIntro);
+introFolder.add(introSettings, 'houseStagger', 0, 0.4, 0.01).name('房子間隔 (秒)').onFinishChange(logIntro);
+introFolder.add(introSettings, 'houseOvershoot', 0, 5, 0.1).name('房子回彈').onFinishChange(logIntro);
+introFolder.add(introSettings, 'ketchupSeconds', 0.5, 4, 0.05).name('番茄醬繞環 (秒)').onFinishChange(logIntro);
+introFolder.add(introSettings, 'ketchupAfterHouse', 0, 1, 0.05).name('醬在末棟比例').onFinishChange(logIntro);
+const introControls = {
+  replayIntro() {
+    replayIntro();
+  },
+};
+introFolder.add(introControls, 'replayIntro').name('重播入場');
+
+function logIntro() {
+  console.log(
+    `const INTRO_EMPTY_HOLD = ${introSettings.emptyHold.toFixed(2)};\n` +
+      `const BALL_SECONDS = ${introSettings.ballSeconds.toFixed(2)};\n` +
+      `const BALL_SCALE_LAG = ${introSettings.ballScaleLag.toFixed(2)};\n` +
+      `const BALL_START_SCALE = ${introSettings.ballStartScale.toFixed(2)};\n` +
+      `const BALL_OVERSHOOT = ${introSettings.ballOvershoot.toFixed(2)};\n` +
+      `const BALL_MOVE_EASE = '${introSettings.ballMoveEase}';\n` +
+      `const BALL_SCALE_EASE = '${introSettings.ballScaleEase}';\n` +
+      `const HOUSE_SECONDS = ${introSettings.houseSeconds.toFixed(2)};\n` +
+      `const HOUSE_STAGGER = ${introSettings.houseStagger.toFixed(2)};\n` +
+      `const HOUSE_OVERSHOOT = ${introSettings.houseOvershoot.toFixed(2)};\n` +
+      `const KETCHUP_SECONDS = ${introSettings.ketchupSeconds.toFixed(2)};\n` +
+      `const KETCHUP_AFTER_HOUSE = ${introSettings.ketchupAfterHouse.toFixed(2)};`,
+  );
+}
+
 const ringFolder = gui.addFolder('番茄醬緞帶');
 const ring = ketchupRing.settings;
 // onChange：拖拉中每一格都即時套用，馬上看到效果
@@ -246,6 +295,13 @@ ringFolder.add(ring, 'offsetZ', -2, 2, 0.01).name('位置 Z RING_OFFSET_Z').onCh
 // 食物數量：0 就是醬上什麼都不放。拖拉時立刻增減，放開才把數字印到 console
 ringFolder.add(ketchupFood.settings, 'count', 0, 150, 1).name('食物數量').onChange(ketchupFood.apply).onFinishChange(() => {
   console.log(`const FOOD_COUNT = ${ketchupFood.settings.count};`);
+});
+
+// 點房子時旋進來的方塊。放開顏色才播一次，拖拉過程不要連著重播
+const transitionFolder = gui.addFolder('轉場');
+transitionFolder.addColor(transitionSettings, 'color').name('黑幕顏色').onFinishChange(() => {
+  console.log(`const CURTAIN_COLOR = '${transitionSettings.color}';`);
+  void playHouseTransition();
 });
 
 // DEBUG...房子的控制面板
@@ -315,6 +371,11 @@ const labelAnchor = new THREE.Vector3();
 
 /** 把選中房子的屋頂中心投影到螢幕，名字就浮在它正上方 */
 function updateHouseLabel() {
+  // 房子還埋在地裡時，名字會貼在球面上跟著跑。等它長出來再顯示
+  if (!isHouseGrown(selectedHouse.object)) {
+    houseLabel.style.visibility = 'hidden';
+    return;
+  }
   houseLabel.textContent = selectedHouse.label;
   // 幾何的原點在底部，屋頂在自己的 +Y、還沒乘縮放的高度；localToWorld 會把縮放和地球的旋轉算進去
   labelAnchor.set(0, selectedHouse.settings.height, 0);
@@ -358,6 +419,10 @@ if (HOUSE_DRAG_ENABLED) {
       houseFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
     onDragEnd: logHouse,
+    // 點一下才播轉場。拖曳仍然只是沿著球面移動房子
+    onClick: () => {
+      void playHouseTransition();
+    },
   });
 }
 
@@ -433,6 +498,8 @@ function render(time: number) {
   renderer.render(scene, camera);
 }
 renderer.setAnimationLoop(render);
+// 場景迴圈開始後才掀開：黑幕底下已經有畫好的畫面，不會旋開到一片空白
+void playSceneLoad();
 
 
 window.addEventListener('resize', () => {

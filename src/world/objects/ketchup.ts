@@ -105,7 +105,7 @@ class KetchupCurve extends THREE.Curve<THREE.Vector3> {
  * 用函式每次產生新的一份，而不是共用同一個材質：緞帶會再加上流動變形，醬滴不需要
  */
 function createKetchupMaterial(envMap: THREE.Texture) {
-  return new THREE.MeshPhysicalMaterial({
+  const material = new THREE.MeshPhysicalMaterial({
     color: 0xe83055,
     // color: 0xfffb8f,
     // 粗糙度低 = 表面滑順、高光集中，像濕潤的醬汁
@@ -123,6 +123,11 @@ function createKetchupMaterial(envMap: THREE.Texture) {
     // 亮面的燈光比它強很多會蓋過去，所以橙色只在暗部看得出來，整體還是紅的
     emissive: 0x5a1800,
   });
+  // 管子貼在球面上，深度太接近會和綠球搶同一層像素而閃爍
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = -4;
+  material.polygonOffsetUnits = -4;
+  return material;
 }
 
 /**
@@ -170,19 +175,42 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   const material = createKetchupMaterial(envMap);
 
   // 所有 shader 共用同一個 uniform 物件：每幀改 value，shader 就會讀到新的時間
-  const uniforms = { uTime: { value: 0 } };
+  const uniforms = {
+    uTime: { value: 0 },
+    // 載入時醬從 uWrapOrigin 開始，沿著圈圈長到 uWrap。1 = 已經繞滿
+    uWrap: { value: 0 },
+    uWrapOrigin: { value: 0 },
+  };
 
   // onBeforeCompile：在 three.js 編譯內建材質的 shader 前插入自己的程式碼
   // 好處是保留 MeshPhysicalMaterial 的光照、清漆效果，只加上我們要的變形
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime;
+    shader.uniforms.uWrap = uniforms.uWrap;
+    shader.uniforms.uWrapOrigin = uniforms.uWrapOrigin;
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        uniform float uWrap;
+        uniform float uWrapOrigin;
+        varying float vWrapProgress;`,
+      )
+      .replace(
+        '#include <clipping_planes_fragment>',
+        `#include <clipping_planes_fragment>
+        // 還沒繞到的部分剪掉。從球後方那一點開始長，再繞到前面
+        if (uWrap < 0.999 && fract(vWrapProgress - uWrapOrigin + 1.0) > uWrap) discard;`,
+      );
 
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
         `#include <common>
         uniform float uTime;
-        attribute float aProgress;`,
+        attribute float aProgress;
+        varying float vWrapProgress;`,
       )
       // begin_vertex 之後 transformed 就是頂點原始位置，在這裡把它推出去
       .replace(
@@ -197,8 +225,8 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
                      * sin(position.y * 11.0 - uTime * 1.3)
                      * sin(position.z * 7.0 + uTime * 2.1);
         // 沿法線（管子表面朝外的方向）推動：正值變粗、負值變細
-        // 管子半徑 ${TUBE_RADIUS}，推動量控制在半徑的一半以內，才不會細到斷掉
-        transformed += objectNormal * (blob * ${BLOB_AMOUNT.toFixed(4)} + wobble * ${WOBBLE_AMOUNT.toFixed(4)});`,
+        transformed += objectNormal * (blob * ${BLOB_AMOUNT.toFixed(4)} + wobble * ${WOBBLE_AMOUNT.toFixed(4)});
+        vWrapProgress = aProgress;`,
       );
   };
 
@@ -236,8 +264,11 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     offsetZ: RING_OFFSET_Z,
   };
 
+  let wrapOriginReady = false;
+
   /** 依照 ringSettings 擺放整圈；半徑有變才重建管子（重建比較花時間，角度、高度改變不需要） */
   function applyRingSettings() {
+    wrapOriginReady = false;
     // 'YXZ'：先轉方位（y），再往上翻（x），翻的方向才會跟著方位走
     pivot.rotation.set(
       THREE.MathUtils.degToRad(ringSettings.tiltDegrees),
@@ -275,6 +306,11 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   const root = new THREE.Group();
   root.add(pivot);
   if (splash) root.add(splash.object);
+
+  const wrapPoint = new THREE.Vector3();
+  const ballCenter = new THREE.Vector3(0, 0, 0);
+  const viewToBall = new THREE.Vector3();
+  const fromBallCenter = new THREE.Vector3();
 
   let lastTime: number | null = null;
   // 每幀重算配料位置用的暫存，避免一直 new 新的向量
@@ -345,9 +381,68 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     splash?.update(deltaTime);
   }
 
+  /** 環上落在球後方的那一點當起點，醬從背面先長出來 */
+  function ensureWrapOrigin() {
+    if (wrapOriginReady) return;
+    wrapOriginReady = true;
+    pivot.updateMatrixWorld(true);
+    mesh.updateWorldMatrix(true, false);
+    camera.updateMatrixWorld();
+    viewToBall.copy(ballCenter).sub(camera.position).normalize();
+    let bestT = 0;
+    let mostBehind = -Infinity;
+    for (let i = 0; i < 48; i++) {
+      const t = i / 48;
+      curve.getPoint(t, wrapPoint);
+      wrapPoint.applyMatrix4(mesh.matrixWorld);
+      fromBallCenter.copy(wrapPoint).sub(ballCenter);
+      // 球心→環上點 若和 鏡頭→球心 同向，人在球後方；dot 越大越靠後
+      const behind = fromBallCenter.dot(viewToBall);
+      if (behind > mostBehind) {
+        mostBehind = behind;
+        bestT = t;
+      }
+    }
+    uniforms.uWrapOrigin.value = bestT;
+  }
+
+  /**
+   * 載入時讓醬沿著圈圈長出來。0 = 還沒流出，1 = 繞滿一圈
+   * 食物跟在醬的後面出現，才不會先浮在空的位置上
+   */
+  function setWrap(amount: number) {
+    const wrap = THREE.MathUtils.clamp(amount, 0, 1);
+    ensureWrapOrigin();
+    uniforms.uWrap.value = wrap;
+    mesh.visible = wrap > 0.001;
+    const origin = uniforms.uWrapOrigin.value;
+    for (const rider of riders) {
+      const along = (rider.progress - origin + 1) % 1;
+      rider.mesh.visible = wrap >= 1 || along < wrap - 0.04;
+    }
+  }
+
+  setWrap(0);
+
+  /** 入場重播：起點重算，醬帶收成 0 */
+  function resetIntro() {
+    wrapOriginReady = false;
+    setWrap(0);
+  }
+
   // ringObject：整圈緞帶（pivot），給「在畫面上直接拖曳」用
   // foodSettings：食物數量，給控制面板的滑桿用
-  return { object: root, update, ringObject: pivot, ringSettings, applyRingSettings, foodSettings, setFoodCount };
+  return {
+    object: root,
+    update,
+    ringObject: pivot,
+    ringSettings,
+    applyRingSettings,
+    foodSettings,
+    setFoodCount,
+    setWrap,
+    resetIntro,
+  };
 }
 
 /**

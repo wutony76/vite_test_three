@@ -33,9 +33,14 @@ type SurfaceDragOptions = {
   onDragStart?: (target: SurfaceDragTarget) => void;
   onDrag: (normal: THREE.Vector3, target: SurfaceDragTarget) => void;
   onDragEnd?: (target: SurfaceDragTarget) => void;
+  // 只是點一下、幾乎沒移動時通知。拖著房子走不要算點擊，不然每拖一次都播整段轉場
+  onClick?: (target: SurfaceDragTarget) => void;
 };
 
-export function enableSurfaceDrag({ targets, ground, groundRadius, camera, domElement, controls, onDragStart, onDrag, onDragEnd }: SurfaceDragOptions) {
+// 超過這個距離就當成在拖房子，不播轉場。單位是像素
+const CLICK_DISTANCE = 6;
+
+export function enableSurfaceDrag({ targets, ground, groundRadius, camera, domElement, controls, onDragStart, onDrag, onDragEnd, onClick }: SurfaceDragOptions) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   // 射線換到 ground 的座標系：球心就是原點，算球面交點比較單純
@@ -49,6 +54,9 @@ export function enableSurfaceDrag({ targets, ground, groundRadius, camera, domEl
   const grabOffset = new THREE.Quaternion();
   // 這次按下點到的那一棟；null = 目前沒在拖
   let active: SurfaceDragTarget | null = null;
+  let downX = 0;
+  let downY = 0;
+  let dragged = false;
 
   /** 把滑鼠的像素座標換成 -1 ~ 1 的標準化座標，射線要用這種座標 */
   function updatePointer(event: PointerEvent) {
@@ -93,6 +101,9 @@ export function enableSurfaceDrag({ targets, ground, groundRadius, camera, domEl
     grabOffset.setFromUnitVectors(pointerNormal, target.getNormal());
 
     active = target;
+    downX = event.clientX;
+    downY = event.clientY;
+    dragged = false;
     onDragStart?.(target);
     controls.enabled = false;
     // 指標捕捉：拖到畫面外、或滑過其他元素，放開時還是會收到 pointerup
@@ -107,6 +118,11 @@ export function enableSurfaceDrag({ targets, ground, groundRadius, camera, domEl
       domElement.style.cursor = findTarget() ? 'grab' : '';
       return;
     }
+    if (!dragged) {
+      const dx = event.clientX - downX;
+      const dy = event.clientY - downY;
+      if (dx * dx + dy * dy > CLICK_DISTANCE * CLICK_DISTANCE) dragged = true;
+    }
     getPointerNormal(pointerNormal);
     onDrag(newNormal.copy(pointerNormal).applyQuaternion(grabOffset), active);
   }
@@ -119,6 +135,7 @@ export function enableSurfaceDrag({ targets, ground, groundRadius, camera, domEl
     domElement.releasePointerCapture(event.pointerId);
     domElement.style.cursor = '';
     onDragEnd?.(target);
+    if (!dragged) onClick?.(target);
   }
 
   // capture: true → 比 OrbitControls 先收到按下事件

@@ -27,6 +27,36 @@ type CreateObjsOptions = {
   camera: THREE.Camera;
 };
 
+/** 入場動畫：面板可調，調完用重播看效果 */
+export type WorldIntroSettings = {
+  emptyHold: number;
+  ballStartScale: number;
+  ballSeconds: number;
+  ballScaleLag: number;
+  ballOvershoot: number;
+  houseSeconds: number;
+  houseStagger: number;
+  houseOvershoot: number;
+  ketchupSeconds: number;
+  ketchupAfterHouse: number;
+  ballMoveEase: IntroBallEase;
+  ballScaleEase: IntroBallEase;
+};
+
+/** 綠球入場可選的 tween，面板下拉選單用這份清單 */
+export const INTRO_BALL_EASE_OPTIONS = [
+  'linear',
+  'inCubic',
+  'outCubic',
+  'inOutCubic',
+  'inOutSine',
+  'inOutQuad',
+  'outQuad',
+  'outBack',
+] as const;
+
+export type IntroBallEase = (typeof INTRO_BALL_EASE_OPTIONS)[number];
+
 export function createObjs({ envMap, camera }: CreateObjsOptions) {
   const all = new THREE.Object3D();
 
@@ -121,9 +151,159 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
 
 
 
+  const introHouses = [mainHall, projectRoom, bgRoom, twRoom, Gamehall];
+  // 鏡頭看的方向。小球的起點會落在這個方向和畫面上方之間
+  const approachDir = new THREE.Vector3();
+  if (camera.position.lengthSq() > 1e-8) approachDir.copy(camera.position).normalize();
+  else approachDir.set(0, 0, 1);
+  const introSettings = {
+    emptyHold: 0.45,
+    ballStartScale: 0.22,
+    ballSeconds: 0.9,
+    ballScaleLag: 0.08,
+    ballOvershoot: 2.8,
+    ballMoveEase: 'outCubic' as IntroBallEase,
+    ballScaleEase: 'outBack' as IntroBallEase,
+    houseSeconds: 1.15,
+    houseStagger: 0.1,
+    houseOvershoot: 2.5,
+    ketchupSeconds: 1.35,
+    // 最後一棟長到這個比例，番茄醬才開始流
+    ketchupAfterHouse: 0.45,
+  };
+
+  let introStarted: number | null = null;
+  let introElapsed = 0;
+  let introDone = false;
+  let startReady = false;
+  const startPos = new THREE.Vector3();
+  const restPos = new THREE.Vector3();
+  const probe = new THREE.Vector3();
+
+  /**
+   * 畫面把球心裁到下緣外面，小球若放在原點會整個看不到
+   * 改從畫面上方、還在鏡頭前面的位置跑進來，才看得出從遠處變大
+   */
+  function ensureStart() {
+    if (startReady || ground === all) return;
+    startReady = true;
+    camera.updateMatrixWorld();
+    const halfFov = Math.tan(THREE.MathUtils.degToRad(14.5 / 2));
+    let bestScore = Infinity;
+    // 球心要落在畫面偏上，而且離鏡頭夠遠，縮小之後才是遠處的一顆小球
+    for (let along = 8; along <= 16; along += 0.4) {
+      for (let lift = -2; lift <= 3; lift += 0.2) {
+        probe.copy(camera.position).addScaledVector(approachDir, -along).addScaledVector(camera.up, lift);
+        const dist = probe.distanceTo(camera.position);
+        const ndcRadius = (introSettings.ballStartScale / dist) / halfFov;
+        if (ndcRadius > 0.16 || ndcRadius < 0.07) continue;
+        const ndc = probe.clone().project(camera);
+        if (ndc.z < -1 || ndc.z > 1) continue;
+        if (Math.abs(ndc.x) > 0.55 || ndc.y < -0.15 || ndc.y > 0.75) continue;
+        const score = Math.abs(ndc.x) + Math.abs(ndc.y - 0.35);
+        if (score < bestScore) {
+          bestScore = score;
+          startPos.copy(probe);
+        }
+      }
+    }
+    // 沒有同時又小又在畫面裡的點時，放在視線前方遠處再往上抬，至少不會貼在鏡頭上
+    if (bestScore === Infinity) {
+      startPos.copy(camera.position).addScaledVector(approachDir, -12).addScaledVector(camera.up, 1.4);
+    }
+  }
+
+  function placeBall(elapsed: number) {
+    if (ground === all) return;
+    const ballTime = elapsed - introSettings.emptyHold;
+    if (ballTime < 0) {
+      ground.visible = false;
+      return;
+    }
+    ground.visible = true;
+    ensureStart();
+    const moveRaw = THREE.MathUtils.clamp(ballTime / introSettings.ballSeconds, 0, 1);
+    const scaleSpan = Math.max(introSettings.ballSeconds - introSettings.ballScaleLag, 0.001);
+    const scaleRaw = THREE.MathUtils.clamp((ballTime - introSettings.ballScaleLag) / scaleSpan, 0, 1);
+    const moveT = sampleIntroBallEase(introSettings.ballMoveEase, moveRaw, introSettings.ballOvershoot);
+    const scaleT = sampleIntroBallEase(introSettings.ballScaleEase, scaleRaw, introSettings.ballOvershoot);
+    ground.position.lerpVectors(startPos, restPos, moveT);
+    ground.scale.setScalar(THREE.MathUtils.lerp(introSettings.ballStartScale, 1, scaleT));
+  }
+
+  function placeHouses(elapsed: number) {
+    const houseStart = introSettings.emptyHold + introSettings.ballSeconds;
+    introHouses.forEach((house, index) => {
+      const t = THREE.MathUtils.clamp(
+        (elapsed - houseStart - index * introSettings.houseStagger) / introSettings.houseSeconds,
+        0,
+        1,
+      );
+      // 原點在屋腳，從 0 放大；略衝過再收回，一次回彈就停穩
+      const grown = Math.max(0.0001, easeOutBack(t, introSettings.houseOvershoot));
+      house.object.scale.setScalar(house.settings.scale * grown);
+    });
+  }
+
+  // 房子先收成 0。開場先不要綠球，等空景一段再從遠處跑進來
+  placeHouses(0);
+  if (ground !== all) ground.visible = false;
+
   /** 每幀呼叫：time 單位是秒，讓會動的物件更新動畫 */
   function update(time: number) {
     ketchup.update(time);
+    if (introDone) return;
+    if (introStarted === null) introStarted = time;
+    introElapsed = time - introStarted;
+
+    placeBall(introElapsed);
+    placeHouses(introElapsed);
+    // 最後一棟長到一半，醬才從球後方沿環流出來
+    const ketchupStart =
+      introSettings.emptyHold +
+      introSettings.ballSeconds +
+      (introHouses.length - 1) * introSettings.houseStagger +
+      introSettings.houseSeconds * introSettings.ketchupAfterHouse;
+    const wrap = easeInOutCubic(
+      THREE.MathUtils.clamp((introElapsed - ketchupStart) / introSettings.ketchupSeconds, 0, 1),
+    );
+    ketchup.setWrap(wrap);
+
+    if (introElapsed >= ketchupStart + introSettings.ketchupSeconds) {
+      if (ground !== all) {
+        ground.visible = true;
+        ground.position.copy(restPos);
+        ground.scale.setScalar(1);
+      }
+      introHouses.forEach((house) => house.object.scale.setScalar(house.settings.scale));
+      ketchup.setWrap(1);
+      introDone = true;
+    }
+  }
+
+  function isHouseGrown(object: THREE.Object3D) {
+    if (introDone) return true;
+    const index = introHouses.findIndex((house) => house.object === object);
+    if (index < 0) return true;
+    return (
+      introElapsed >=
+      introSettings.emptyHold + introSettings.ballSeconds + index * introSettings.houseStagger + introSettings.houseSeconds
+    );
+  }
+
+  /** 從空景重新跑入場，方便在面板調完秒數立刻看效果 */
+  function replayIntro() {
+    introDone = false;
+    introStarted = null;
+    introElapsed = 0;
+    startReady = false;
+    placeHouses(0);
+    if (ground !== all) {
+      ground.visible = false;
+      ground.position.copy(restPos);
+      ground.scale.setScalar(introSettings.ballStartScale);
+    }
+    ketchup.resetIntro();
   }
 
   // 緞帶擺放參數也往外交出去，讓 main.ts 的控制面板可以調整
@@ -137,6 +317,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     // ground、groundRadius：滑鼠拖曳房子時，要知道是在哪顆球的表面上滑
     ground,
     groundRadius: GROUND_RADIUS,
+    isHouseGrown,
+    introSettings,
+    replayIntro,
     houses: [
       exposeHouse('mainHall', mainHall),
       exposeHouse('projectRoom', projectRoom),
@@ -157,6 +340,60 @@ export type WorldHouse = {
 };
 
 /** 把 createHouse 的回傳整理成面板、射線選取都能用的同一種形狀 */
+/** 開始快、結束慢 */
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+/** 兩頭慢、中間快：番茄醬沿環長出來 */
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+/** 略衝過終點再彈回。overshoot 越大，跳動越明顯 */
+function easeOutBack(t: number, overshoot = 1.70158) {
+  return 1 + (overshoot + 1) * Math.pow(t - 1, 3) + overshoot * Math.pow(t - 1, 2);
+}
+
+function easeInOutSine(t: number) {
+  return -(Math.cos(Math.PI * t) - 1) / 2;
+}
+
+function easeInOutQuad(t: number) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+function easeOutQuad(t: number) {
+  return 1 - (1 - t) * (1 - t);
+}
+
+function easeInCubic(t: number) {
+  return t * t * t;
+}
+
+function sampleIntroBallEase(kind: IntroBallEase, t: number, overshoot: number) {
+  switch (kind) {
+    case 'linear':
+      return t;
+    case 'inCubic':
+      return easeInCubic(t);
+    case 'outCubic':
+      return easeOutCubic(t);
+    case 'inOutCubic':
+      return easeInOutCubic(t);
+    case 'inOutSine':
+      return easeInOutSine(t);
+    case 'inOutQuad':
+      return easeInOutQuad(t);
+    case 'outQuad':
+      return easeOutQuad(t);
+    case 'outBack':
+      return easeOutBack(t, overshoot);
+    default:
+      return easeOutCubic(t);
+  }
+}
+
 function exposeHouse(label: string, house: ReturnType<typeof createHouse>): WorldHouse {
   return {
     label,
