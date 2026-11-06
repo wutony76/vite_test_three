@@ -12,6 +12,7 @@ import { createObjs, INTRO_BALL_EASE_OPTIONS, type WorldHouse } from './objects/
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { enableViewPlaneDrag } from './debug/viewPlaneDrag';
 import { enableSurfaceDrag } from './debug/surfaceDrag';
+import { flyCameraTo, isCameraFlying, type CameraPose } from './cameraFlight';
 import { playHouseTransition, playSceneLoad, transitionSettings } from './houseTransition';
 
 // RENDERER
@@ -226,6 +227,22 @@ if (LOCK_CAMERA_VIEW) {
   // 關掉右鍵平移：旋轉中心固定在球心，構圖不會被拖歪
   controls.enablePan = false;
 }
+
+// 入場動畫開始時的鏡頭：緞帶軸、Orbit 鎖定都套用後再存，按「初視」就 tween 回這裡
+const introViewPose: CameraPose = {
+  position: camera.position.clone(),
+  target: controls.target.clone(),
+  up: camera.up.clone(),
+};
+
+const viewIntroButton = document.getElementById('view-intro') as HTMLButtonElement | null;
+viewIntroButton?.addEventListener('click', () => {
+  if (isCameraFlying()) return;
+  viewIntroButton.disabled = true;
+  void flyCameraTo(camera, controls, introViewPose).finally(() => {
+    if (viewIntroButton) viewIntroButton.disabled = false;
+  });
+});
 
 // 放開滑鼠（旋轉、縮放、平移結束）時印出鏡頭位置，方便把喜歡的角度抄回程式碼
 // 用 'end' 而不是 'change'：change 拖曳中每幀都會觸發，console 會被洗版
@@ -458,19 +475,7 @@ bindHousePanel(houses[0]);
 // 選中那棟的名字：用 HTML 畫在畫面上，而不是貼在 3D 房子上
 // 房子會跟著地球傾斜，3D 文字也會跟著歪、變小；HTML 永遠正對螢幕、大小固定，才是「2D 的名字」
 const houseLabel = document.createElement('div');
-houseLabel.style.cssText = [
-  'position: fixed',
-  'top: 0',
-  'left: 0',
-  'z-index: 1',
-  'padding: 5px 12px',
-  'border-radius: 999px',
-  'background: rgb(20 16 28 / 78%)',
-  'color: #fff',
-  'font: 700 14px/1.2 "PingFang TC", "Noto Sans TC", sans-serif',
-  'white-space: nowrap',
-  'pointer-events: none',
-].join(';');
+houseLabel.className = 'world-ui-chip';
 document.body.appendChild(houseLabel);
 // 屋頂的位置：每幀拿來投影到螢幕，重複利用避免一直 new
 const labelAnchor = new THREE.Vector3();
@@ -500,7 +505,8 @@ function updateHouseLabel() {
   const y = rect.top + (-labelAnchor.y * 0.5 + 0.5) * rect.height;
   houseLabel.style.visibility = 'visible';
   // 先移到屋頂的螢幕座標，再往上移一個標籤的高度，名字才不會壓在屋頂上
-  houseLabel.style.transform = `translate(${x}px, ${y}px) translate(-50%, calc(-100% - 8px))`;
+  // 多留一點給 .world-ui-chip 指向房子的小尾巴
+  houseLabel.style.transform = `translate(${x}px, ${y}px) translate(-50%, calc(-100% - 14px))`;
 }
 
 // 直接在畫面上拖曳房子：沿著綠球表面滑動
@@ -608,7 +614,9 @@ function render(time: number) {
 }
 renderer.setAnimationLoop(render);
 // 場景迴圈開始後才掀開：黑幕底下已經有畫好的畫面，不會旋開到一片空白
-void playSceneLoad();
+void playSceneLoad().then(() => {
+  viewIntroButton?.removeAttribute('hidden');
+});
 
 
 window.addEventListener('resize', () => {

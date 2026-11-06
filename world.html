@@ -22,10 +22,118 @@
         background: #dae5e6;
         pointer-events: auto;
       }
+      /* HUD：按鈕 = 可點的果凍 pill；標籤 = 指向房子的對話貼紙（兩套樣式分開） */
+      :root {
+        --world-ui-ink: #5a3d52;
+      }
+
+      /* —— 按鈕「初視」：實心、光暈、可 hover —— */
+      .world-ui-btn {
+        position: fixed;
+        left: 18px;
+        bottom: 18px;
+        z-index: 2;
+        margin: 0;
+        padding: 12px 26px;
+        border: 3px solid #fff;
+        border-radius: 999px;
+        cursor: pointer;
+        overflow: hidden;
+        isolation: isolate;
+        color: #fff;
+        font-family: "SF Pro Rounded", "Arial Rounded MT Bold", "Hiragino Maru Gothic ProN", "PingFang TC", sans-serif;
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        line-height: 1.2;
+        text-shadow: 0 1px 2px rgb(90 40 60 / 35%);
+        background: linear-gradient(160deg, #ffb3cc 0%, #ff6b9d 45%, #f04f88 100%);
+        box-shadow:
+          0 0 0 2px rgb(255 120 160 / 50%),
+          0 4px 0 #c93d72,
+          0 14px 32px rgb(240 79 136 / 42%);
+        transition:
+          transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+          box-shadow 0.22s ease,
+          filter 0.22s ease;
+      }
+
+      .world-ui-btn::before {
+        content: "";
+        position: absolute;
+        inset: 3px 10px auto;
+        height: 40%;
+        border-radius: 999px;
+        background: linear-gradient(180deg, rgb(255 255 255 / 55%) 0%, transparent 100%);
+        pointer-events: none;
+      }
+
+      .world-ui-btn:hover:not(:disabled) {
+        filter: brightness(1.05);
+        transform: translateY(-3px) scale(1.03);
+        box-shadow:
+          0 0 0 3px rgb(255 160 190 / 55%),
+          0 7px 0 #c93d72,
+          0 18px 36px rgb(240 79 136 / 48%);
+      }
+
+      .world-ui-btn:active:not(:disabled) {
+        transform: translateY(2px) scale(0.98);
+        box-shadow:
+          0 0 0 2px rgb(255 120 160 / 45%),
+          0 1px 0 #c93d72,
+          0 8px 20px rgb(240 79 136 / 35%);
+      }
+
+      .world-ui-btn:disabled {
+        opacity: 0.5;
+        cursor: wait;
+        filter: saturate(0.65);
+        transform: none;
+      }
+
+      /* —— 房子名稱 tag：扁貼紙 + 指向下方的小尾巴，不搶按鈕 —— */
+      .world-ui-chip {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        margin: 0;
+        padding: 5px 12px 6px;
+        border: 2px solid var(--world-ui-ink);
+        border-radius: 10px;
+        background: rgb(255 252 245 / 94%);
+        color: var(--world-ui-ink);
+        font-family: "PingFang TC", "Noto Sans TC", sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        line-height: 1.25;
+        white-space: nowrap;
+        pointer-events: none;
+        box-shadow: 0 2px 0 rgb(90 61 82 / 18%);
+      }
+
+      .world-ui-chip::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: -6px;
+        width: 10px;
+        height: 10px;
+        background: rgb(255 252 245 / 94%);
+        border-right: 2px solid var(--world-ui-ink);
+        border-bottom: 2px solid var(--world-ui-ink);
+        transform: translateX(-50%) rotate(45deg);
+        box-shadow: 2px 2px 0 rgb(90 61 82 / 12%);
+      }
     </style>
   </head>
   <body>
     <div id="scene-cover" aria-hidden="true"></div>
+    <button type="button" id="view-intro" class="world-ui-btn" hidden aria-label="回到初視">
+      初視
+    </button>
     <div id="app"></div>
     <!-- <script type="module" src="/src/learn/main.ts"></script> -->
     <script type="module" src="/src/world/main.ts"></script>
