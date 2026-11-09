@@ -411,40 +411,26 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
       rider.ringKnock *= pushDecay;
       const surge = 0.35 + 0.65 * Math.sin(time * 0.45 + rider.driftPhase);
       const heading = Math.sin(time * rider.climbRate + rider.driftPhase) >= 0 ? 1 : -1;
-      rider.pathProgress = THREE.MathUtils.euclideanModulo(
-        rider.pathProgress + deltaTime * (rider.drift * surge + rider.ringKnock),
+      rider.progress = THREE.MathUtils.euclideanModulo(
+        rider.progress + deltaTime * (rider.drift * surge + rider.ringKnock),
         1,
       );
-      rider.pathClimb = THREE.MathUtils.clamp(
-        rider.pathClimb + deltaTime * rider.climbSpeed * heading,
-        -0.7,
-        0.7,
-      );
-
       const yielding = time < rider.sharkYieldUntil;
-      const returning = needsPathReturn(rider, time);
       if (yielding) {
         rider.climb += deltaTime * SHARK_YIELD_CLIMB_SPEED * rider.yieldClimbDir;
         rider.climb = THREE.MathUtils.clamp(rider.climb, -0.88, 0.88);
-      } else if (returning) {
-        rider.progress = stepTowardRingProgress(
-          rider.progress,
-          rider.pathProgress,
-          SHARK_RETURN_PROGRESS_SPEED * deltaTime,
-        );
-        rider.climb = stepToward(rider.climb, rider.pathClimb, SHARK_RETURN_CLIMB_SPEED * deltaTime);
-      } else {
-        rider.progress = rider.pathProgress;
-        rider.climb = rider.pathClimb;
+      } else if (!rider.freeSectionAfterShark) {
+        rider.climb = THREE.MathUtils.clamp(rider.climb + deltaTime * rider.climbSpeed * heading, -0.7, 0.7);
       }
+      // 被撞後維持讓開結束時的截面角，不用 heading 擺回環的中線
       rider.yaw += deltaTime * rider.yawSpeed;
     }
     separateRiders(riders);
     const movers = sharkFin ? [...riders, sharkFin] : riders;
     for (const rider of movers) {
       curve.getPoint(rider.progress, rider.center);
-      curve.getTangent(rider.progress, riderTangent);
-      riderTangent.transformDirection(mesh.matrixWorld);
+      const along = rider.progress * Math.PI * 2;
+      riderTangent.set(-Math.sin(along), 0, Math.cos(along)).transformDirection(mesh.matrixWorld);
       riderWorld.copy(rider.center).applyMatrix4(mesh.matrixWorld);
       // 從球心指向管子中心線，扣掉沿管切線 — 才是貼在醬外側的法線方向
       fromBallCenter.copy(riderWorld).sub(ballCenter);
@@ -588,43 +574,9 @@ const RING_LENGTH = ORBIT_RADIUS * Math.PI * 2;
 // 依進度排序後重複使用，數量很大時不要每幀重新配置陣列
 const separateOrder: Rider[] = [];
 
-/** 碰到鯊魚：先 1.3 秒沿截面 90° 滑開，再平滑接回 phantom 路徑 */
+/** 碰到鯊魚：短暫沿截面 90° 讓開，之後在當前位置順流漂，不回到原路線 */
 const SHARK_FOOD_YIELD_DURATION = 1.3;
 const SHARK_YIELD_CLIMB_SPEED = 0.42;
-const SHARK_RECOVER_DURATION = 2.8;
-/** 接回時與讓開同樣用固定慢速滑動，不用指數 lerp */
-const SHARK_RETURN_CLIMB_SPEED = 0.34;
-const SHARK_RETURN_PROGRESS_SPEED = 0.024;
-/** 與 path 差距小於此才視為接回，避免時間到就硬切 */
-const SHARK_PROGRESS_SNAP = 0.0025;
-const SHARK_CLIMB_SNAP = 0.02;
-
-function ringProgressGap(a: number, b: number) {
-  let d = Math.abs(b - a);
-  if (d > 0.5) d = 1 - d;
-  return d;
-}
-
-function stepToward(current: number, target: number, maxDelta: number) {
-  const d = target - current;
-  if (Math.abs(d) <= maxDelta) return target;
-  return current + Math.sign(d) * maxDelta;
-}
-
-function stepTowardRingProgress(from: number, to: number, maxStep: number) {
-  let delta = to - from;
-  if (delta > 0.5) delta -= 1;
-  if (delta < -0.5) delta += 1;
-  const step = THREE.MathUtils.clamp(delta, -maxStep, maxStep);
-  return THREE.MathUtils.euclideanModulo(from + step, 1);
-}
-
-function needsPathReturn(rider: Rider, time: number) {
-  if (time < rider.sharkYieldUntil) return false;
-  const progressFar = ringProgressGap(rider.progress, rider.pathProgress) > SHARK_PROGRESS_SNAP;
-  const climbFar = Math.abs(rider.climb - rider.pathClimb) > SHARK_CLIMB_SNAP;
-  return time < rider.sharkRecoverUntil || progressFar || climbFar;
-}
 
 function yieldFoodFromShark(shark: Rider, foods: Rider[], ringLength: number, time: number) {
   for (const food of foods) {
@@ -639,9 +591,7 @@ function yieldFoodFromShark(shark: Rider, foods: Rider[], ringLength: number, ti
     if (time < food.sharkYieldUntil) continue;
 
     food.sharkYieldUntil = time + SHARK_FOOD_YIELD_DURATION;
-    food.sharkRecoverUntil = time + SHARK_FOOD_YIELD_DURATION + SHARK_RECOVER_DURATION;
-    food.pathProgress = food.progress;
-    food.pathClimb = food.climb;
+    food.freeSectionAfterShark = true;
     food.ringKnock = 0;
     // 魚貼外緣游（climb≈0）；食物往截面兩側滑，與游向垂直
     if (Math.abs(food.climb) > 0.08) {
@@ -662,19 +612,19 @@ function separateRiders(riders: Rider[]) {
   if (count < 2) return;
   // 只推開相鄰的兩塊。數量到幾千時，如果每塊都跟其他所有塊比，畫面會卡住
   for (let pass = 0; pass < 4; pass++) {
-    separateOrder.sort((a, b) => a.pathProgress - b.pathProgress);
+    separateOrder.sort((a, b) => a.progress - b.progress);
     for (let i = 0; i < count; i++) {
       const a = separateOrder[i];
       const b = separateOrder[(i + 1) % count];
-      let delta = b.pathProgress - a.pathProgress;
+      let delta = b.progress - a.progress;
       // 最後一塊的下一塊是繞回開頭，差距要加一整圈
       if (delta < 0) delta += 1;
       const gap = delta * RING_LENGTH;
       const need = a.reach + b.reach + 0.012;
       if (gap >= need) continue;
       const push = (need - gap) / RING_LENGTH / 2;
-      a.pathProgress = THREE.MathUtils.euclideanModulo(a.pathProgress - push, 1);
-      b.pathProgress = THREE.MathUtils.euclideanModulo(b.pathProgress + push, 1);
+      a.progress = THREE.MathUtils.euclideanModulo(a.progress - push, 1);
+      b.progress = THREE.MathUtils.euclideanModulo(b.progress + push, 1);
     }
   }
 }
@@ -721,21 +671,14 @@ type Rider = {
   swimPhase3: number;
   /** 被鯊魚撞後沿環緩漂（progress / 秒） */
   ringKnock: number;
-  /** 與鯊魚重疊中（已彈開、等拉開距離） */
-  sharkTouch: boolean;
-  /** 秒；撞完冷卻內不再被同一條鯊連撞 */
-  sharkKnockCooldown: number;
   /** 已在醬上出現過或被撞過，入場時不會再被 setWrap 藏起來 */
   revealed: boolean;
-  /** 秒；在此時間前以截面滑開，不沿環漂 */
+  /** 秒；在此時間前以截面滑開（讓開期間仍沿環順流） */
   sharkYieldUntil: number;
   /** 截面滑開方向（±1，與魚游向 90°） */
   yieldClimbDir: number;
-  /** 秒；讓開後平滑接回 path 的結束時間 */
-  sharkRecoverUntil: number;
-  /** 若沒被撞，應有的沿環進度／截面角（讓開期間仍持續推進） */
-  pathProgress: number;
-  pathClimb: number;
+  /** 被鯊魚撞過：不再用上下擺動把 climb 拉回環外緣中線 */
+  freeSectionAfterShark: boolean;
 };
 
 /**
@@ -929,14 +872,10 @@ function createSharkFinRider(parent: THREE.Object3D, settings: SharkFinSettings)
     swimPhase2: random() * Math.PI * 2,
     swimPhase3: random() * Math.PI * 2,
     ringKnock: 0,
-    sharkTouch: false,
-    sharkKnockCooldown: 0,
     revealed: false,
     sharkYieldUntil: 0,
     yieldClimbDir: 1,
-    sharkRecoverUntil: 0,
-    pathProgress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
-    pathClimb: 0,
+    freeSectionAfterShark: false,
   };
 }
 
@@ -972,7 +911,6 @@ function createRider(parent: THREE.Object3D, index: number): Rider {
     mesh,
     center,
     progress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
-    pathProgress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
     // 有的幾乎停在醬裡，有的漂得比較快，才不會永遠保持同樣的間距
     // 薯條較長，轉到順著圈時比較容易碰到旁邊那塊
     reach: kind === 'nugget' ? 0.032 : 0.038,
@@ -981,7 +919,6 @@ function createRider(parent: THREE.Object3D, index: number): Rider {
     yawSpeed: spec.yawSpeed,
     // 一開始就有的在上緣、有的在下緣，之後各自慢慢換邊
     climb: spec.climb,
-    pathClimb: spec.climb,
     climbSpeed: spec.climbSpeed,
     climbRate: spec.climbRate,
     // 負得比半高少一點：大部分埋在醬的外側，只留一截露出來
@@ -998,11 +935,9 @@ function createRider(parent: THREE.Object3D, index: number): Rider {
     swimPhase2: 0,
     swimPhase3: 0,
     ringKnock: 0,
-    sharkTouch: false,
-    sharkKnockCooldown: 0,
     revealed: false,
     sharkYieldUntil: 0,
     yieldClimbDir: 1,
-    sharkRecoverUntil: 0,
+    freeSectionAfterShark: false,
   };
 }
