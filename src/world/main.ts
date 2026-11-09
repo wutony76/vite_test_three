@@ -160,7 +160,9 @@ const {
   all,
   update: updateObjs,
   ketchupRing,
+  ketchupVisual,
   ketchupFood,
+  ketchupShark,
   houses,
   ground,
   groundSurface,
@@ -419,6 +421,29 @@ ringFolder.add(ring, 'offsetZ', -2, 2, 0.01).name('位置 Z RING_OFFSET_Z').onCh
 ringFolder.add(ketchupFood.settings, 'count', 0, 150, 1).name('食物數量').onChange(ketchupFood.apply).onFinishChange(() => {
   console.log(`const FOOD_COUNT = ${ketchupFood.settings.count};`);
 });
+
+const sharkFolder = gui.addFolder('番茄醬海・鯊魚');
+const shark = ketchupShark.settings;
+sharkFolder.add(shark, 'enabled').name('顯示魚鰭').onChange(ketchupShark.apply);
+sharkFolder.add(shark, 'drift', 0, 2, 0.02).name('游動速度 SHARK_FIN_DRIFT').onChange(ketchupShark.apply).onFinishChange(logSharkFin);
+sharkFolder.add(shark, 'forward').name('順環游（關＝逆環）');
+sharkFolder.addColor(shark, 'color').name('顏色 SHARK_FIN_COLOR').onChange(ketchupShark.apply).onFinishChange(logSharkFin);
+sharkFolder.add(shark, 'lift', -0.05, 0.04, 0.001).name('埋入醬面 lift').onChange(ketchupShark.apply).onFinishChange(logSharkFin);
+sharkFolder.add(shark, 'depth', 0.003, 0.025, 0.001).name('厚度 depth').onChange(ketchupShark.apply).onFinishChange(logSharkFin);
+sharkFolder
+  .add(ketchupVisual.settings, 'opacity', 0, 1, 0.02)
+  .name('醬透明（看魚鰭）')
+  .onChange(ketchupVisual.apply);
+
+function logSharkFin() {
+  const hex = (color: string) => `0x${color.replace('#', '')}`;
+  console.log(
+    `const SHARK_FIN_ENABLED = ${shark.enabled};\n` +
+      `const SHARK_FIN_DRIFT = ${shark.drift.toFixed(2)};\n` +
+      `const SHARK_FIN_COLOR = ${hex(shark.color)};\n` +
+      `// forward ${shark.forward}, lift ${shark.lift.toFixed(3)}, depth ${shark.depth.toFixed(3)}`,
+  );
+}
 
 // 點房子時旋進來的方塊。放開顏色才播一次，拖拉過程不要連著重播
 const transitionFolder = gui.addFolder('轉場');

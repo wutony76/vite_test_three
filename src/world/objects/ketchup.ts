@@ -41,6 +41,11 @@ const SPLASH_ENABLED = false;
 const FOOD_COUNT = 7;
 // 滑桿上限。形狀和材質是共用的，不會每一塊都做一份新的
 const FOOD_COUNT_MAX = 150;
+// 番茄醬海：三角魚鰭（鯊魚），沿環較快游動
+const SHARK_FIN_ENABLED = true;
+const SHARK_FIN_COLOR = 0xc07ab8;
+// 整圈進度 / 秒；雞塊薯條約 0.006~0.046，鰭快很多才有「掠過醬海」的感覺
+const SHARK_FIN_DRIFT = 0.12;
 
 /**
  * 簡單的「可重現亂數」（mulberry32）：同一個 seed 每次產生的數列都一樣
@@ -163,6 +168,23 @@ export type KetchupRingSettings = {
   offsetZ: number;
 };
 
+/** 醬汁外觀（除錯用，例如調透明看魚鰭） */
+export type KetchupVisualSettings = {
+  /** 1 = 不透明，0 = 全透明 */
+  opacity: number;
+};
+
+/** 番茄醬海鯊魚鰭：控制面板可調 */
+export type SharkFinSettings = {
+  enabled: boolean;
+  drift: number;
+  /** true = 沿環正向游，false = 反向 */
+  forward: boolean;
+  color: string;
+  lift: number;
+  depth: number;
+};
+
 type KetchupOptions = {
   envMap: THREE.Texture;
   camera: THREE.Camera;
@@ -234,7 +256,44 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   // 雞塊、薯條掛在緞帶自己身上：mesh 繞 y 軸轉的時候，它們會跟著醬一起繞，不用另外算位置
   // 用 let：控制面板改數量時會換掉這份清單，update 每幀讀到的才是新的
   let riders = createRiders(mesh, FOOD_COUNT);
+  const sharkFinSettings: SharkFinSettings = {
+    enabled: SHARK_FIN_ENABLED,
+    drift: SHARK_FIN_DRIFT,
+    color: `#${SHARK_FIN_COLOR.toString(16).padStart(6, '0')}`,
+    forward: true,
+    lift: -0.035,
+    depth: 0.008,
+  };
+  let sharkFin: Rider | null = sharkFinSettings.enabled ? createSharkFinRider(mesh, sharkFinSettings) : null;
   const foodSettings = { count: FOOD_COUNT };
+  const visualSettings: KetchupVisualSettings = { opacity: 1 };
+
+  function applyVisualSettings() {
+    const o = THREE.MathUtils.clamp(visualSettings.opacity, 0, 1);
+    visualSettings.opacity = o;
+    const seeThrough = o < 0.999;
+    material.transparent = seeThrough;
+    material.opacity = o;
+    // 半透明時不寫深度，裡面的魚鰭才看得見（僅除錯用）
+    material.depthWrite = !seeThrough;
+    material.needsUpdate = true;
+  }
+  applyVisualSettings();
+
+  function applySharkFinSettings() {
+    if (!sharkFinSettings.enabled) {
+      if (sharkFin) sharkFin.mesh.visible = false;
+      return;
+    }
+    if (!sharkFin) sharkFin = createSharkFinRider(mesh, sharkFinSettings);
+    sharkFin.drift = sharkFinSettings.drift;
+    sharkFin.lift = sharkFinSettings.lift;
+    const mat = sharkFinMaterial ?? sharedSharkFinMaterial();
+    mat.color.set(sharkFinSettings.color);
+    mat.emissive.set(sharkFinSettings.color).multiplyScalar(0.55);
+    sharkFin.mesh.geometry = sharedSharkFinGeometry(sharkFinSettings.depth);
+    setWrap(uniforms.uWrap.value);
+  }
 
   /** 把食物數量改成 count。多的從尾巴拿掉，少的只補新的，已經在漂的不會被重新洗牌 */
   function setFoodCount(count: number) {
@@ -322,6 +381,9 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   const riderSurface = new THREE.Vector3();
   const riderBinormal = new THREE.Vector3();
   const riderDir = new THREE.Vector3();
+  const flowAlongTube = new THREE.Vector3();
+  const finLateral = new THREE.Vector3();
+  const finBasis = new THREE.Matrix4();
   const RIDER_Y_AXIS = new THREE.Vector3(0, 1, 0);
 
   /** 每幀呼叫：time 單位是秒 */
@@ -335,24 +397,58 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     lastTime = time;
     mesh.updateWorldMatrix(true, false);
     riderInverse.copy(mesh.matrixWorld).invert();
-    for (const rider of riders) {
-      // 每塊速度不一樣，而且會快一下、停一下、偶爾退一點，像在流動的液體裡
-      const surge = 0.35 + 0.65 * Math.sin(time * 0.45 + rider.driftPhase);
-      rider.progress = THREE.MathUtils.euclideanModulo(rider.progress + deltaTime * rider.drift * surge, 1);
-      rider.yaw += deltaTime * rider.yawSpeed;
-      // 順著流的時候，有一段往醬的上緣、有一段往下緣。碰到邊緣就停，換向之後再漂回來
-      const heading = Math.sin(time * rider.climbRate + rider.driftPhase) >= 0 ? 1 : -1;
-      rider.climb = THREE.MathUtils.clamp(rider.climb + deltaTime * rider.climbSpeed * heading, -0.7, 0.7);
+    if (sharkFin && sharkFinSettings.enabled) {
+      const swimSign = sharkFinSettings.forward ? 1 : -1;
+      sharkFin.progress = THREE.MathUtils.euclideanModulo(
+        sharkFin.progress + deltaTime * sharkFin.drift * swimSign,
+        1,
+      );
+      const ringLength = curve.radius * Math.PI * 2;
+      yieldFoodFromShark(sharkFin, riders, ringLength, time);
     }
-    // 快的追上慢的時把彼此推開，不要從身上穿過去
-    separateRiders(riders);
+    const pushDecay = Math.exp(-3.2 * deltaTime);
     for (const rider of riders) {
-      const along = rider.progress * Math.PI * 2;
-      rider.center.set(Math.cos(along) * ORBIT_RADIUS, 0, Math.sin(along) * ORBIT_RADIUS);
-      // 扣掉沿管子的分量，食物才貼在表面上，而不是懸在管子前面
-      riderTangent.set(-Math.sin(along), 0, Math.cos(along)).transformDirection(mesh.matrixWorld);
+      rider.ringKnock *= pushDecay;
+      const surge = 0.35 + 0.65 * Math.sin(time * 0.45 + rider.driftPhase);
+      const heading = Math.sin(time * rider.climbRate + rider.driftPhase) >= 0 ? 1 : -1;
+      rider.pathProgress = THREE.MathUtils.euclideanModulo(
+        rider.pathProgress + deltaTime * (rider.drift * surge + rider.ringKnock),
+        1,
+      );
+      rider.pathClimb = THREE.MathUtils.clamp(
+        rider.pathClimb + deltaTime * rider.climbSpeed * heading,
+        -0.7,
+        0.7,
+      );
+
+      const yielding = time < rider.sharkYieldUntil;
+      const returning = needsPathReturn(rider, time);
+      if (yielding) {
+        rider.climb += deltaTime * SHARK_YIELD_CLIMB_SPEED * rider.yieldClimbDir;
+        rider.climb = THREE.MathUtils.clamp(rider.climb, -0.88, 0.88);
+      } else if (returning) {
+        rider.progress = stepTowardRingProgress(
+          rider.progress,
+          rider.pathProgress,
+          SHARK_RETURN_PROGRESS_SPEED * deltaTime,
+        );
+        rider.climb = stepToward(rider.climb, rider.pathClimb, SHARK_RETURN_CLIMB_SPEED * deltaTime);
+      } else {
+        rider.progress = rider.pathProgress;
+        rider.climb = rider.pathClimb;
+      }
+      rider.yaw += deltaTime * rider.yawSpeed;
+    }
+    separateRiders(riders);
+    const movers = sharkFin ? [...riders, sharkFin] : riders;
+    for (const rider of movers) {
+      curve.getPoint(rider.progress, rider.center);
+      curve.getTangent(rider.progress, riderTangent);
+      riderTangent.transformDirection(mesh.matrixWorld);
       riderWorld.copy(rider.center).applyMatrix4(mesh.matrixWorld);
-      riderOffset.copy(riderWorld);
+      // 從球心指向管子中心線，扣掉沿管切線 — 才是貼在醬外側的法線方向
+      fromBallCenter.copy(riderWorld).sub(ballCenter);
+      riderOffset.copy(fromBallCenter);
       riderOffset.addScaledVector(riderTangent, -riderOffset.dot(riderTangent));
       if (riderOffset.lengthSq() < 1e-8) riderOffset.copy(riderWorld);
       riderOffset.normalize();
@@ -360,21 +456,43 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
       riderBinormal.crossVectors(riderTangent, riderOffset);
       if (riderBinormal.lengthSq() < 1e-8) riderBinormal.set(0, 1, 0);
       else riderBinormal.normalize();
-      if (riderBinormal.dot(camera.up) < 0) riderBinormal.negate();
-      riderDir.copy(riderOffset).multiplyScalar(Math.cos(rider.climb)).addScaledVector(riderBinormal, Math.sin(rider.climb)).normalize();
+      // 魚鰭用固定截面基準，不因鏡頭翻轉而突然的左右跳
+      if (rider.kind !== 'sharkFin' && riderBinormal.dot(camera.up) < 0) riderBinormal.negate();
+      if (rider.kind === 'sharkFin') {
+        // 貼外側中線直游，不在截面上滑來滑去
+        riderDir.copy(riderOffset);
+      } else {
+        riderDir
+          .copy(riderOffset)
+          .multiplyScalar(Math.cos(rider.climb))
+          .addScaledVector(riderBinormal, Math.sin(rider.climb))
+          .normalize();
+      }
       riderLocalDir.copy(riderDir).transformDirection(riderInverse);
       riderSurface.copy(rider.center).addScaledVector(riderLocalDir, TUBE_RADIUS);
+      // swell 要跟醬面鼓包一致，否則鰭會懸在管子的理論半徑上、看起來像漂在空中
       const swell = sauceSwell(rider.progress, riderSurface, uniforms.uTime.value);
-      // 兩層慢起伏疊在一起：一下浮出多一點，一下再沉回去。幅度小，底部仍留在醬裡
       const bob =
-        Math.sin(time * 0.9 + rider.phase) * 0.007 +
-        Math.sin(time * 0.27 + rider.driftPhase) * 0.004;
-      // 中心在醬面裡面，上半露在外側。鏡頭怎麼轉，這一面都不變
+        rider.kind === 'sharkFin'
+          ? 0
+          : Math.sin(time * 0.9 + rider.phase) * 0.007 + Math.sin(time * 0.27 + rider.driftPhase) * 0.004;
       rider.mesh.position.copy(riderWorld).addScaledVector(riderDir, TUBE_RADIUS + swell + rider.lift + bob);
       rider.mesh.position.applyMatrix4(riderInverse);
-      rider.mesh.quaternion.setFromUnitVectors(RIDER_Y_AXIS, riderLocalDir);
-      rider.mesh.rotateY(rider.yaw);
-      if (!rider.nugget) rider.mesh.rotateX(rider.tilt);
+      if (rider.kind === 'sharkFin') {
+        // 解析切線 + 固定游向：只朝前或朝後，不吃 getTangent 分段抖動
+        const along = rider.progress * Math.PI * 2;
+        const swimSign = sharkFinSettings.forward ? 1 : -1;
+        flowAlongTube.set(-Math.sin(along), 0, Math.cos(along)).multiplyScalar(swimSign);
+        finLateral.crossVectors(flowAlongTube, riderLocalDir);
+        if (finLateral.lengthSq() < 1e-10) finLateral.set(0, 0, 1);
+        else finLateral.normalize();
+        finBasis.makeBasis(flowAlongTube, riderLocalDir, finLateral);
+        rider.mesh.quaternion.setFromRotationMatrix(finBasis);
+      } else {
+        rider.mesh.quaternion.setFromUnitVectors(RIDER_Y_AXIS, riderLocalDir);
+        rider.mesh.rotateY(rider.yaw);
+        if (rider.kind === 'fry') rider.mesh.rotateX(rider.tilt);
+      }
     }
 
     // 醬滴是「每幀往前推一點」的模擬。時間差在上面算過，切分頁回來時已壓在 0.1 秒內
@@ -416,9 +534,16 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     uniforms.uWrap.value = wrap;
     mesh.visible = wrap > 0.001;
     const origin = uniforms.uWrapOrigin.value;
-    for (const rider of riders) {
+    const visibleOnRing = sharkFin ? [...riders, sharkFin] : riders;
+    for (const rider of visibleOnRing) {
       const along = (rider.progress - origin + 1) % 1;
-      rider.mesh.visible = wrap >= 1 || along < wrap - 0.04;
+      const inWrap = wrap >= 1 || along < wrap - 0.04;
+      if (inWrap && rider.kind !== 'sharkFin') rider.revealed = true;
+      const onRing =
+        wrap >= 1 ||
+        along < wrap - 0.04 ||
+        (rider.kind !== 'sharkFin' && rider.revealed);
+      rider.mesh.visible = onRing && (rider.kind !== 'sharkFin' || sharkFinSettings.enabled);
     }
   }
 
@@ -438,8 +563,12 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     ringObject: pivot,
     ringSettings,
     applyRingSettings,
+    visualSettings,
+    applyVisualSettings,
     foodSettings,
     setFoodCount,
+    sharkFinSettings,
+    applySharkFinSettings,
     setWrap,
     resetIntro,
   };
@@ -459,26 +588,93 @@ const RING_LENGTH = ORBIT_RADIUS * Math.PI * 2;
 // 依進度排序後重複使用，數量很大時不要每幀重新配置陣列
 const separateOrder: Rider[] = [];
 
+/** 碰到鯊魚：先 1.3 秒沿截面 90° 滑開，再平滑接回 phantom 路徑 */
+const SHARK_FOOD_YIELD_DURATION = 1.3;
+const SHARK_YIELD_CLIMB_SPEED = 0.42;
+const SHARK_RECOVER_DURATION = 2.8;
+/** 接回時與讓開同樣用固定慢速滑動，不用指數 lerp */
+const SHARK_RETURN_CLIMB_SPEED = 0.34;
+const SHARK_RETURN_PROGRESS_SPEED = 0.024;
+/** 與 path 差距小於此才視為接回，避免時間到就硬切 */
+const SHARK_PROGRESS_SNAP = 0.0025;
+const SHARK_CLIMB_SNAP = 0.02;
+
+function ringProgressGap(a: number, b: number) {
+  let d = Math.abs(b - a);
+  if (d > 0.5) d = 1 - d;
+  return d;
+}
+
+function stepToward(current: number, target: number, maxDelta: number) {
+  const d = target - current;
+  if (Math.abs(d) <= maxDelta) return target;
+  return current + Math.sign(d) * maxDelta;
+}
+
+function stepTowardRingProgress(from: number, to: number, maxStep: number) {
+  let delta = to - from;
+  if (delta > 0.5) delta -= 1;
+  if (delta < -0.5) delta += 1;
+  const step = THREE.MathUtils.clamp(delta, -maxStep, maxStep);
+  return THREE.MathUtils.euclideanModulo(from + step, 1);
+}
+
+function needsPathReturn(rider: Rider, time: number) {
+  if (time < rider.sharkYieldUntil) return false;
+  const progressFar = ringProgressGap(rider.progress, rider.pathProgress) > SHARK_PROGRESS_SNAP;
+  const climbFar = Math.abs(rider.climb - rider.pathClimb) > SHARK_CLIMB_SNAP;
+  return time < rider.sharkRecoverUntil || progressFar || climbFar;
+}
+
+function yieldFoodFromShark(shark: Rider, foods: Rider[], ringLength: number, time: number) {
+  for (const food of foods) {
+    let delta = food.progress - shark.progress;
+    if (delta > 0.5) delta -= 1;
+    if (delta < -0.5) delta += 1;
+    const gap = Math.abs(delta) * ringLength;
+    const need = shark.reach + food.reach + 0.01;
+    if (gap >= need) continue;
+
+    food.revealed = true;
+    if (time < food.sharkYieldUntil) continue;
+
+    food.sharkYieldUntil = time + SHARK_FOOD_YIELD_DURATION;
+    food.sharkRecoverUntil = time + SHARK_FOOD_YIELD_DURATION + SHARK_RECOVER_DURATION;
+    food.pathProgress = food.progress;
+    food.pathClimb = food.climb;
+    food.ringKnock = 0;
+    // 魚貼外緣游（climb≈0）；食物往截面兩側滑，與游向垂直
+    if (Math.abs(food.climb) > 0.08) {
+      food.yieldClimbDir = food.climb > 0 ? 1 : -1;
+    } else {
+      food.yieldClimbDir = delta >= 0 ? 1 : -1;
+    }
+  }
+}
+
 function separateRiders(riders: Rider[]) {
-  const count = riders.length;
-  if (count < 2) return;
   separateOrder.length = 0;
-  for (let i = 0; i < count; i++) separateOrder.push(riders[i]);
+  for (let i = 0; i < riders.length; i++) {
+    if (riders[i].kind === 'sharkFin') continue;
+    separateOrder.push(riders[i]);
+  }
+  const count = separateOrder.length;
+  if (count < 2) return;
   // 只推開相鄰的兩塊。數量到幾千時，如果每塊都跟其他所有塊比，畫面會卡住
   for (let pass = 0; pass < 4; pass++) {
-    separateOrder.sort((a, b) => a.progress - b.progress);
+    separateOrder.sort((a, b) => a.pathProgress - b.pathProgress);
     for (let i = 0; i < count; i++) {
       const a = separateOrder[i];
       const b = separateOrder[(i + 1) % count];
-      let delta = b.progress - a.progress;
+      let delta = b.pathProgress - a.pathProgress;
       // 最後一塊的下一塊是繞回開頭，差距要加一整圈
       if (delta < 0) delta += 1;
       const gap = delta * RING_LENGTH;
       const need = a.reach + b.reach + 0.012;
       if (gap >= need) continue;
       const push = (need - gap) / RING_LENGTH / 2;
-      a.progress = THREE.MathUtils.euclideanModulo(a.progress - push, 1);
-      b.progress = THREE.MathUtils.euclideanModulo(b.progress + push, 1);
+      a.pathProgress = THREE.MathUtils.euclideanModulo(a.pathProgress - push, 1);
+      b.pathProgress = THREE.MathUtils.euclideanModulo(b.pathProgress + push, 1);
     }
   }
 }
@@ -492,8 +688,11 @@ function sauceSwell(progress: number, surface: THREE.Vector3, uTime: number) {
   return blob * BLOB_AMOUNT + wobble * WOBBLE_AMOUNT;
 }
 
+type RiderKind = 'nugget' | 'fry' | 'sharkFin';
+
 type Rider = {
   mesh: THREE.Mesh;
+  kind: RiderKind;
   // 管子中心線上的點（緞帶自己的座標）。每幀再往「離開球心」推到醬的表面
   center: THREE.Vector3;
   // 目前漂到整圈的哪裡（0~1）。每幀會往前走，不是釘在固定刻度
@@ -510,11 +709,33 @@ type Rider = {
   climbRate: number;
   // 負值 = 中心在表面裡面，底部埋進醬裡
   lift: number;
-  nugget: boolean;
   // 每塊自己的轉向，每幀重設朝向之後再疊上去，才不會越轉越多
   yaw: number;
   tilt: number;
   phase: number;
+  swimRate1: number;
+  swimRate2: number;
+  swimRate3: number;
+  swimPhase1: number;
+  swimPhase2: number;
+  swimPhase3: number;
+  /** 被鯊魚撞後沿環緩漂（progress / 秒） */
+  ringKnock: number;
+  /** 與鯊魚重疊中（已彈開、等拉開距離） */
+  sharkTouch: boolean;
+  /** 秒；撞完冷卻內不再被同一條鯊連撞 */
+  sharkKnockCooldown: number;
+  /** 已在醬上出現過或被撞過，入場時不會再被 setWrap 藏起來 */
+  revealed: boolean;
+  /** 秒；在此時間前以截面滑開，不沿環漂 */
+  sharkYieldUntil: number;
+  /** 截面滑開方向（±1，與魚游向 90°） */
+  yieldClimbDir: number;
+  /** 秒；讓開後平滑接回 path 的結束時間 */
+  sharkRecoverUntil: number;
+  /** 若沒被撞，應有的沿環進度／截面角（讓開期間仍持續推進） */
+  pathProgress: number;
+  pathClimb: number;
 };
 
 /**
@@ -548,10 +769,53 @@ function disposeRider(rider: Rider) {
 
 let nuggetGeometry: THREE.BoxGeometry | null = null;
 let fryGeometry: THREE.BoxGeometry | null = null;
+let sharkFinGeometry: THREE.BufferGeometry | null = null;
+let sharkFinGeometryDepth = NaN;
 let nuggetMaterial: THREE.MeshPhongMaterial | null = null;
 let fryMaterial: THREE.MeshPhongMaterial | null = null;
+let sharkFinMaterial: THREE.MeshPhongMaterial | null = null;
 
-function sharedFoodGeometry(nugget: boolean) {
+function sharedSharkFinGeometry(depth = 0.008) {
+  if (sharkFinGeometry && sharkFinGeometryDepth === depth) return sharkFinGeometry;
+  if (sharkFinGeometry) sharkFinGeometry.dispose();
+  // ◺ 直角三角：左下直角、左上尖、右下與底邊相接（不是等腰三稜錐）
+  const baseW = 0.056;
+  const height = 0.062;
+  const tipFlat = 0.011;
+  const outline = new THREE.Shape();
+  outline.moveTo(0, 0);
+  outline.lineTo(baseW, 0);
+  outline.lineTo(tipFlat, height);
+  outline.lineTo(0, height - tipFlat);
+  outline.closePath();
+  const geom = new THREE.ExtrudeGeometry(outline, { depth, bevelEnabled: false });
+  geom.translate(-baseW * 0.5, 0, -depth / 2);
+  darkenSunkSide(geom);
+  sharkFinGeometry = geom;
+  sharkFinGeometryDepth = depth;
+  return sharkFinGeometry;
+}
+
+function sharedSharkFinMaterial() {
+  if (!sharkFinMaterial) {
+    sharkFinMaterial = new THREE.MeshPhongMaterial({
+      color: SHARK_FIN_COLOR,
+      emissive: 0x704068,
+      emissiveIntensity: 0.42,
+      shininess: 26,
+      vertexColors: true,
+      // 略埋進醬時仍畫在管子表面之上，不用把 lift 拉到 0.02 才看得到
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    });
+  }
+  return sharkFinMaterial;
+}
+
+function sharedFoodGeometry(kind: RiderKind) {
+  if (kind === 'sharkFin') return sharedSharkFinGeometry();
+  const nugget = kind === 'nugget';
   if (nugget) {
     if (!nuggetGeometry) {
       nuggetGeometry = new THREE.BoxGeometry(0.04, 0.04, 0.04);
@@ -566,7 +830,9 @@ function sharedFoodGeometry(nugget: boolean) {
   return fryGeometry;
 }
 
-function sharedFoodMaterial(nugget: boolean) {
+function sharedFoodMaterial(kind: RiderKind) {
+  if (kind === 'sharkFin') return sharedSharkFinMaterial();
+  const nugget = kind === 'nugget';
   if (nugget) {
     if (!nuggetMaterial) {
       nuggetMaterial = new THREE.MeshPhongMaterial({
@@ -618,23 +884,66 @@ function riderSpec(index: number) {
     let angle = random() * Math.PI * 2;
     let spec: ReturnType<typeof oneSpec> | null = null;
     for (let i = 0; i <= index; i++) {
-      const nugget = kinds[i] === 'nugget';
+      const kind = kinds[i] === 'nugget' ? 'nugget' : 'fry';
       const clustered = random() < 0.4;
       // 最近也要超過兩塊食物的長度，不然一放上去就穿在一起
       angle += clustered ? 0.16 + random() * 0.2 : 0.9 + random() * 1.5;
-      spec = oneSpec(nugget, angle, random);
+      spec = oneSpec(kind, angle, random);
     }
     return spec!;
   }
   const random = createRandom(11 + index * 97);
-  const nugget = index % 7 < 3;
+  const kind = index % 7 < 3 ? 'nugget' : 'fry';
   const angle = random() * Math.PI * 2;
-  return oneSpec(nugget, angle, random);
+  return oneSpec(kind, angle, random);
 }
 
-function oneSpec(nugget: boolean, angle: number, random: () => number) {
+/** 鯊魚三角鰭：固定一塊，不計入食物數量 */
+function createSharkFinRider(parent: THREE.Object3D, settings: SharkFinSettings): Rider {
+  const random = createRandom(9042);
+  const angle = random() * Math.PI * 2;
+  const mesh = new THREE.Mesh(sharedSharkFinGeometry(settings.depth), sharedSharkFinMaterial());
+  const center = new THREE.Vector3(Math.cos(angle) * ORBIT_RADIUS, 0, Math.sin(angle) * ORBIT_RADIUS);
+  mesh.position.copy(center);
+  parent.add(mesh);
   return {
-    nugget,
+    mesh,
+    kind: 'sharkFin',
+    center,
+    progress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
+    reach: 0.034,
+    drift: settings.drift,
+    driftPhase: random() * Math.PI * 2,
+    yawSpeed: 0,
+    climb: 0,
+    climbSpeed: 0,
+    climbRate: 0,
+    lift: settings.lift,
+    yaw: 0,
+    tilt: 0,
+    phase: random() * Math.PI * 2,
+    swimRate1: 0.55 + random() * 0.85,
+    swimRate2: 0.4 + random() * 0.75,
+    swimRate3: 0.25 + random() * 0.5,
+    swimPhase1: random() * Math.PI * 2,
+    swimPhase2: random() * Math.PI * 2,
+    swimPhase3: random() * Math.PI * 2,
+    ringKnock: 0,
+    sharkTouch: false,
+    sharkKnockCooldown: 0,
+    revealed: false,
+    sharkYieldUntil: 0,
+    yieldClimbDir: 1,
+    sharkRecoverUntil: 0,
+    pathProgress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
+    pathClimb: 0,
+  };
+}
+
+function oneSpec(kind: 'nugget' | 'fry', angle: number, random: () => number) {
+  const nugget = kind === 'nugget';
+  return {
+    kind,
     angle,
     drift: 0.006 + random() * 0.04,
     driftPhase: random() * Math.PI * 2,
@@ -650,9 +959,9 @@ function oneSpec(nugget: boolean, angle: number, random: () => number) {
 
 function createRider(parent: THREE.Object3D, index: number): Rider {
   const spec = riderSpec(index);
-  const { nugget, angle } = spec;
+  const { kind, angle } = spec;
   // 正方體 = 雞塊；細長的長方體 = 薯條。形狀共用，數量很大時才不會每一塊都做一份
-  const mesh = new THREE.Mesh(sharedFoodGeometry(nugget), sharedFoodMaterial(nugget));
+  const mesh = new THREE.Mesh(sharedFoodGeometry(kind), sharedFoodMaterial(kind));
 
   // 一開始的位置。之後每幀會沿著圈圈改這個點
   const center = new THREE.Vector3(Math.cos(angle) * ORBIT_RADIUS, 0, Math.sin(angle) * ORBIT_RADIUS);
@@ -663,22 +972,37 @@ function createRider(parent: THREE.Object3D, index: number): Rider {
     mesh,
     center,
     progress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
+    pathProgress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
     // 有的幾乎停在醬裡，有的漂得比較快，才不會永遠保持同樣的間距
     // 薯條較長，轉到順著圈時比較容易碰到旁邊那塊
-    reach: nugget ? 0.032 : 0.038,
+    reach: kind === 'nugget' ? 0.032 : 0.038,
     drift: spec.drift,
     driftPhase: spec.driftPhase,
     yawSpeed: spec.yawSpeed,
     // 一開始就有的在上緣、有的在下緣，之後各自慢慢換邊
     climb: spec.climb,
+    pathClimb: spec.climb,
     climbSpeed: spec.climbSpeed,
     climbRate: spec.climbRate,
     // 負得比半高少一點：大部分埋在醬的外側，只留一截露出來
-    lift: nugget ? -0.016 : -0.026,
-    nugget,
+    lift: kind === 'nugget' ? -0.016 : -0.026,
+    kind,
     yaw: spec.yaw,
     // 薯條只微微傾斜。斜太多時兩端會翹出醬面，整根看起來浮在空中
     tilt: spec.tilt,
     phase: spec.phase,
+    swimRate1: 0,
+    swimRate2: 0,
+    swimRate3: 0,
+    swimPhase1: 0,
+    swimPhase2: 0,
+    swimPhase3: 0,
+    ringKnock: 0,
+    sharkTouch: false,
+    sharkKnockCooldown: 0,
+    revealed: false,
+    sharkYieldUntil: 0,
+    yieldClimbDir: 1,
+    sharkRecoverUntil: 0,
   };
 }

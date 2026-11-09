@@ -316,8 +316,10 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     all,
     update,
     ketchupRing: { object: ketchup.ringObject, settings: ketchup.ringSettings, apply: ketchup.applyRingSettings },
+    ketchupVisual: { settings: ketchup.visualSettings, apply: ketchup.applyVisualSettings },
     // 食物數量：面板上的滑桿改這個，再叫 apply 把多出來或少掉的塊數補上
     ketchupFood: { settings: ketchup.foodSettings, apply: () => ketchup.setFoodCount(ketchup.foodSettings.count) },
+    ketchupShark: { settings: ketchup.sharkFinSettings, apply: ketchup.applySharkFinSettings },
     // ground、groundSurface、groundRadius：拖曳與地表材質；ground 是 pivot，groundSurface 才是綠球 mesh
     ground,
     groundSurface,
