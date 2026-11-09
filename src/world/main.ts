@@ -163,6 +163,7 @@ const {
   ketchupVisual,
   ketchupFood,
   ketchupShark,
+  ketchupSharkWaves,
   houses,
   ground,
   groundSurface,
@@ -434,6 +435,35 @@ sharkFolder
   .add(ketchupVisual.settings, 'opacity', 0, 1, 0.02)
   .name('醬透明（看魚鰭）')
   .onChange(ketchupVisual.apply);
+
+const waveFolder = sharkFolder.addFolder('魚鰭水波');
+const finWave = ketchupSharkWaves.settings;
+waveFolder.add(finWave, 'enabled').name('顯示水波');
+waveFolder.add(finWave, 'interval', 0.05, 0.55, 0.01).name('間隔 interval').onFinishChange(logSharkFinWaves);
+waveFolder.add(finWave, 'life', 0.15, 1.4, 0.02).name('持續 life').onFinishChange(logSharkFinWaves);
+waveFolder.add(finWave, 'scale', 0.25, 2.2, 0.05).name('大小 scale').onFinishChange(logSharkFinWaves);
+waveFolder.add(finWave, 'opacity', 0, 1, 0.02).name('透明度 opacity').onFinishChange(logSharkFinWaves);
+waveFolder.add(finWave, 'sideSpread', 0, 0.055, 0.001).name('左右偏移 sideSpread').onFinishChange(logSharkFinWaves);
+waveFolder.add(finWave, 'trail', 0.005, 0.09, 0.001).name('落後距離 trail').onFinishChange(logSharkFinWaves);
+waveFolder
+  .addColor(finWave, 'color')
+  .name('色調 color')
+  .onChange(ketchupSharkWaves.apply)
+  .onFinishChange(logSharkFinWaves);
+
+function logSharkFinWaves() {
+  const hex = (color: string) => `0x${color.replace('#', '')}`;
+  console.log(
+    `const SHARK_FIN_WAVE_ENABLED = ${finWave.enabled};\n` +
+      `const SHARK_FIN_WAVE_INTERVAL = ${finWave.interval.toFixed(2)};\n` +
+      `const SHARK_FIN_WAVE_LIFE = ${finWave.life.toFixed(2)};\n` +
+      `const SHARK_FIN_WAVE_SCALE = ${finWave.scale.toFixed(2)};\n` +
+      `const SHARK_FIN_WAVE_OPACITY = ${finWave.opacity.toFixed(2)};\n` +
+      `const SHARK_FIN_WAVE_SIDE = ${finWave.sideSpread.toFixed(3)};\n` +
+      `const SHARK_FIN_WAVE_TRAIL = ${finWave.trail.toFixed(3)};\n` +
+      `const SHARK_FIN_WAVE_COLOR = ${hex(finWave.color)};`,
+  );
+}
 
 function logSharkFin() {
   const hex = (color: string) => `0x${color.replace('#', '')}`;

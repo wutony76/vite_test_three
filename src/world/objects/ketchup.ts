@@ -46,6 +46,14 @@ const SHARK_FIN_ENABLED = true;
 const SHARK_FIN_COLOR = 0xc07ab8;
 // 整圈進度 / 秒；雞塊薯條約 0.006~0.046，鰭快很多才有「掠過醬海」的感覺
 const SHARK_FIN_DRIFT = 0.12;
+const SHARK_FIN_WAVE_ENABLED = true;
+const SHARK_FIN_WAVE_INTERVAL = 0.17;
+const SHARK_FIN_WAVE_LIFE = 0.88;
+const SHARK_FIN_WAVE_SCALE = 2;
+const SHARK_FIN_WAVE_OPACITY = 0.52;
+const SHARK_FIN_WAVE_SIDE = 0.016;
+const SHARK_FIN_WAVE_TRAIL = 0.028;
+const SHARK_FIN_WAVE_COLOR = 0xfd0808;
 
 /**
  * 簡單的「可重現亂數」（mulberry32）：同一個 seed 每次產生的數列都一樣
@@ -185,6 +193,24 @@ export type SharkFinSettings = {
   depth: number;
 };
 
+/** 魚鰭兩側卡通水波：控制面板可調 */
+export type SharkFinWaveSettings = {
+  enabled: boolean;
+  /** 兩道水波間隔（秒） */
+  interval: number;
+  /** 單道水波存活時間（秒） */
+  life: number;
+  /** 尺寸倍率 */
+  scale: number;
+  /** 峰值透明度 0~1 */
+  opacity: number;
+  /** 離鰭中心往兩側偏移（起點） */
+  sideSpread: number;
+  /** 落在鰭後方距離（起點） */
+  trail: number;
+  color: string;
+};
+
 type KetchupOptions = {
   envMap: THREE.Texture;
   camera: THREE.Camera;
@@ -265,6 +291,21 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     depth: 0.008,
   };
   let sharkFin: Rider | null = sharkFinSettings.enabled ? createSharkFinRider(mesh, sharkFinSettings) : null;
+  const sharkFinWaveSettings: SharkFinWaveSettings = {
+    enabled: SHARK_FIN_WAVE_ENABLED,
+    interval: SHARK_FIN_WAVE_INTERVAL,
+    life: SHARK_FIN_WAVE_LIFE,
+    scale: SHARK_FIN_WAVE_SCALE,
+    opacity: SHARK_FIN_WAVE_OPACITY,
+    sideSpread: SHARK_FIN_WAVE_SIDE,
+    trail: SHARK_FIN_WAVE_TRAIL,
+    color: `#${SHARK_FIN_WAVE_COLOR.toString(16).padStart(6, '0')}`,
+  };
+  const finWaves = createSharkFinWaves(mesh, sharkFinWaveSettings);
+
+  function applySharkFinWaveSettings() {
+    finWaves.applyColor();
+  }
   const foodSettings = { count: FOOD_COUNT };
   const visualSettings: KetchupVisualSettings = { opacity: 1 };
 
@@ -474,6 +515,14 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
         else finLateral.normalize();
         finBasis.makeBasis(flowAlongTube, riderLocalDir, finLateral);
         rider.mesh.quaternion.setFromRotationMatrix(finBasis);
+        finWaves.update(
+          deltaTime,
+          sharkFinWaveSettings.enabled && sharkFinSettings.enabled && rider.mesh.visible,
+          rider.mesh.position,
+          flowAlongTube,
+          finLateral,
+          riderLocalDir,
+        );
       } else {
         rider.mesh.quaternion.setFromUnitVectors(RIDER_Y_AXIS, riderLocalDir);
         rider.mesh.rotateY(rider.yaw);
@@ -555,6 +604,8 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     setFoodCount,
     sharkFinSettings,
     applySharkFinSettings,
+    sharkFinWaveSettings,
+    applySharkFinWaveSettings,
     setWrap,
     resetIntro,
   };
@@ -842,6 +893,151 @@ function riderSpec(index: number) {
 }
 
 /** 鯊魚三角鰭：固定一塊，不計入食物數量 */
+/** 魚鰭兩側：卡通半圓水紋（Sprite 循環冒出 → 放大淡出） */
+const FIN_WAVE_SLOTS = 8;
+
+let finWaveTexture: THREE.CanvasTexture | null = null;
+
+function sharedFinWaveTexture() {
+  if (finWaveTexture) return finWaveTexture;
+  const size = 96;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, size, size);
+    const cx = size * 0.5;
+    const cy = size * 0.58;
+    const strokes = [
+      { w: 4.5, rgba: 'rgba(255,255,255,0.92)' },
+      { w: 3.2, rgba: 'rgba(190,235,255,0.75)' },
+      { w: 2.4, rgba: 'rgba(255,255,255,0.55)' },
+    ];
+    for (let i = 0; i < 3; i++) {
+      const r = 14 + i * 11;
+      for (const stroke of strokes) {
+        ctx.strokeStyle = stroke.rgba;
+        ctx.lineWidth = stroke.w;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, Math.PI + 0.35, -0.35);
+        ctx.stroke();
+      }
+    }
+  }
+  finWaveTexture = new THREE.CanvasTexture(canvas);
+  finWaveTexture.colorSpace = THREE.SRGBColorSpace;
+  return finWaveTexture;
+}
+
+type FinWaveSlot = {
+  sprite: THREE.Sprite;
+  material: THREE.SpriteMaterial;
+  age: number;
+  life: number;
+  side: number;
+  trail: number;
+};
+
+function createSharkFinWaves(parent: THREE.Object3D, settings: SharkFinWaveSettings) {
+  const group = new THREE.Group();
+  group.name = 'sharkFinWaves';
+  parent.add(group);
+  const map = sharedFinWaveTexture();
+  const slots: FinWaveSlot[] = [];
+  for (let i = 0; i < FIN_WAVE_SLOTS; i++) {
+    const material = new THREE.SpriteMaterial({
+      map,
+      transparent: true,
+      depthWrite: false,
+      opacity: 0,
+      color: new THREE.Color(settings.color),
+    });
+    const sprite = new THREE.Sprite(material);
+    sprite.renderOrder = 3;
+    sprite.visible = false;
+    group.add(sprite);
+    slots.push({
+      sprite,
+      material,
+      age: settings.life,
+      life: settings.life,
+      side: 1,
+      trail: settings.trail,
+    });
+  }
+  let spawnTimer = settings.interval * 0.35;
+  let nextSide = 1;
+  const pos = new THREE.Vector3();
+  const back = new THREE.Vector3();
+  const lateral = new THREE.Vector3();
+  const lift = new THREE.Vector3();
+
+  function applyColor() {
+    const c = new THREE.Color(settings.color);
+    for (const slot of slots) slot.material.color.copy(c);
+  }
+
+  function takeSlot() {
+    const idle = slots.find((s) => s.age >= s.life);
+    if (idle) return idle;
+    return slots.reduce((best, s) => (s.age > best.age ? s : best));
+  }
+
+  function spawn() {
+    const slot = takeSlot();
+    slot.age = 0;
+    slot.life = settings.life * (0.82 + Math.random() * 0.36);
+    slot.side = nextSide;
+    nextSide *= -1;
+    slot.trail = settings.trail + Math.random() * settings.trail * 0.75;
+    slot.sprite.visible = true;
+  }
+
+  function update(
+    dt: number,
+    enabled: boolean,
+    finPos: THREE.Vector3,
+    flowAlongTube: THREE.Vector3,
+    finLateral: THREE.Vector3,
+    surfaceNormal: THREE.Vector3,
+  ) {
+    if (!enabled) {
+      for (const slot of slots) slot.sprite.visible = false;
+      spawnTimer = 0;
+      return;
+    }
+    const interval = Math.max(0.04, settings.interval);
+    spawnTimer += dt;
+    if (spawnTimer >= interval) {
+      spawnTimer = 0;
+      spawn();
+    }
+    const baseScale = 0.04 * settings.scale;
+    const peakOpacity = THREE.MathUtils.clamp(settings.opacity, 0, 1);
+    const sideBase = settings.sideSpread;
+    for (const slot of slots) {
+      if (slot.age >= slot.life) {
+        slot.sprite.visible = false;
+        continue;
+      }
+      slot.age += dt;
+      const t = slot.age / slot.life;
+      const grow = 0.5 + t * 1.05;
+      slot.sprite.scale.set(baseScale * grow, baseScale * 0.75 * grow, 1);
+      slot.material.opacity = Math.sin(Math.PI * t) * peakOpacity;
+      back.copy(flowAlongTube).multiplyScalar(-(slot.trail + t * (settings.trail * 2.3 + 0.02)));
+      lateral.copy(finLateral).multiplyScalar(slot.side * (sideBase + t * sideBase * 0.88));
+      lift.copy(surfaceNormal).multiplyScalar(0.0025 + Math.sin(t * Math.PI) * 0.0015);
+      pos.copy(finPos).add(back).add(lateral).add(lift);
+      slot.sprite.position.copy(pos);
+    }
+  }
+
+  return { update, applyColor, group };
+}
+
 function createSharkFinRider(parent: THREE.Object3D, settings: SharkFinSettings): Rider {
   const random = createRandom(9042);
   const angle = random() * Math.PI * 2;
