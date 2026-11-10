@@ -19,6 +19,70 @@ r = api.validate_mesh_topology("Body", profile="building_shell")
 print(r["ok"], r["errors"], r["report"]["checks"]["components"])
 ```
 
+## 讓 AI 編輯器照流程建模
+
+AI 要建模時，常常不讀文件就直接用 primitive 堆疊。所以把流程寫成編輯器的 rule，讓 AI 一開始建模就自動載入。
+
+### Cursor
+
+需要兩個設定：
+
+| 檔案 | 作用 | 進版控 |
+|---|---|---|
+| `~/.cursor/mcp.json` | 讓 Cursor 連上 Blender（MCP server） | 否，每台電腦各設一次 |
+| `.cursor/rules/blender-modeling.mdc` | 建模流程 rule：拆解 → lowpoly_kit 建模 → 驗證 → 匯出 → 報告 | 是 |
+
+**1. 設定 MCP**（每台電腦一次）
+
+`~/.cursor/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "blender": {
+      "command": "uvx",
+      "args": ["mcp-for-blender"]
+    }
+  }
+}
+```
+
+前置條件：
+
+- 已安裝 [`uv`](https://docs.astral.sh/uv/)，才能使用 `uvx`。
+- Blender 已開啟，MCP for Blender addon 也已啟用。
+- 到 Cursor Settings → MCP 確認 `blender` 亮綠燈。
+
+同一時間只讓一個 AI 工具操作 Blender，例如不要讓 Cursor 和 Claude Code 同時連。
+
+**2. 叫 Cursor 建模**
+
+rule 是 `alwaysApply: false`，Cursor 會依 rule 的描述判斷要不要載入。在訊息裡寫出 rule 名稱最保險：
+
+```
+用 Blender 建一個 Low Poly 的【物件】，照 blender-modeling 規則走
+```
+
+也可以輸入 `@blender-modeling` 強制載入。Cursor 會依序這樣做：
+
+1. 列出部件拆解表（方法 + profile），**等你確認**後才動手。
+2. 用 `create_connected_mesh` / `extrude_mesh_region` / `boolean_union_objects` 建模。
+3. 用 `repair_mesh_topology` 修正，再用 `validate_mesh_topology` 驗證。
+4. 用 `prepare_for_gltf` 匯出到 `public/models/<名稱>/<名稱>.glb`。
+5. 輸出品質報告表格。
+
+修改流程時，改 `.cursor/rules/blender-modeling.mdc` 就好。
+
+### Claude Code
+
+MCP 設定：`claude mcp add blender -- uvx mcp-for-blender`。流程規則目前記在 Claude Code 的使用者記憶裡，沒有進版控。要讓團隊共用的話，可以把 `.cursor/rules/blender-modeling.mdc` 的內文複製到 `CLAUDE.md`。
+
+### 搬到其他專案
+
+1. 複製 `tools/blender/` 和 `.cursor/rules/blender-modeling.mdc`。
+2. 把 rule 和本文件裡 `sys.path.insert(0, ".../tools/blender")` 的**絕對路徑**改成新專案的路徑。Blender 執行程式時的工作目錄不是專案根目錄，所以不能用相對路徑。
+3. 如果 GLB 輸出目錄不是 `public/models/`，也要改 rule 裡的路徑。
+
 ## 建模流程
 
 1. 拆解物件，決定每個零件的 profile
