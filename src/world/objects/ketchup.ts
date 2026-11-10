@@ -57,7 +57,7 @@ const SHARK_FIN_WAVE_SCALE = 2;
 const SHARK_FIN_WAVE_OPACITY = 0.52;
 const SHARK_FIN_WAVE_SIDE = 0.016;
 const SHARK_FIN_WAVE_TRAIL = 0.028;
-const SHARK_FIN_WAVE_COLOR = 0xfd0808;
+const SHARK_FIN_WAVE_COLOR = 0xff85e9;
 
 /**
  * 簡單的「可重現亂數」（mulberry32）：同一個 seed 每次產生的數列都一樣
