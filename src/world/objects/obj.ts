@@ -12,6 +12,9 @@ import { createCartoonRainbow } from './rainbow';
 // const MODEL_URL = `${import.meta.env.BASE_URL}models/nugget/nugget.glb`;
 const MODEL_URL = `${import.meta.env.BASE_URL}models/chicken_leg/chicken_leg.glb`;
 
+// projectRoom 的外觀：用 Blender 做的 low poly 房子（匯出時已拿掉底下那塊平的地面，才能種在球面上）
+const PROJECT_ROOM_MODEL_URL = `${import.meta.env.BASE_URL}models/project_room/project_room.glb`;
+
 // true = 載入網路下載的模型；false = 顯示原本的綠色球
 const USE_MODEL = false;
 
@@ -105,6 +108,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   });
   projectRoom.applySettings();
   ground.add(projectRoom.object);
+  attachHouseModel(projectRoom, PROJECT_ROOM_MODEL_URL);
 
   // BG
   const bgRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
@@ -498,6 +502,57 @@ function loadModel(all: THREE.Object3D) {
       console.error(`[obj] 模型載入失敗，請確認檔案存在：${MODEL_URL}`, error);
     },
   );
+}
+
+/**
+ * 把 glb 模型套到某一棟房子上，取代原本的長方體外觀
+ * 長方體不刪：種在球面上的位置、拖曳點選、控制面板、入場長大，全都是靠它算的
+ * 所以只把它「藏起來」，模型當成它的子物件，長方體怎麼移動、縮放，模型都會跟著走
+ */
+function attachHouseModel(house: ReturnType<typeof createHouse>, url: string) {
+  // material.visible = false：畫面上不畫、也不投影子（不然會多一塊方形的影子）
+  // 但射線（Raycaster）不看材質可不可見，所以滑鼠還是點得到、拖得動這一棟
+  // 不能用 object.visible = false：那會連子物件（模型）一起藏起來
+  house.object.material.visible = false;
+
+  const loader = new GLTFLoader();
+  loader.load(
+    url,
+    (gltf) => {
+      const model = gltf.scene;
+      fitIntoHouseBox(model, house.settings);
+      model.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        // 跟原本的長方體一樣會投影、也接得到影子；少了這兩行，房子在手電筒光下會像貼紙一樣沒有影子
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      });
+      house.object.add(model);
+    },
+    undefined,
+    (error) => {
+      console.error(`[obj] 房子模型載入失敗，請確認檔案存在：${url}`, error);
+    },
+  );
+}
+
+/**
+ * 把模型等比例縮放，塞進房子長方體的範圍裡（寬 × 高 × 深，原點在底部中央）
+ * 為什麼是長方體的範圍、不是直接用 HOUSE_SCALE？
+ *   模型是長方體的子物件，長方體的 scale 會再乘上去；這裡只要對齊「長方體還沒縮放前」的大小
+ *   這樣面板調 scale、入場動畫從 0 長大，模型都會跟長方體一模一樣
+ * 注意：只在載入時算一次，之後在面板改寬高深，模型不會重新塞
+ */
+function fitIntoHouseBox(model: THREE.Object3D, { width, height, depth }: HouseSettings) {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  // 取三個方向裡最緊的那個比例：等比例縮放才不會把房子壓扁，又保證三邊都不會超出長方體
+  const scale = Math.min(width / size.x, height / size.y, depth / size.z);
+  model.scale.setScalar(scale);
+  // 水平置中、底部貼齊 y = 0（長方體的原點在底部中央）；少了這步，房子會一半陷進地裡或偏到一邊
+  model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
 }
 
 /**
