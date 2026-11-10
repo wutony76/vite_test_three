@@ -164,6 +164,7 @@ const {
   ketchupFood,
   ketchupShark,
   ketchupSharkWaves,
+  rainbow,
   houses,
   ground,
   groundSurface,
@@ -384,6 +385,7 @@ introFolder.add(introSettings, 'houseStagger', 0, 0.4, 0.01).name('房子間隔 
 introFolder.add(introSettings, 'houseOvershoot', 0, 5, 0.1).name('房子回彈').onFinishChange(logIntro);
 introFolder.add(introSettings, 'ketchupSeconds', 0.5, 4, 0.05).name('番茄醬繞環 (秒)').onFinishChange(logIntro);
 introFolder.add(introSettings, 'ketchupAfterHouse', 0, 1, 0.05).name('醬在末棟比例').onFinishChange(logIntro);
+introFolder.add(introSettings, 'rainbowSeconds', 0.2, 3, 0.05).name('彩虹入場 (秒)').onFinishChange(logIntro);
 const introControls = {
   replayIntro() {
     replayIntro();
@@ -404,7 +406,61 @@ function logIntro() {
       `const HOUSE_STAGGER = ${introSettings.houseStagger.toFixed(2)};\n` +
       `const HOUSE_OVERSHOOT = ${introSettings.houseOvershoot.toFixed(2)};\n` +
       `const KETCHUP_SECONDS = ${introSettings.ketchupSeconds.toFixed(2)};\n` +
-      `const KETCHUP_AFTER_HOUSE = ${introSettings.ketchupAfterHouse.toFixed(2)};`,
+      `const KETCHUP_AFTER_HOUSE = ${introSettings.ketchupAfterHouse.toFixed(2)};\n` +
+      `const RAINBOW_SECONDS = ${introSettings.rainbowSeconds.toFixed(2)};`,
+  );
+}
+
+const rainbowFolder = gui.addFolder('彩虹');
+const rainbowSettings = rainbow.settings;
+rainbowFolder.add(rainbowSettings, 'enabled').name('顯示').onChange(rainbow.apply);
+rainbowFolder.add(rainbowSettings, 'camX', -6, 2, 0.05).name('左右 camX').onFinishChange(logRainbow);
+rainbowFolder.add(rainbowSettings, 'camY', 0, 5, 0.02).name('上下 camY').onFinishChange(logRainbow);
+rainbowFolder
+  .add(rainbowSettings, 'camZ', -28, -6, 0.1)
+  .name('前後 camZ')
+  .onFinishChange(logRainbow);
+rainbowFolder.add(rainbowSettings, 'scale', 0.1, 1.2, 0.02).name('大小 scale').onChange(rainbow.apply).onFinishChange(logRainbow);
+rainbowFolder.add(rainbowSettings, 'bob', 0, 0.2, 0.005).name('漂浮 bob').onFinishChange(logRainbow);
+rainbowFolder
+  .add(rainbowSettings, 'bandThickness', 0.4, 1.8, 0.02)
+  .name('色帶寬度 bandThickness')
+  .onChange(rainbow.apply)
+  .onFinishChange(logRainbow);
+rainbowFolder
+  .add(rainbowSettings, 'arcRadius', 1.8, 3.4, 0.02)
+  .name('弧半徑 arcRadius')
+  .onChange(rainbow.apply)
+  .onFinishChange(logRainbow);
+rainbowFolder
+  .add(rainbowSettings, 'opacity', 0.2, 1, 0.02)
+  .name('透明度 opacity')
+  .onChange(rainbow.apply)
+  .onFinishChange(logRainbow);
+const rainbowColorFolder = rainbowFolder.addFolder('漸層色（內→外）');
+const rainbowColorLabels = ['內 color0', 'color1', 'color2', 'color3', 'color4', 'color5', '外 color6'];
+for (let i = 0; i < 7; i++) {
+  const key = `color${i}` as keyof typeof rainbowSettings;
+  rainbowColorFolder
+    .addColor(rainbowSettings, key)
+    .name(rainbowColorLabels[i])
+    .onChange(rainbow.apply)
+    .onFinishChange(logRainbow);
+}
+
+function logRainbow() {
+  const r = rainbowSettings;
+  const hex = (color: string) => `0x${color.replace('#', '')}`;
+  console.log(
+    `const RAINBOW_CAM_X = ${r.camX.toFixed(2)};\n` +
+      `const RAINBOW_CAM_Y = ${r.camY.toFixed(2)};\n` +
+      `const RAINBOW_CAM_Z = ${r.camZ.toFixed(2)};\n` +
+      `const RAINBOW_SCALE = ${r.scale.toFixed(2)};\n` +
+      `const RAINBOW_BOB = ${r.bob.toFixed(3)};\n` +
+      `const RAINBOW_ARC_RADIUS = ${r.arcRadius.toFixed(2)};\n` +
+      `const RAINBOW_BAND_THICKNESS = ${r.bandThickness.toFixed(2)};\n` +
+      `const RAINBOW_MESH_OPACITY = ${r.opacity.toFixed(2)};\n` +
+      `const RAINBOW_COLORS = [${[0, 1, 2, 3, 4, 5, 6].map((i) => hex(r[`color${i}` as keyof typeof r] as string)).join(', ')}];`,
   );
 }
 
@@ -431,6 +487,8 @@ sharkFolder.add(shark, 'forward').name('順環游（關＝逆環）');
 sharkFolder.addColor(shark, 'color').name('顏色 SHARK_FIN_COLOR').onChange(ketchupShark.apply).onFinishChange(logSharkFin);
 sharkFolder.add(shark, 'lift', -0.05, 0.04, 0.001).name('埋入醬面 lift').onChange(ketchupShark.apply).onFinishChange(logSharkFin);
 sharkFolder.add(shark, 'depth', 0.003, 0.025, 0.001).name('厚度 depth').onChange(ketchupShark.apply).onFinishChange(logSharkFin);
+sharkFolder.add(shark, 'curveAmp', 0, 0.85, 0.02).name('曲線幅度 curveAmp').onFinishChange(logSharkFin);
+sharkFolder.add(shark, 'curveRate', 0.1, 2.5, 0.05).name('曲線速度 curveRate').onFinishChange(logSharkFin);
 sharkFolder
   .add(ketchupVisual.settings, 'opacity', 0, 1, 0.02)
   .name('醬透明（看魚鰭）')
@@ -471,7 +529,9 @@ function logSharkFin() {
     `const SHARK_FIN_ENABLED = ${shark.enabled};\n` +
       `const SHARK_FIN_DRIFT = ${shark.drift.toFixed(2)};\n` +
       `const SHARK_FIN_COLOR = ${hex(shark.color)};\n` +
-      `// forward ${shark.forward}, lift ${shark.lift.toFixed(3)}, depth ${shark.depth.toFixed(3)}`,
+      `// forward ${shark.forward}, lift ${shark.lift.toFixed(3)}, depth ${shark.depth.toFixed(3)}\n` +
+      `const SHARK_FIN_CURVE_AMP = ${shark.curveAmp.toFixed(2)};\n` +
+      `const SHARK_FIN_CURVE_RATE = ${shark.curveRate.toFixed(2)};`,
   );
 }
 
@@ -651,10 +711,10 @@ function logKetchupRing() {
 function render(time: number) {
   // setAnimationLoop 給的 time 是毫秒，shader 裡用秒比較好讀
   backgroundMaterial.uniforms.uTime.value = time * 0.001;
-  // 番茄醬等會動的物件
-  updateObjs(time * 0.001);
   // enableDamping 開啟時每幀都要 update，否則放開滑鼠後不會有慣性滑動
   controls.update();
+  // 彩虹等跟鏡頭對齊的物件要在 controls 之後更新
+  updateObjs(time * 0.001);
   updateFlashlight();
   // 入場會動 ground pivot，陰影貼圖要用最新的世界矩陣
   all.updateMatrixWorld(true);

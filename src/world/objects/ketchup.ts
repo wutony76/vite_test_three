@@ -45,7 +45,11 @@ const FOOD_COUNT_MAX = 150;
 const SHARK_FIN_ENABLED = true;
 const SHARK_FIN_COLOR = 0xc07ab8;
 // 整圈進度 / 秒；雞塊薯條約 0.006~0.046，鰭快很多才有「掠過醬海」的感覺
-const SHARK_FIN_DRIFT = 0.12;
+const SHARK_FIN_DRIFT = 0.115;
+/** 沿醬環截面左右擺（弧度上限），0 = 貼外緣直線游 */
+const SHARK_FIN_CURVE_AMP = 0.6;
+/** 曲線游動快慢（弧度 / 秒 量級） */
+const SHARK_FIN_CURVE_RATE = 1.15;
 const SHARK_FIN_WAVE_ENABLED = true;
 const SHARK_FIN_WAVE_INTERVAL = 0.17;
 const SHARK_FIN_WAVE_LIFE = 0.88;
@@ -191,6 +195,9 @@ export type SharkFinSettings = {
   color: string;
   lift: number;
   depth: number;
+  /** 截面 S 擺幅度，0 = 貼外緣中線 */
+  curveAmp: number;
+  curveRate: number;
 };
 
 /** 魚鰭兩側卡通水波：控制面板可調 */
@@ -289,6 +296,8 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     forward: true,
     lift: -0.035,
     depth: 0.008,
+    curveAmp: SHARK_FIN_CURVE_AMP,
+    curveRate: SHARK_FIN_CURVE_RATE,
   };
   let sharkFin: Rider | null = sharkFinSettings.enabled ? createSharkFinRider(mesh, sharkFinSettings) : null;
   const sharkFinWaveSettings: SharkFinWaveSettings = {
@@ -445,6 +454,15 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
         1,
       );
       const ringLength = curve.radius * Math.PI * 2;
+      const curveAmp = sharkFinSettings.curveAmp;
+      const curveRate = sharkFinSettings.curveRate;
+      if (curveAmp > 0.001) {
+        sharkFin.climb =
+          curveAmp * Math.sin(time * curveRate + sharkFin.phase) +
+          curveAmp * 0.38 * Math.sin(time * curveRate * 1.65 + sharkFin.driftPhase);
+      } else {
+        sharkFin.climb = 0;
+      }
       yieldFoodFromShark(sharkFin, riders, ringLength, time);
     }
     const pushDecay = Math.exp(-3.2 * deltaTime);
@@ -483,10 +501,14 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
       riderBinormal.crossVectors(riderTangent, riderOffset);
       if (riderBinormal.lengthSq() < 1e-8) riderBinormal.set(0, 1, 0);
       else riderBinormal.normalize();
-      // 魚鰭用固定截面基準，不因鏡頭翻轉而突然的左右跳
-      if (rider.kind !== 'sharkFin' && riderBinormal.dot(camera.up) < 0) riderBinormal.negate();
-      if (rider.kind === 'sharkFin') {
-        // 貼外側中線直游，不在截面上滑來滑去
+      if (riderBinormal.dot(camera.up) < 0) riderBinormal.negate();
+      if (rider.kind === 'sharkFin' && sharkFinSettings.curveAmp > 0.001) {
+        riderDir
+          .copy(riderOffset)
+          .multiplyScalar(Math.cos(rider.climb))
+          .addScaledVector(riderBinormal, Math.sin(rider.climb))
+          .normalize();
+      } else if (rider.kind === 'sharkFin') {
         riderDir.copy(riderOffset);
       } else {
         riderDir

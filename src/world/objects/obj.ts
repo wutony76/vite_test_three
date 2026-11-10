@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { createKetchup } from './ketchup';
 import { createHouse, type HouseSettings } from './house';
+import { createCartoonRainbow } from './rainbow';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -39,6 +40,7 @@ export type WorldIntroSettings = {
   houseOvershoot: number;
   ketchupSeconds: number;
   ketchupAfterHouse: number;
+  rainbowSeconds: number;
   ballMoveEase: IntroBallEase;
   ballScaleEase: IntroBallEase;
 };
@@ -77,6 +79,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   // 番茄醬緞帶：繞著中間的物件流動
   const ketchup = createKetchup({ envMap, camera });
   all.add(ketchup.object);
+
+  const rainbow = createCartoonRainbow(camera);
+  all.add(rainbow.object);
 
   // 房子：house.ts 裡的長方體，種在綠球（地表）上
   // 要用緞帶的軸來決定種在哪，所以放在緞帶建立之後
@@ -174,11 +179,13 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     ketchupSeconds: 1.35,
     // 最後一棟長到這個比例，番茄醬才開始流
     ketchupAfterHouse: 0.45,
+    rainbowSeconds: 1.1,
   };
 
   let introStarted: number | null = null;
   let introElapsed = 0;
   let introDone = false;
+  let lastUpdateTime: number | null = null;
   let startReady = false;
   const startPos = new THREE.Vector3();
   const restPos = new THREE.Vector3();
@@ -255,34 +262,51 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
 
   /** 每幀呼叫：time 單位是秒，讓會動的物件更新動畫 */
   function update(time: number) {
+    const deltaTime = lastUpdateTime === null ? 0 : Math.min(time - lastUpdateTime, 0.1);
+    lastUpdateTime = time;
     ketchup.update(time);
-    if (introDone) return;
     if (introStarted === null) introStarted = time;
     introElapsed = time - introStarted;
 
-    placeBall(introElapsed);
-    placeHouses(introElapsed);
-    // 最後一棟長到一半，醬才從球後方沿環流出來
-    const ketchupStart =
-      introSettings.emptyHold +
-      introSettings.ballSeconds +
-      (introHouses.length - 1) * introSettings.houseStagger +
-      introSettings.houseSeconds * introSettings.ketchupAfterHouse;
-    const wrap = easeInOutCubic(
-      THREE.MathUtils.clamp((introElapsed - ketchupStart) / introSettings.ketchupSeconds, 0, 1),
-    );
-    ketchup.setWrap(wrap);
+    if (introDone) {
+      rainbow.finishIntro();
+    } else {
+      placeBall(introElapsed);
+      placeHouses(introElapsed);
+      // 最後一棟長到一半，醬才從球後方沿環流出來
+      const ketchupStart =
+        introSettings.emptyHold +
+        introSettings.ballSeconds +
+        (introHouses.length - 1) * introSettings.houseStagger +
+        introSettings.houseSeconds * introSettings.ketchupAfterHouse;
+      const ketchupEnd = ketchupStart + introSettings.ketchupSeconds;
+      const wrap = easeInOutCubic(
+        THREE.MathUtils.clamp((introElapsed - ketchupStart) / introSettings.ketchupSeconds, 0, 1),
+      );
+      ketchup.setWrap(wrap);
 
-    if (introElapsed >= ketchupStart + introSettings.ketchupSeconds) {
-      if (ground !== all) {
-        ground.visible = true;
-        ground.position.copy(restPos);
-        ground.scale.setScalar(1);
+      let rainbowReveal = 0;
+      if (introElapsed >= ketchupEnd) {
+        rainbowReveal = easeOutCubic(
+          THREE.MathUtils.clamp((introElapsed - ketchupEnd) / introSettings.rainbowSeconds, 0, 1),
+        );
       }
-      introHouses.forEach((house) => house.object.scale.setScalar(house.settings.scale));
-      ketchup.setWrap(1);
-      introDone = true;
+      rainbow.setIntroReveal(rainbowReveal);
+
+      if (introElapsed >= ketchupEnd + introSettings.rainbowSeconds) {
+        if (ground !== all) {
+          ground.visible = true;
+          ground.position.copy(restPos);
+          ground.scale.setScalar(1);
+        }
+        introHouses.forEach((house) => house.object.scale.setScalar(house.settings.scale));
+        ketchup.setWrap(1);
+        rainbow.finishIntro();
+        introDone = true;
+      }
     }
+
+    rainbow.update(deltaTime);
   }
 
   function isHouseGrown(object: THREE.Object3D) {
@@ -308,6 +332,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       ground.scale.setScalar(introSettings.ballStartScale);
     }
     ketchup.resetIntro();
+    rainbow.resetIntro();
   }
 
   // 緞帶擺放參數也往外交出去，讓 main.ts 的控制面板可以調整
@@ -321,6 +346,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     ketchupFood: { settings: ketchup.foodSettings, apply: () => ketchup.setFoodCount(ketchup.foodSettings.count) },
     ketchupShark: { settings: ketchup.sharkFinSettings, apply: ketchup.applySharkFinSettings },
     ketchupSharkWaves: { settings: ketchup.sharkFinWaveSettings, apply: ketchup.applySharkFinWaveSettings },
+    rainbow: { settings: rainbow.settings, apply: rainbow.applyRainbowSettings },
     // ground、groundSurface、groundRadius：拖曳與地表材質；ground 是 pivot，groundSurface 才是綠球 mesh
     ground,
     groundSurface,
