@@ -29,7 +29,15 @@ vite_test_three/
 ├─ vite.config.ts             多頁面 build 設定（新增頁面要加進 input）
 ├─ public/                    靜態資源（以 /xxx 絕對路徑引用）
 │  ├─ favicon.svg
-│  └─ models/shoe/            商品模型 shoe.glb（meshopt + WebP 壓縮）與授權說明
+│  └─ models/
+│     ├─ shoe/                商品模型 shoe.glb（meshopt + WebP 壓縮）與授權說明
+│     ├─ project_room/        world 場景的 Blender 小屋
+│     └─ lowpoly_house/       lowpoly_kit 產生的驗收用小屋（tools/blender/scripts/build_house.py）
+├─ tools/
+│  └─ blender/                Blender 建模工具（Python，不參與 Vite build）
+│     ├─ lowpoly_kit/         Low Poly 建模 + 拓撲驗證函式庫，透過 MCP 的 execute_blender_code 載入
+│     ├─ scripts/             背景模式產生模型的腳本
+│     └─ tests/               headless Blender 測試 + Three.js 載入檢查
 ├─ src/
 │  ├─ main.ts                 方塊練習：方陣、Raycaster 點擊變色、波浪動畫、效能面板
 │  ├─ style.scss              方塊練習頁樣式
@@ -171,6 +179,11 @@ vite_test_three/
 | `npm run dev` | 啟動 Vite dev server（http://localhost:5173/ 、/cinema.html、/product.html、/diorama.html、/house.html、/web.html、/lights.html、/market.html、/drive.html） |
 | `npm run build` | `tsc` 型別檢查 + `vite build` 輸出至 `dist/` |
 | `npm run preview` | 預覽 build 結果 |
+| `Blender --background --factory-startup --python-exit-code 1 --python tools/blender/tests/run.py` | lowpoly_kit 測試（詳見 `tools/blender/README.md`） |
+
+## 4.1 Blender 建模流程
+
+AI 透過 MCP for Blender 建模時，一律使用 `tools/blender/lowpoly_kit`：Custom Mesh／Extrude／Inset／Boolean Union 建出連續拓撲，依 profile（`building_shell`、`opening`、`glass`、`water_surface`、`decoration`、`organic`）以程式驗證 9 項拓撲指標（含 Connected Components），全部通過才匯出 GLB。每棟建築一個根 Empty，需要點擊或動畫的零件保留為獨立 Object。
 
 ## 5. 開發規範重點
 
