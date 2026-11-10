@@ -47,7 +47,8 @@
 
 - **語言規範**：
   - OpenSpec 文件與 `docs/` 使用繁體中文
-  - 代碼命名、commit message 使用英文
+  - 代碼命名使用英文
+  - commit message 使用繁體中文（`type(scope):` 前綴維持 conventional commits 英文，摘要與內文用中文）
   - 程式碼註解使用繁體中文（學習用專案，註解以說明概念、參數意義與「少了會怎樣」為主）
 - **程式語言標準**：TypeScript，遵守 `tsconfig.json` 的 strict 類規則（`noUnusedLocals`、`erasableSyntaxOnly` 等；不使用 `enum` / `namespace`）
 - **狀態管理**：模組內以單一狀態物件 `state` 為主，避免散落多個 `let` 變數
