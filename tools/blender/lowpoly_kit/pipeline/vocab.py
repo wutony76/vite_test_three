@@ -36,14 +36,14 @@ KINDS = (
     # 主體
     "wall_block", "foundation", "coping", "roof_flat", "roof_gable", "roof_hip",
     # 結構
-    "pillar", "beam", "brick_patch", "canopy", "awning", "steps", "chimney", "roof_tiles",
+    "pillar", "beam", "brick_patch", "canopy", "awning", "steps", "chimney", "roof_tiles", "gable_trim", "pipe",
     # 開口
     "window", "door", "shop_window", "glass_pane",
     # 裝飾
     "planter_box", "pot_plant", "vine", "sign_disc", "poster", "chalkboard_sign",
-    "wall_lamp", "wall_light", "street_lamp", "lantern", "cat_silhouette", "crate", "fence",
+    "wall_lamp", "wall_light", "street_lamp", "lantern", "cat_silhouette", "crate", "fence", "bucket",
     # 植物、自然物
-    "tree_trunk", "tree_canopy", "bush", "rock",
+    "tree_trunk", "tree_canopy", "bush", "rock", "rock_pile",
     # 暫時找不到合適種類時使用，驗證會給 warning
     "generic",
 )

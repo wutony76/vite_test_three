@@ -51,3 +51,33 @@ def wobble_mesh(mesh, origin, seed, amplitude):
             vert.co.z += max(-z_limit[kz], min(z_limit[kz], dz))
     mesh.update()
     return len(mesh.vertices)
+
+
+def wobble_mesh_safe(mesh, origin, seed, amplitude):
+    """wobble 後自我交叉變多，就換回原本的 mesh（不做手繪偏移）。回傳是否保留 wobble。
+
+    凹多邊形擠出的零件（人字屋頂、階梯），端面被 ear clipping 切成細長三角形，
+    頂點被推動後細長三角形可能翻面、和旁邊的三角形重疊（Phase 6 前置建 test02 門廊屋頂時發現）。
+    """
+    from .bevel import _restore, _self_intersections
+    import bmesh
+    import bpy
+
+    def count():
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        try:
+            return _self_intersections(bm)
+        finally:
+            bm.free()
+
+    before = count()
+    original = mesh.copy()
+    try:
+        wobble_mesh(mesh, origin, seed, amplitude)
+        if count() > before:
+            _restore(mesh, original)
+            return False
+        return True
+    finally:
+        bpy.data.meshes.remove(original)

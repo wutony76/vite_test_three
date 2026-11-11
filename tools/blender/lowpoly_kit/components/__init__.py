@@ -45,7 +45,7 @@ def get_builder(kind):
 
 def _load_builders():
     # 延遲 import：builder 模組會 import 本模組的 register，放在最上面會循環 import
-    from . import nature, openings, props, structure  # noqa: F401
+    from . import nature, openings, props, roofs, structure  # noqa: F401
 
 
 class BuildContext:

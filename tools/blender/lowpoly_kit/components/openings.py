@@ -44,7 +44,8 @@ def build_window(ctx):
     data = _frame(ctx, int(cols), int(rows))
     # 窗台：往前凸出的一條，窗下會多一道陰影。secondary_density 太低時省略
     if ctx.param("sill", True) and ctx.density("secondary") >= 0.3:
-        data.extend(shapes.box(-ctx.hw - 0.03, -ctx.hd - 0.05, -0.02, ctx.hw + 0.03, -ctx.hd + 0.04, 0.04,
+        sill = min(ctx.param("sill_height", 0.06), ctx.h * 0.3)
+        data.extend(shapes.box(-ctx.hw - 0.03, -ctx.hd - 0.05, -0.02, ctx.hw + 0.03, -ctx.hd + 0.04, sill - 0.02,
                                ctx.material))
     return data
 

@@ -14,6 +14,7 @@ from lowpoly_kit.export import glb_stats
 PLANS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plans")
 SHOP = os.path.join(PLANS, "test01_shop.plan.json")
 TREE = os.path.join(PLANS, "tree_round.plan.json")
+COTTAGE = os.path.join(PLANS, "test02_cottage.plan.json")
 
 
 def _load(path):
@@ -117,3 +118,15 @@ def test_extrude_multiple_faces_leaves_no_wire_edges():
     edited = api.extrude_mesh_region("Slab", {"normal": [0, 0, 1]}, mode="inset_extrude", thickness=0.1, depth=-0.3)
     assert edited["ok"], edited["errors"]
     assert edited["report"]["checks"]["loose_edges"] == 0
+
+
+def test_cottage_builds_with_chimney_merged_and_flue_kept():
+    """test02：煙囪融進四坡屋頂；掛在煙囪底下的煙管改掛到屋頂，仍然屬於資產（Phase 6 前置發現的問題）。"""
+    result = api.build_asset_from_plan(COTTAGE)
+    assert result["ok"], result["errors"]
+    assert "test02_cottage_chimney" not in result["changes"]["objects"]
+    flue = bpy.data.objects["test02_cottage_flue_pipe"]
+    assert flue.parent.name == "test02_cottage_roof_main"
+    assert flue in bpy.data.objects["test02_cottage_Root"].children_recursive
+    assert result["changes"]["triangles"] <= 6000 and result["changes"]["primitives"] <= 32
+    assert not [i for i in result["report"]["geometry"]["issues"] if i["level"] == "fail"]

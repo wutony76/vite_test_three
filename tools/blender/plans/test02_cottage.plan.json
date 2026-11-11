@@ -1,0 +1,119 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "test02_cottage",
+  "reference": "test02",
+  "notes": "Test B 的第二種建築（童話石屋）。尺寸由 test02.reference.json 的 bbox 以門高 1.8 m 換算（1 px ≈ 12.86 mm）；原點在 footprint 中心的地面，正面朝 -Y。",
+  "dimensions": {
+    "w": 6.4,
+    "d": 6.2,
+    "h": 11.3
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {}
+  },
+  "style": {
+    "edge_wobble": 0.025,
+    "palette": "test02"
+  },
+  "materials": [
+    {
+      "name": "plaster",
+      "hex": "#F9F4E8",
+      "roughness": 0.9
+    },
+    {
+      "name": "plaster_shade",
+      "hex": "#64484E",
+      "roughness": 0.9
+    },
+    {
+      "name": "roof_tile",
+      "hex": "#9D5B2A",
+      "roughness": 0.8
+    },
+    {
+      "name": "stone",
+      "hex": "#7D7572",
+      "roughness": 0.95
+    },
+    {
+      "name": "wood_door",
+      "hex": "#966D4D",
+      "roughness": 0.8
+    },
+    {
+      "name": "wood_dark",
+      "hex": "#785447",
+      "roughness": 0.85
+    },
+    {
+      "name": "glass",
+      "hex": "#343E4D",
+      "roughness": 0.1,
+      "alpha": 0.45
+    },
+    {
+      "name": "niche_dark",
+      "hex": "#2A2626",
+      "roughness": 0.9
+    },
+    {
+      "name": "metal",
+      "hex": "#A29B98",
+      "roughness": 0.45,
+      "metallic": 0.6
+    },
+    {
+      "name": "step_stone",
+      "hex": "#767E79",
+      "roughness": 0.95
+    },
+    {
+      "name": "bush_orange",
+      "hex": "#B97121",
+      "roughness": 0.85
+    },
+    {
+      "name": "bush_green",
+      "hex": "#504122",
+      "roughness": 0.85
+    }
+  ],
+  "budget": {
+    "max_tris": 6000,
+    "max_primitives": 32
+  },
+  "components": [
+    {"id": "tower", "kind": "wall_block", "tier": "primary", "method": "component", "profile": "building_shell", "material": "plaster", "params": {"openings": ["upper_window", "vent_window"], "reveal": 0.2, "niche_material": "niche_dark"}, "bounds": [[-2.4, -1.708, 0.0], [1.015, 1.708, 7.408]], "source": "observed", "confidence": 0.85},
+    {"id": "roof_main", "kind": "roof_hip", "tier": "primary", "method": "component", "profile": "roof", "material": "roof_tile", "params": {"ridge_ratio": 0.45, "courses": 6, "lip": 0.08}, "bounds": [[-2.815, -2.007, 7.269], [1.385, 2.007, 9.623]], "source": "observed", "confidence": 0.75},
+    {"id": "chimney", "kind": "chimney", "tier": "secondary", "method": "boolean_union", "profile": "roof", "material": "wood_dark", "union_into": "roof_main", "bounds": [[-2.308, -0.35, 8.1], [-1.385, 0.35, 11.077]], "source": "inferred", "confidence": 0.7, "assumption": "煙囪底部要完整埋進屋頂實體才能 Union；依四坡屋頂斜率算出 8.1 m 以下仍在屋頂內"},
+    {"id": "flue_pipe", "kind": "pipe", "tier": "tertiary", "method": "component", "profile": "trim", "material": "metal", "parent": "chimney", "params": {"hat": true}, "bounds": [[-1.8, -0.23, 11.049], [-1.338, 0.23, 12.669]], "source": "observed", "confidence": 0.85},
+    {"id": "downpipe", "kind": "pipe", "tier": "tertiary", "method": "component", "profile": "trim", "material": "wood_dark", "parent": "tower", "params": {"hat": false}, "bounds": [[-1.772, -1.908, 5.054], [-1.569, -1.708, 7.2]], "source": "observed", "confidence": 0.7},
+    {"id": "upper_window", "kind": "window", "tier": "secondary", "method": "component", "profile": "opening", "material": "wood_dark", "parent": "tower", "params": {"panes": [2, 2], "sill": true, "sill_height": 0.22}, "bounds": [[-1.292, -1.788, 6.092], [-0.277, -1.627, 7.131]], "source": "observed", "confidence": 0.85},
+    {"id": "upper_window_glass", "kind": "glass_pane", "tier": "secondary", "method": "component", "profile": "glass", "material": "glass", "parent": "upper_window", "bounds": [[-1.2, -1.688, 6.231], [-0.369, -1.667, 7.062]], "source": "observed", "confidence": 0.8},
+    {"id": "vent_window", "kind": "window", "tier": "secondary", "method": "component", "profile": "opening", "material": "wood_dark", "parent": "tower", "params": {"panes": [1, 2], "sill": false}, "bounds": [[-0.738, -1.768, 3.877], [-0.369, -1.647, 4.431]], "source": "observed", "confidence": 0.7},
+    {"id": "porch_wall", "kind": "wall_block", "tier": "primary", "method": "component", "profile": "building_shell", "material": "plaster_shade", "params": {"openings": ["door"], "reveal": 0.12, "niche_material": "niche_dark"}, "bounds": [[0.554, -2.208, 0.0], [2.585, -0.008, 4.0]], "source": "inferred", "confidence": 0.6, "assumption": "門廊牆高 4.0 m：要高於門頂 3.81 m，又要低於屋頂外緣，牆角才不會穿出屋頂"},
+    {"id": "porch_roof", "kind": "roof_gable", "tier": "primary", "method": "component", "profile": "roof", "material": "roof_tile", "params": {"ridge_at": 0.15, "courses": 5, "lip": 0.07, "thickness": 0.2}, "bounds": [[0.462, -2.508, 3.808], [3.138, 0.2, 6.369]], "source": "observed", "confidence": 0.7},
+    {"id": "gable_trim", "kind": "gable_trim", "tier": "secondary", "method": "component", "profile": "trim", "material": "wood_dark", "parent": "porch_wall", "params": {"infill_material": "plaster_shade", "board": 0.12}, "bounds": [[0.738, -2.278, 3.669], [2.585, -2.208, 4.777]], "source": "observed", "confidence": 0.75},
+    {"id": "door", "kind": "door", "tier": "secondary", "method": "component", "profile": "opening", "material": "wood_door", "parent": "porch_wall", "params": {"glass_upper": true, "handle": true, "glass_niche_material": "niche_dark", "handle_material": "metal"}, "bounds": [[1.154, -2.248, 2.008], [2.215, -2.168, 3.808]], "source": "observed", "confidence": 0.9},
+    {"id": "door_glass", "kind": "glass_pane", "tier": "secondary", "method": "component", "profile": "glass", "material": "glass", "parent": "door", "bounds": [[1.606, -2.208, 3.365], [1.92, -2.188, 3.6]], "source": "observed", "confidence": 0.7},
+    {"id": "steps", "kind": "steps", "tier": "secondary", "method": "component", "profile": "building_shell", "material": "step_stone", "params": {"count": 6}, "bounds": [[1.154, -3.008, 0.0], [2.862, -2.208, 2.008]], "source": "observed", "confidence": 0.85},
+    {"id": "stones_left", "kind": "rock_pile", "tier": "secondary", "method": "component", "profile": "decoration", "material": "stone", "params": {"stones": 7}, "bounds": [[-2.4, -2.058, 0.0], [-0.923, -0.907, 5.469]], "source": "observed", "confidence": 0.8},
+    {"id": "stones_front", "kind": "rock_pile", "tier": "secondary", "method": "component", "profile": "decoration", "material": "stone", "params": {"stones": 7}, "bounds": [[-1.477, -2.308, 0.0], [1.108, -1.407, 3.046]], "source": "observed", "confidence": 0.8},
+    {"id": "lantern", "kind": "lantern", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "metal", "parent": "tower", "params": {"mount": "right"}, "bounds": [[-3.092, -1.2, 5.4], [-2.123, -0.6, 6.923]], "source": "observed", "confidence": 0.8},
+    {"id": "bucket", "kind": "bucket", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "wood_dark", "bounds": [[2.677, -2.608, 2.977], [3.462, -2.108, 3.946]], "source": "observed", "confidence": 0.7},
+    {"id": "crate", "kind": "crate", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "wood_dark", "bounds": [[-0.415, -3.008, 0.0], [0.508, -2.408, 1.038]], "source": "observed", "confidence": 0.75},
+    {"id": "bush_right", "kind": "bush", "tier": "tertiary", "method": "component", "profile": "vegetation", "material": "bush_orange", "params": {"plant_material": "bush_orange"}, "bounds": [[2.492, -2.808, 0.0], [4.154, -1.608, 2.838]], "source": "observed", "confidence": 0.7},
+    {"id": "bush_left", "kind": "bush", "tier": "tertiary", "method": "component", "profile": "vegetation", "material": "bush_green", "params": {"plant_material": "bush_green"}, "bounds": [[-3.877, -1.808, 0.0], [-2.262, -0.407, 2.285]], "source": "observed", "confidence": 0.6}
+  ],
+  "export": {
+    "path": "public/models/test02_cottage/test02_cottage.glb",
+    "clickable": [
+      "door",
+      "porch_wall"
+    ],
+    "anim_groups": {},
+    "instance_groups": {}
+  }
+}

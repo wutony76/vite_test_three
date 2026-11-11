@@ -239,9 +239,16 @@ def build_asset(plan_or_path, location=(0.0, 0.0, 0.0), export=False, preset=Non
         if target is None or other is None:
             fail("COMPONENT_BUILD_FAILED", cid, "Union 的目標或元件本身沒有建立成功")
             continue
+        children = list(other.children)
         merged = api.boolean_union_objects(target, [other])
         if merged["ok"]:
             objects.pop(cid)  # 已被移到備份 collection，不再是資產的一部分
+            # 掛在被融合元件底下的子元件（例如煙囪上的煙管）改掛到融合目標，保留世界位置。
+            # 少了這步，它們會跟著煙囪離開資產：不在根節點底下、不會匯出、QA 也看不到
+            for child in children:
+                world = child.matrix_world.copy()
+                child.parent = target
+                child.matrix_world = world
         else:
             fail("COMPONENT_BUILD_FAILED", cid, "Union：" + merged["errors"][0]["message"])
 
@@ -249,6 +256,7 @@ def build_asset(plan_or_path, location=(0.0, 0.0, 0.0), export=False, preset=Non
     amplitude = doc.get("style", {}).get("edge_wobble", 0.0)
     done_wobble, done_bevel = set(), set()
     bevel_used = {}
+    wobble_kept = {}
     # 要不要 wobble／bevel 由 profile 決定（validation/profiles.py），不寫死在這裡：
     # 新增 profile 時只要改規則表，建模行為就會跟著改
     for cid, obj in objects.items():
@@ -256,7 +264,7 @@ def build_asset(plan_or_path, location=(0.0, 0.0, 0.0), export=False, preset=Non
         rule = PROFILES[comp["profile"]]
         structural = comp["tier"] in ("primary", "secondary")
         if structural and rule["wobble"] and obj.data.name not in done_wobble:
-            wobble.wobble_mesh(obj.data, lay["origins"][cid], config.seed, amplitude)
+            wobble_kept[obj.name] = wobble.wobble_mesh_safe(obj.data, lay["origins"][cid], config.seed, amplitude)
             done_wobble.add(obj.data.name)
     for cid, obj in objects.items():
         comp = comps[cid]
@@ -296,6 +304,7 @@ def build_asset(plan_or_path, location=(0.0, 0.0, 0.0), export=False, preset=Non
             "triangles": tris, "primitives": prims,
             "self_intersections": checks.get("self_intersections"),
             "bevel_width": round(bevel_used.get(obj.name, 0.0), 4),
+            "wobble": wobble_kept.get(obj.name),
         }
         if not checked_obj["ok"]:
             fail("VALIDATION_FAILED", cid, checked_obj["errors"][0]["message"])

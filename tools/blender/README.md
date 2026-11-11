@@ -123,7 +123,7 @@ print(r["ok"], r["errors"], r["report"]["warnings"])
 | 層 | 檔案 | 依賴 |
 |---|---|---|
 | 幾何產生器 | `shapes.py`：`grid_slab`（凹槽／貫穿洞）、`prism`（ear clipping）、`loft`、`lathe`（每段材質）、`sweep`、`blob` | 純 Python |
-| 零件庫 | `components/`：`structure`、`openings`、`props`、`nature`，共 25 個 kind；`layout.py` 把 plan 整理成建模步驟 | 純 Python |
+| 零件庫 | `components/`：`structure`、`openings`、`roofs`、`props`、`nature`，共 34 個 kind；`layout.py` 把 plan 整理成建模步驟 | 純 Python |
 | 建模流程 | `build/orchestrator.py`、`materials.py`、`wobble.py`、`bevel.py` | Blender |
 
 - 每個 builder 都輸出封閉流形（glass 除外）。窗框加窗櫺、路燈的底座到燈罩，都是 1 個幾何島。
@@ -134,6 +134,9 @@ print(r["ok"], r["errors"], r["report"]["warnings"])
   - 密度決定窗台、門板、煙道、葉團、海報的多寡
   - `tertiary_density = 0` 時跳過裝飾
 - 手繪感：`style.edge_wobble`，依頂點世界座標雜湊做 x／z 偏移，相同位置的頂點偏移相同，接縫不會裂開。
+- 屋瓦：`roof_hip`（實心四坡）、`roof_gable`（厚殼人字，`ridge_at` 決定屋脊位置）都用「階梯狀瓦列」（`courses`、`lip`）表現，整個屋頂仍是 1 個封閉島；山牆的三角形由 `gable_trim` 補上。
+- wobble 和 bevel 都有安全模式：處理後同一個島內的自我交叉變多，就換回處理前的 mesh；報告的 `wobble`、`bevel_width` 記錄實際結果。
+- Boolean 融合後，掛在被融合元件底下的子元件（例如煙囪上的煙管）會改掛到融合目標。
 - 新增 kind：在 `components/` 用 `@register("kind")` 寫 builder，並在 `tests/test_shapes.py` 補上測試。
 
 ```bash
@@ -255,7 +258,7 @@ profile 存在 Object 的 custom property `lowpoly_profile`，匯出後是 Three
 ## 測試
 
 ```bash
-# 128 個 headless 測試（不會碰到正在使用的 Blender）
+# 131 個 headless 測試（不會碰到正在使用的 Blender）
 ~/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup \
   --python-exit-code 1 --python tools/blender/tests/run.py [-- 關鍵字]
 
@@ -277,7 +280,7 @@ node tools/blender/tests/threejs_check.mjs
 ```
 tools/blender/
 ├─ WORKFLOW.md            AI 建模流程（Cursor rule、Claude Code skill 都指向這裡）
-├─ plans/                 test01.reference.json、test01_shop.plan.json、tree_round.plan.json、sample_town.scene.json
+├─ plans/                 test01／test02 的 reference 與 plan、tree_round.plan.json、sample_town.scene.json
 ├─ lowpoly_kit/
 │  ├─ api.py              對外函式（備份、還原、驗證都在這層處理）
 │  ├─ result.py           回傳格式與錯誤碼

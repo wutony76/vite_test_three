@@ -210,3 +210,75 @@ def build_vine(ctx):
         data.extend(shapes.blob((p[0] + math.cos(angle) * reach_x * 0.9, p[1] + math.sin(angle) * reach_y * 0.9, p[2]),
                                 (size, size * 0.7, size * 0.7), plant, segments=5, rings=3, jitter=0.1, rng=ctx.rng))
     return data
+
+
+@register("pipe")
+def build_pipe(ctx):
+    """管子（煙管、排水管）：細長的旋轉體。hat=true 時頂端加一頂圓錐帽（防雨的煙囪帽）。"""
+    radius = min(ctx.hw, ctx.hd) * 0.8
+    h = ctx.h
+    if ctx.param("hat", False):
+        hat_h = min(h * 0.18, ctx.hw * 1.2)
+        brim = min(ctx.hw, ctx.hd) * 0.95  # 帽簷是圓的，要同時塞進寬度和深度
+        profile = [(0.0, 0.0), (radius, 0.0), (radius, h - hat_h), (brim, h - hat_h * 0.55), (radius * 0.6, h - hat_h * 0.15),
+                   (0.0, h)]
+    else:
+        profile = [(0.0, 0.0), (radius, 0.0), (radius, h), (0.0, h)]
+    return shapes.lathe(profile, ctx.segments(0.75), ctx.material)
+
+
+@register("lantern")
+def build_lantern(ctx):
+    """吊燈：從牆伸出的橫桿 + 吊鏈 + 方形燈籠（4 段的旋轉體，轉 45° 讓正面是平的）。
+
+    mount：牆在 bounds 的哪一側（right = +x、left = -x）。
+    """
+    side = -1.0 if ctx.param("mount", "right") == "left" else 1.0
+    hw, hd, h = ctx.hw, ctx.hd, ctx.h
+    arm = min(0.05, h * 0.05)
+    radius = min(hw * 0.45, hd * 0.8)
+    body = h * 0.55
+    hang_x = -side * (hw - radius - 0.02)
+    data = shapes.box(-hw, -arm, h - arm * 2, hw, arm, h, ctx.material)
+    chain_top, lamp_top = h - arm * 2, body + 0.02
+    data.extend(shapes.sweep([(hang_x, 0.0, chain_top + 0.01), (hang_x, 0.0, lamp_top - 0.01)], min(0.012, radius * 0.1), 4,
+                             ctx.material))
+    profile, roles = _lantern_profile(radius, body)
+    glow = ctx.param_mat("glow_material")
+    mats = [glow if role == "glow" else ctx.material for role in roles]
+    data.extend(shapes.lathe(profile, 4, mats, center=(hang_x, 0.0, 0.0), phase=math.pi / 4))
+    return data
+
+
+@register("bucket")
+def build_bucket(ctx):
+    """木桶：上寬下窄的旋轉體（桶口往下凹）+ 半圓形提把。"""
+    radius = min(ctx.hw, ctx.hd) * 0.8
+    body = ctx.h * 0.6
+    profile = [(0.0, 0.0), (radius * 0.8, 0.0), (radius, body), (radius * 0.88, body), (radius * 0.88, body * 0.85),
+               (0.0, body * 0.85)]
+    data = shapes.lathe(profile, ctx.segments(1.0), ctx.material)
+    arc = [(math.cos(a) * radius * 0.93, 0.0, body + math.sin(a) * min(radius, ctx.h - body) * 0.9)
+           for a in (math.pi * k / 6 for k in range(7))]
+    data.extend(shapes.sweep(arc, min(0.015, radius * 0.06), 4, ctx.param_mat("handle_material")))
+    if ctx.param("hang", True):
+        # 吊繩從提把頂端拉到 bounds 頂端（屋簷）：少了它，木桶看起來是浮在半空中（Geometry QA 的 FLOATING）
+        top = arc[3][2]
+        data.extend(shapes.sweep([(0.0, 0.0, top - 0.01), (0.0, 0.0, ctx.h)], min(0.01, radius * 0.05), 4,
+                                 ctx.param_mat("handle_material")))
+    return data
+
+
+@register("crate")
+def build_crate(ctx):
+    """木箱：正面有兩道淺凹的板縫（grid_slab 的凹槽），看得出是一塊塊木板釘成的。"""
+    hw, hd, h = ctx.hw, ctx.hd, ctx.h
+    frame = min(0.04, hw * 0.15)
+    gap = min(0.015, h * 0.03)
+    xs = [-hw, -hw + frame, hw - frame, hw]
+    zs = sorted({0.0, h} | {v for k in (1, 2) for v in (h * k / 3 - gap, h * k / 3 + gap)})
+    cells = {}
+    for index, k in enumerate((1, 2)):
+        for cell in shapes.cells_in(xs, zs, -hw + frame, hw - frame, h * k / 3 - gap, h * k / 3 + gap):
+            cells[cell] = ("niche", index, min(0.015, ctx.d * 0.1), ctx.material)
+    return shapes.grid_slab(xs, zs, -hd, hd, cells, "xzy", ctx.material)

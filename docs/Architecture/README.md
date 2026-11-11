@@ -34,9 +34,10 @@ vite_test_three/
 │     ├─ project_room/        world 場景的 Blender 小屋
 │     ├─ lowpoly_house/       lowpoly_kit 產生的驗收用小屋（tools/blender/scripts/build_house.py）
 │     ├─ test01_shop/         Test A 店面，依 plans/test01_shop.plan.json 產生（build_from_plan.py）
+│     ├─ test02_cottage/      Test B 第二種建築（童話石屋），依 plans/test02_cottage.plan.json 產生
 │     └─ tree_round/          小鎮用樹（organic + Voxel Remesh 示範）
 ├─ tools/
-│  ├─ img/                    建模用參考圖（test01.jpg = Test A）
+│  ├─ img/                    建模用參考圖（test01.jpg = Test A 店面、test02.jpg = 童話石屋）
 │  └─ blender/                Blender 建模工具（Python，不參與 Vite build）
 │     ├─ WORKFLOW.md          AI 建模流程的單一來源（Cursor rule、Claude Code skill 都指向它）
 │     ├─ lowpoly_kit/         Low Poly 建模 + 拓撲驗證函式庫，透過 MCP 的 execute_blender_code 載入

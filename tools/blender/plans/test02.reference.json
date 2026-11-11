@@ -1,0 +1,549 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "test02",
+  "image": {
+    "path": "tools/img/test02.jpg",
+    "width": 718,
+    "height": 1077
+  },
+  "medium": "watercolor + ink illustration",
+  "view": {
+    "type": "front_ortho",
+    "source": "observed",
+    "confidence": 0.5
+  },
+  "scale_anchor": {
+    "component": "door",
+    "axis": "height",
+    "meters": 1.8
+  },
+  "silhouette": {
+    "outline": [
+      [
+        0.2,
+        0.965
+      ],
+      [
+        0.2,
+        0.57
+      ],
+      [
+        0.21,
+        0.44
+      ],
+      [
+        0.155,
+        0.435
+      ],
+      [
+        0.2,
+        0.33
+      ],
+      [
+        0.21,
+        0.3
+      ],
+      [
+        0.21,
+        0.165
+      ],
+      [
+        0.31,
+        0.165
+      ],
+      [
+        0.31,
+        0.275
+      ],
+      [
+        0.45,
+        0.3
+      ],
+      [
+        0.53,
+        0.32
+      ],
+      [
+        0.61,
+        0.425
+      ],
+      [
+        0.57,
+        0.44
+      ],
+      [
+        0.57,
+        0.52
+      ],
+      [
+        0.53,
+        0.505
+      ],
+      [
+        0.8,
+        0.69
+      ],
+      [
+        0.74,
+        0.69
+      ],
+      [
+        0.74,
+        0.82
+      ],
+      [
+        0.77,
+        0.86
+      ],
+      [
+        0.77,
+        0.965
+      ]
+    ],
+    "source": "observed",
+    "confidence": 0.65
+  },
+  "palette": [
+    {
+      "name": "plaster",
+      "hex": "#F9F4E8",
+      "usage": "塔樓灰泥牆",
+      "sample": [
+        0.4,
+        0.55,
+        0.5,
+        0.62
+      ]
+    },
+    {
+      "name": "plaster_shade",
+      "hex": "#64484E",
+      "usage": "門廊牆（陰影中）",
+      "sample": [
+        0.535,
+        0.7,
+        0.575,
+        0.78
+      ]
+    },
+    {
+      "name": "roof_tile",
+      "hex": "#9D5B2A",
+      "usage": "屋瓦",
+      "sample": [
+        0.28,
+        0.36,
+        0.36,
+        0.39
+      ]
+    },
+    {
+      "name": "stone",
+      "hex": "#7D7572",
+      "usage": "圓石堆",
+      "sample": [
+        0.22,
+        0.725,
+        0.28,
+        0.76
+      ]
+    },
+    {
+      "name": "wood_door",
+      "hex": "#966D4D",
+      "usage": "門",
+      "sample": [
+        0.61,
+        0.74,
+        0.68,
+        0.86
+      ]
+    },
+    {
+      "name": "wood_dark",
+      "hex": "#785447",
+      "usage": "窗台、飾板、煙囪、木箱",
+      "sample": [
+        0.32,
+        0.505,
+        0.42,
+        0.52
+      ]
+    },
+    {
+      "name": "glass",
+      "hex": "#343E4D",
+      "usage": "窗玻璃",
+      "sample": [
+        0.335,
+        0.455,
+        0.415,
+        0.5
+      ]
+    },
+    {
+      "name": "metal",
+      "hex": "#A29B98",
+      "usage": "煙管、吊燈",
+      "sample": [
+        0.285,
+        0.09,
+        0.3,
+        0.15
+      ]
+    },
+    {
+      "name": "step_stone",
+      "hex": "#767E79",
+      "usage": "石階",
+      "sample": [
+        0.6,
+        0.9,
+        0.74,
+        0.94
+      ]
+    },
+    {
+      "name": "bush_orange",
+      "hex": "#B97121",
+      "usage": "右側秋色灌木",
+      "sample": [
+        0.78,
+        0.82,
+        0.86,
+        0.9
+      ]
+    },
+    {
+      "name": "bush_green",
+      "hex": "#504122",
+      "usage": "左側灌木",
+      "sample": [
+        0.07,
+        0.88,
+        0.15,
+        0.95
+      ]
+    }
+  ],
+  "components": [
+    {
+      "id": "tower",
+      "kind": "wall_block",
+      "tier": "primary",
+      "bbox": [
+        0.2,
+        0.43,
+        0.57,
+        0.965
+      ],
+      "material_hint": "plaster",
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "roof_main",
+      "kind": "roof_hip",
+      "tier": "primary",
+      "bbox": [
+        0.155,
+        0.27,
+        0.61,
+        0.44
+      ],
+      "material_hint": "roof_tile",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "chimney",
+      "kind": "chimney",
+      "tier": "secondary",
+      "bbox": [
+        0.21,
+        0.165,
+        0.31,
+        0.3
+      ],
+      "material_hint": "wood_dark",
+      "parent": "roof_main",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "flue_pipe",
+      "kind": "pipe",
+      "tier": "tertiary",
+      "bbox": [
+        0.27,
+        0.05,
+        0.32,
+        0.17
+      ],
+      "material_hint": "metal",
+      "parent": "chimney",
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "downpipe",
+      "kind": "pipe",
+      "tier": "tertiary",
+      "bbox": [
+        0.268,
+        0.445,
+        0.29,
+        0.6
+      ],
+      "material_hint": "wood_dark",
+      "parent": "tower",
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "upper_window",
+      "kind": "window",
+      "tier": "secondary",
+      "bbox": [
+        0.32,
+        0.44,
+        0.43,
+        0.525
+      ],
+      "material_hint": "wood_dark",
+      "parent": "tower",
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "vent_window",
+      "kind": "window",
+      "tier": "secondary",
+      "bbox": [
+        0.38,
+        0.645,
+        0.42,
+        0.685
+      ],
+      "material_hint": "wood_dark",
+      "parent": "tower",
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "porch_wall",
+      "kind": "wall_block",
+      "tier": "primary",
+      "bbox": [
+        0.52,
+        0.68,
+        0.74,
+        0.965
+      ],
+      "material_hint": "plaster_shade",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "porch_roof",
+      "kind": "roof_gable",
+      "tier": "primary",
+      "bbox": [
+        0.51,
+        0.505,
+        0.8,
+        0.69
+      ],
+      "material_hint": "roof_tile",
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "gable_trim",
+      "kind": "gable_trim",
+      "tier": "secondary",
+      "bbox": [
+        0.54,
+        0.62,
+        0.74,
+        0.7
+      ],
+      "material_hint": "wood_dark",
+      "parent": "porch_wall",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "door",
+      "kind": "door",
+      "tier": "secondary",
+      "bbox": [
+        0.585,
+        0.69,
+        0.7,
+        0.82
+      ],
+      "material_hint": "wood_door",
+      "parent": "porch_wall",
+      "source": "observed",
+      "confidence": 0.9
+    },
+    {
+      "id": "steps",
+      "kind": "steps",
+      "tier": "secondary",
+      "bbox": [
+        0.585,
+        0.82,
+        0.77,
+        0.965
+      ],
+      "material_hint": "step_stone",
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "stones_left",
+      "kind": "rock_pile",
+      "tier": "secondary",
+      "bbox": [
+        0.2,
+        0.57,
+        0.36,
+        0.965
+      ],
+      "material_hint": "stone",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "stones_front",
+      "kind": "rock_pile",
+      "tier": "secondary",
+      "bbox": [
+        0.3,
+        0.745,
+        0.58,
+        0.965
+      ],
+      "material_hint": "stone",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "lantern",
+      "kind": "lantern",
+      "tier": "tertiary",
+      "bbox": [
+        0.125,
+        0.465,
+        0.23,
+        0.575
+      ],
+      "material_hint": "metal",
+      "parent": "tower",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "bucket",
+      "kind": "bucket",
+      "tier": "tertiary",
+      "bbox": [
+        0.75,
+        0.68,
+        0.835,
+        0.75
+      ],
+      "material_hint": "wood_dark",
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "crate",
+      "kind": "crate",
+      "tier": "tertiary",
+      "bbox": [
+        0.415,
+        0.89,
+        0.515,
+        0.96
+      ],
+      "material_hint": "wood_dark",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "bush_right",
+      "kind": "bush",
+      "tier": "tertiary",
+      "bbox": [
+        0.73,
+        0.76,
+        0.91,
+        0.965
+      ],
+      "material_hint": "bush_orange",
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "bush_left",
+      "kind": "bush",
+      "tier": "tertiary",
+      "bbox": [
+        0.04,
+        0.8,
+        0.215,
+        0.975
+      ],
+      "material_hint": "bush_green",
+      "source": "observed",
+      "confidence": 0.6
+    }
+  ],
+  "hidden": [
+    {
+      "id": "view_projection",
+      "assumption": "畫面略帶俯角（看得到屋頂面），以正面正交近似；影像中屋頂的高度視為實際高度，因此屋頂很陡（符合童話屋風格）",
+      "source": "inferred",
+      "confidence": 0.5
+    },
+    {
+      "id": "tower_depth",
+      "assumption": "塔樓平面為正方形，深度 = 寬度",
+      "source": "inferred",
+      "confidence": 0.5
+    },
+    {
+      "id": "porch_depth",
+      "assumption": "門廊深 1.8 m，往塔樓前方凸出 0.4 m，左側貼在塔樓右牆上",
+      "source": "inferred",
+      "confidence": 0.4
+    },
+    {
+      "id": "roof_tiles",
+      "assumption": "屋瓦用屋頂表面的階梯狀瓦列（courses）表現，不逐片建模",
+      "source": "inferred",
+      "confidence": 0.6
+    }
+  ],
+  "excluded": [
+    {
+      "what": "背景的橘綠色暈染樹叢",
+      "reason": "水彩背景暈染，形體不明確；場景中的樹由 tree_round 提供"
+    },
+    {
+      "what": "門廊屋頂右側的曬衣桿與繩子",
+      "reason": "細長幾何，閃爍且增加 draw call"
+    },
+    {
+      "what": "塔樓左下的小吊盒",
+      "reason": "形體不明確、尺寸太小"
+    },
+    {
+      "what": "右下角的簽名與浮水印",
+      "reason": "不是場景中的物體"
+    }
+  ]
+}

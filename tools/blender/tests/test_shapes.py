@@ -24,6 +24,7 @@ from lowpoly_kit.pipeline import resolve_detail  # noqa: E402
 from lowpoly_kit.validation.profiles import PROFILES  # noqa: E402
 
 PLANS = os.path.join(BLENDER_DIR, "plans")
+PLAN_FILES = ("test01_shop.plan.json", "tree_round.plan.json", "test02_cottage.plan.json")
 
 
 def _closed_single(data, islands=1):
@@ -108,7 +109,7 @@ def _build_all(name, preset=None):
 
 
 def test_every_component_is_closed_and_inside_bounds():
-    for plan in ("test01_shop.plan.json", "tree_round.plan.json"):
+    for plan in PLAN_FILES:
         _doc, _lay, built = _build_all(plan)
         for cid, (ctx, data) in built.items():
             stats = shapes.topology_stats(data)
@@ -185,9 +186,28 @@ def test_instances_scale_to_fit():
     assert "pot_door" not in lay["instances"] and lay["instance_rejected"] == ["pot_door"]
 
 
+def test_cottage_roofs_are_single_shells():
+    """四坡、人字屋頂都是 1 個封閉島；四坡屋頂的側面有 courses 個往外凸的瓦列。"""
+    _doc, _lay, built = _build_all("test02_cottage.plan.json")
+    for cid in ("roof_main", "porch_roof"):
+        _closed_single(built[cid][1])
+    ctx, roof = built["roof_main"]
+    # 每一列瓦（最上面一列除外）都有一個往外凸的環 → 不同高度的 z 值 = 1 + 2 × (courses - 1) + 1
+    heights = {round(v[2], 4) for v in roof.verts}
+    assert len(heights) == 2 * ctx.param("courses") , sorted(heights)
+
+
+def test_rock_pile_and_bush_islands():
+    _doc, _lay, built = _build_all("test02_cottage.plan.json")
+    for cid in ("stones_left", "stones_front"):
+        stats = shapes.topology_stats(built[cid][1])
+        assert stats["islands"] == 7 and stats["boundary_edges"] == 0, (cid, stats)
+    assert shapes.topology_stats(built["bush_right"][1])["islands"] <= 6
+
+
 def test_registry_covers_plans():
     kinds = implemented_kinds()
-    for plan in ("test01_shop.plan.json", "tree_round.plan.json"):
+    for plan in PLAN_FILES:
         doc, _lay = _layout(plan)
         assert {c["kind"] for c in doc["components"]} <= kinds
 
