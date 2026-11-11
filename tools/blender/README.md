@@ -176,6 +176,35 @@ node tools/blender/tests/threejs_plan_check.mjs tools/blender/plans/test01_shop.
 - 參考圖不是正面正交視角時回報 `skipped`。
 - 計算模組 `qa/metrics.py` 是純 Python + numpy：掃描線填色、IoU、Lab ΔE、外框投影。
 
+## 場景組裝（Scene Assembly）
+
+`api.build_scene_from_plan(scene_path, export=)`：依 ScenePlan 組裝小鎮。設計細節見 `openspec/changes/add-scene-assembly/design.md`。
+
+- **資產庫**：每個資產只建一次，放在隱藏的 collection；每次擺放都是共用 mesh 的複本，glTF 中同一份 mesh 只存一次。
+- **地形**：起伏的格狀地面。建築外框與道路周圍自動整平，並用 smoothstep 平滑過渡；`terrain.params` 可設定 `amplitude`、`seed`、`resolution`、`flatten_margin`、`frequency`。
+- **道路**：沿 polyline 掃出的帶狀面，轉角用斜接，多條道路依序抬高 5 mm，避免重疊處閃爍。
+- **擺放**：
+  - 建築：`<擺放 id>_Root` 掛在群組底下，可以單獨點擊、做動畫
+  - `instance: true`（樹）：直接掛在群組底下，匯出成 `EXT_mesh_gpu_instancing`
+- **複本的 custom property**：帶 `lpk_scene`、`lpk_placement`、`lpk_asset_ref`，**不帶 `lpk_asset`**，重建單一資產時才不會刪到場景。
+- **Scene QA**：每次組裝都會執行，結果在 `result["report"]`。
+
+| 檢查 | 判定 |
+|---|---|
+| `SCENE_OVERLAP` | 建築外框互相重疊（旋轉後的長方形，SAT 判定） |
+| `SCENE_ON_ROAD` | 建築外框壓到道路（fail）；樹幹壓到道路（warn） |
+| `SCENE_TREE_IN_BUILDING` | 樹種在建築外框裡 |
+| `SCENE_OUT_OF_TERRAIN` | 外框超出地形 |
+| `SCENE_ON_SLOPE` | 建築底下的地面高度 > 0.08 m |
+| `SCENE_HIERARCHY` | mesh 不在任何群組底下，或建築沒有自己的根節點 |
+| `SCENE_BUDGET` | 三角面或 draw call 超出預算 |
+
+```bash
+~/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python-exit-code 1 \
+  --python tools/blender/scripts/build_scene.py -- tools/blender/plans/sample_town.scene.json --export --render /tmp/town
+node tools/blender/tests/threejs_scene_check.mjs
+```
+
 ## 建模流程
 
 完整步驟見 [`WORKFLOW.md`](WORKFLOW.md)。摘要：
@@ -199,6 +228,7 @@ node tools/blender/tests/threejs_plan_check.mjs tools/blender/plans/test01_shop.
 | `validate_mesh_topology(obj, profile=)` | 拓撲檢查（含自我交叉、島數／三角面上限、縮放）+ profile 判定 | 否 |
 | `validate_asset_geometry(plan, root=)` | Geometry QA：對照 plan 檢查位置、大小、懸空 | 否 |
 | `validate_visual(plan_path, out_dir, root=)` | Visual QA：輪廓 IoU、元件位置 IoU、色差，輸出疊圖 | 否（暫改渲染設定後還原） |
+| `build_scene_from_plan(scene_path, export=)` | 依 ScenePlan 組裝場景並執行 Scene QA | 只新建／重建該場景與它用到的資產 |
 | `optimize_lowpoly_mesh(obj, planar_angle_deg=1.0)` | 溶掉共平面的多餘邊、Flat Shading | 是 |
 | `remesh_organic_mesh(obj, voxel_size=)` | Voxel Remesh，只允許 `organic` | 是 |
 | `prepare_for_gltf(root, filepath)` | 驗證 root 底下所有 Mesh，全部通過才匯出 GLB | 否 |
@@ -258,7 +288,7 @@ profile 存在 Object 的 custom property `lowpoly_profile`，匯出後是 Three
 ## 測試
 
 ```bash
-# 131 個 headless 測試（不會碰到正在使用的 Blender）
+# 147 個 headless 測試（不會碰到正在使用的 Blender）
 ~/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup \
   --python-exit-code 1 --python tools/blender/tests/run.py [-- 關鍵字]
 
@@ -266,6 +296,7 @@ profile 存在 Object 的 custom property `lowpoly_profile`，匯出後是 Three
 python3 -m unittest discover -s tools/blender/tests -p "test_plan_schema.py"
 python3 -m unittest discover -s tools/blender/tests -p "test_shapes.py"
 python3 -m unittest discover -s tools/blender/tests -p "test_visual_metrics.py"
+python3 -m unittest discover -s tools/blender/tests -p "test_scene_terrain.py"
 
 # 重新產生小屋 GLB → public/models/lowpoly_house/lowpoly_house.glb
 ~/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup \
@@ -299,8 +330,9 @@ tools/blender/
 │  ├─ components/         零件庫（25 個 kind）與 layout，不依賴 bpy
 │  ├─ appearance/         palette atlas 色格配置（不依賴 bpy）
 │  ├─ build/              orchestrator／materials／appearance／wobble／bevel（Blender 端建模流程）
-│  ├─ qa/                 geometry（Geometry QA）、visual（Visual QA）、metrics（不依賴 bpy）
+│  ├─ qa/                 geometry、visual、scene（Scene QA）、metrics（不依賴 bpy）
+│  ├─ scene/              terrain（高度場、道路、外框幾何，不依賴 bpy）、assembly（場景組裝）
 │  └─ presets/building.py Low Poly 小屋
-├─ scripts/              build_from_plan.py（依 plan 建模／匯出／預覽）、overlay_reference.py、build_house.py
+├─ scripts/              build_from_plan.py（資產）、build_scene.py（場景）、overlay_reference.py、build_house.py
 └─ tests/                 run.py、fixtures、test_*.py（test_plan_schema、test_shapes 不需要 Blender）、threejs_check.mjs、threejs_plan_check.mjs
 ```

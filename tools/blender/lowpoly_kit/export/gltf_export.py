@@ -18,7 +18,7 @@ def _gltf_props():
     return bpy.ops.export_scene.gltf.get_rna_type().properties
 
 
-def export_glb(root, filepath, apply_modifiers=True):
+def export_glb(root, filepath, apply_modifiers=True, gpu_instances=False):
     props = _gltf_props()
     # export_format 是動態 enum（選項由 callback 產生），沒有 context 時讀出來可能是空的。
     # 讀得到就確認 GLB 存在；讀不到就直接用 "GLB"，傳錯時匯出器會丟 TypeError 並列出合法值。
@@ -41,6 +41,10 @@ def export_glb(root, filepath, apply_modifiers=True):
     }
     if "export_extras" in props:
         kwargs["export_extras"] = True
+    if gpu_instances and "export_gpu_instances" in props:
+        # 同一個父節點下、共用 mesh 的兄弟物件（場景裡的樹）合併成 EXT_mesh_gpu_instancing，
+        # Three.js 會建成 InstancedMesh：8 棵樹 2 次 draw call，而不是 16 次
+        kwargs["export_gpu_instances"] = True
     if "export_vertex_color" in props:
         # ACTIVE：匯出作用中的 color attribute 成 COLOR_0（palette_vc 的明暗起伏）。
         # 預設的 MATERIAL 只在 exporter 認得材質節點組合時才匯出，貼圖 × vertex color 的組合不一定認得

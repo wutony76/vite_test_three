@@ -1,30 +1,37 @@
 {
   "schema": "lowpoly.scene/1",
   "id": "sample_town",
-  "notes": "Test B 草稿：目前只有 test01_shop 一種建築，Phase 8 驗收前要再補第二種建築 plan（驗收要求至少 2 種造型）。燈光不寫在這裡，由 Three.js 端建立。",
-  "terrain": {"kind": "grid_hills", "size": [60, 60], "params": {"amplitude": 1.2, "seed": 7, "flatten_radius_around_placements": 4.0}},
+  "notes": "Test B：2 棟店面（test01_shop）+ 2 棟童話石屋（test02_cottage）+ 8 棵 instanced 樹。資產正面朝 -Y：道路北側的建築轉 0°、南側轉 180°，正面都朝向道路。燈光不寫在這裡，由 Three.js 端建立。",
+  "materials": [
+    {"name": "grass", "hex": "#8DB04A", "roughness": 0.95},
+    {"name": "road", "hex": "#C9B38A", "roughness": 0.9}
+  ],
+  "terrain": {"kind": "grid_hills", "size": [60, 60], "material": "grass",
+              "params": {"amplitude": 1.6, "seed": 7, "resolution": 48, "flatten_margin": 4.0, "frequency": 0.12}},
   "roads": [
-    {"id": "main_street", "polyline": [[-28, 0], [-10, 2], [10, -2], [28, 0]], "width": 3.0},
-    {"id": "side_lane", "polyline": [[0, 0], [2, 12], [-4, 26]], "width": 2.0}
+    {"id": "main_street", "polyline": [[-28, 0], [-10, 2], [10, -2], [28, 0]], "width": 3.0, "material": "road"},
+    {"id": "side_lane", "polyline": [[0, 0], [2, 12], [-4, 26]], "width": 2.0, "material": "road"}
   ],
   "hierarchy": ["Terrain", "Roads", "Buildings", "Vegetation", "Props"],
   "assets": [
     {"asset_id": "test01_shop", "plan": "test01_shop.plan.json"},
+    {"asset_id": "test02_cottage", "plan": "test02_cottage.plan.json"},
     {"asset_id": "tree_round", "plan": "tree_round.plan.json"}
   ],
   "placements": [
-    {"id": "shop_a", "asset_id": "test01_shop", "group": "Buildings", "location": [-14, 6.5, 0], "rotation_z_deg": 180, "scale": 1.0, "instance": false},
-    {"id": "shop_b", "asset_id": "test01_shop", "group": "Buildings", "location": [-6, 7.5, 0], "rotation_z_deg": 185, "scale": 1.1, "instance": false},
-    {"id": "shop_c", "asset_id": "test01_shop", "group": "Buildings", "location": [8, -7.5, 0], "rotation_z_deg": 0, "scale": 0.95, "instance": false},
-    {"id": "shop_d", "asset_id": "test01_shop", "group": "Buildings", "location": [16, -6.5, 0], "rotation_z_deg": -5, "scale": 1.0, "instance": false},
-    {"id": "tree_01", "asset_id": "tree_round", "group": "Vegetation", "location": [-22, 9, 0], "rotation_z_deg": 0, "scale": 1.0, "instance": true},
-    {"id": "tree_02", "asset_id": "tree_round", "group": "Vegetation", "location": [-18, -8, 0], "rotation_z_deg": 40, "scale": 1.2, "instance": true},
-    {"id": "tree_03", "asset_id": "tree_round", "group": "Vegetation", "location": [-2, 14, 0], "rotation_z_deg": 90, "scale": 0.9, "instance": true},
-    {"id": "tree_04", "asset_id": "tree_round", "group": "Vegetation", "location": [4, 9, 0], "rotation_z_deg": 15, "scale": 1.1, "instance": true},
-    {"id": "tree_05", "asset_id": "tree_round", "group": "Vegetation", "location": [12, 8, 0], "rotation_z_deg": 200, "scale": 1.0, "instance": true},
-    {"id": "tree_06", "asset_id": "tree_round", "group": "Vegetation", "location": [22, -12, 0], "rotation_z_deg": 130, "scale": 1.3, "instance": true},
-    {"id": "tree_07", "asset_id": "tree_round", "group": "Vegetation", "location": [-8, 20, 0], "rotation_z_deg": 300, "scale": 0.8, "instance": true},
-    {"id": "tree_08", "asset_id": "tree_round", "group": "Vegetation", "location": [24, 6, 0], "rotation_z_deg": 60, "scale": 1.0, "instance": true}
+    {"id": "shop_a", "asset_id": "test01_shop", "group": "Buildings", "location": [-15, 7.5, 0], "rotation_z_deg": 0, "scale": 1.0, "instance": false},
+    {"id": "cottage_a", "asset_id": "test02_cottage", "group": "Buildings", "location": [-5.5, 9.5, 0], "rotation_z_deg": 0, "scale": 1.0, "instance": false},
+    {"id": "cottage_b", "asset_id": "test02_cottage", "group": "Buildings", "location": [8, -8.5, 0], "rotation_z_deg": 180, "scale": 1.0, "instance": false},
+    {"id": "shop_b", "asset_id": "test01_shop", "group": "Buildings", "location": [19, -7, 0], "rotation_z_deg": 180, "scale": 1.0, "instance": false},
+    {"id": "tree_01", "asset_id": "tree_round", "group": "Vegetation", "location": [-24, 11, 0], "rotation_z_deg": 0, "scale": 1.0, "instance": true},
+    {"id": "tree_02", "asset_id": "tree_round", "group": "Vegetation", "location": [-22, -9, 0], "rotation_z_deg": 40, "scale": 1.2, "instance": true},
+    {"id": "tree_03", "asset_id": "tree_round", "group": "Vegetation", "location": [-10, 18, 0], "rotation_z_deg": 90, "scale": 0.9, "instance": true},
+    {"id": "tree_04", "asset_id": "tree_round", "group": "Vegetation", "location": [6, 14, 0], "rotation_z_deg": 15, "scale": 1.1, "instance": true},
+    {"id": "tree_05", "asset_id": "tree_round", "group": "Vegetation", "location": [14, 9, 0], "rotation_z_deg": 200, "scale": 1.0, "instance": true},
+    {"id": "tree_06", "asset_id": "tree_round", "group": "Vegetation", "location": [25, -13, 0], "rotation_z_deg": 130, "scale": 1.3, "instance": true},
+    {"id": "tree_07", "asset_id": "tree_round", "group": "Vegetation", "location": [-6, -12, 0], "rotation_z_deg": 300, "scale": 0.8, "instance": true},
+    {"id": "tree_08", "asset_id": "tree_round", "group": "Vegetation", "location": [26, 8, 0], "rotation_z_deg": 60, "scale": 1.0, "instance": true}
   ],
-  "budget": {"max_tris": 150000, "max_draw_calls": 150}
+  "budget": {"max_tris": 150000, "max_draw_calls": 150},
+  "export": {"path": "public/models/sample_town/sample_town.glb"}
 }

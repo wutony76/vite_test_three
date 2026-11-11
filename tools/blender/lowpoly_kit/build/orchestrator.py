@@ -64,6 +64,10 @@ def _collection(plan_id):
     collection = bpy.data.collections.get(name) or bpy.data.collections.new(name)
     if collection.name not in bpy.context.scene.collection.children:
         bpy.context.scene.collection.children.link(collection)
+    # 場景組裝會把資產庫的 collection 隱藏起來。隱藏（hide_viewport）的物件不會被 depsgraph 計算，
+    # 在裡面重建資產時，Boolean 融合會失敗。所以建模前一律先恢復可見，場景組裝結束後再由它自己隱藏。
+    collection.hide_viewport = False
+    collection.hide_render = False
     return collection
 
 

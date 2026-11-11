@@ -35,6 +35,7 @@ vite_test_three/
 │     ├─ lowpoly_house/       lowpoly_kit 產生的驗收用小屋（tools/blender/scripts/build_house.py）
 │     ├─ test01_shop/         Test A 店面，依 plans/test01_shop.plan.json 產生（build_from_plan.py）
 │     ├─ test02_cottage/      Test B 第二種建築（童話石屋），依 plans/test02_cottage.plan.json 產生
+│     ├─ sample_town/         Test B 小鎮場景，依 plans/sample_town.scene.json 組裝（build_scene.py）
 │     └─ tree_round/          小鎮用樹（organic + Voxel Remesh 示範）
 ├─ tools/
 │  ├─ img/                    建模用參考圖（test01.jpg = Test A 店面、test02.jpg = 童話石屋）
@@ -46,7 +47,8 @@ vite_test_three/
 │     │  ├─ components/       零件庫：kind → builder（不依賴 bpy）
 │     │  ├─ build/            依 plan 建模的 orchestrator、材質、wobble、bevel（Blender）
 │     │  ├─ appearance/       palette atlas 色格配置（不依賴 bpy）
-│     │  └─ qa/               Geometry QA、Visual QA（Blender）；metrics（不依賴 bpy）
+│     │  ├─ scene/            場景組裝：terrain（不依賴 bpy）、assembly（Blender）
+│     │  └─ qa/               Geometry、Visual、Scene QA（Blender）；metrics（不依賴 bpy）
 │     ├─ plans/               ReferenceSpec／AssetPlan／ScenePlan JSON
 │     ├─ scripts/             背景模式產生模型、參考圖疊圖校正的腳本
 │     └─ tests/               headless Blender 測試 + Three.js 載入檢查
@@ -196,6 +198,7 @@ vite_test_three/
 | `python3 -m unittest discover -s tools/blender/tests -p "test_shapes.py"` | 幾何產生器與零件庫拓撲測試（不需要 Blender） |
 | `python3 -m unittest discover -s tools/blender/tests -p "test_visual_metrics.py"` | Visual QA 計算與 atlas 配置測試（不需要 Blender） |
 | `node tools/blender/tests/threejs_plan_check.mjs <plan.json>` | 依 plan 檢查 GLB 在 Three.js 的結構、射線、draw call |
+| `node tools/blender/tests/threejs_scene_check.mjs` | 檢查場景 GLB：群組、每棟建築的門、InstancedMesh、draw call |
 
 ## 4.1 Blender 建模流程
 
@@ -208,6 +211,7 @@ AI 透過 MCP for Blender 建模時，一律使用 `tools/blender/lowpoly_kit`�
 - 零件庫（`components/`）的每個 kind 都用 `shapes.py` 的產生器建出封閉流形，不用 primitive 堆疊。
 - orchestrator 依序：建立 Object → 編輯 parent（屋頂、磚面）→ Boolean Union（煙囪）→ wobble（手繪感）→ bevel（稜角高光）→ 外觀（palette atlas + vertex color）→ profile 驗證 → Geometry QA → 預算檢查 → 匯出 GLB。
 - Visual QA（`api.validate_visual`）和正面參考圖比較輪廓 IoU、元件位置 IoU、色差，並輸出疊圖給 AI 寫評語；判定只看數字。
+- 場景由 `api.build_scene_from_plan` 依 ScenePlan 組裝：資產只建一次，擺放是共用 mesh 的複本；地形在建築與道路周圍自動整平；樹用 GPU instancing。Scene QA 檢查重疊、壓道路、地面不平、階層與預算。
 
 ## 5. 開發規範重點
 

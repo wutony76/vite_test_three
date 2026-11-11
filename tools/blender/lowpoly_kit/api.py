@@ -38,6 +38,7 @@ __all__ = [
     "build_asset_from_plan",
     "validate_asset_geometry",
     "validate_visual",
+    "build_scene_from_plan",
 ]
 
 
@@ -385,6 +386,17 @@ def validate_visual(plan_path, out_dir, root=None):
         if item["level"] == "fail":
             add_error(result, f"VISUAL_{item['code']}", item["message"])
     return result
+
+
+@safe_call
+def build_scene_from_plan(scene_path, export=False, repo_root=None):
+    """依 ScenePlan 組裝場景：資產庫（每個資產建一次、隱藏）→ 地形、道路 → 擺放（共用 mesh 的複本）→ Scene QA。
+
+    同一份 plan 重複執行會先清掉上一次的場景。export=True 且 Scene QA 通過時，匯出到 plan 的 export.path
+    （樹等 instance 擺放用 EXT_mesh_gpu_instancing）。報告在 result["report"]。
+    """
+    from .scene.assembly import build_scene
+    return build_scene(os.fspath(scene_path), export=export, repo_root=repo_root)
 
 
 @safe_call

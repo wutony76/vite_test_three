@@ -101,6 +101,15 @@ Blender --background --factory-startup --python-exit-code 1 --python tools/blend
 
 - plan 以外的臨時修改，才直接用 `create_connected_mesh`／`extrude_mesh_region`／`boolean_union_objects`，而且每次都要檢查 `ok`。
 
+## 3b. 組裝場景（ScenePlan）
+
+- 場景用到的每個資產都要先有通過 QA 的 AssetPlan。
+- 擺放規則：
+  - 資產正面朝 -Y。道路北側的建築轉 0°、南側轉 180°，正面才會朝向道路
+  - 重複的植物、小物用 `instance: true`
+- 用 `api.build_scene_from_plan(scene_path)` 組裝，**不要手動複製物件**。Scene QA 有 fail 時要改 plan 的擺放位置，不是移動 Blender 裡的物件。
+- 預覽：`scripts/build_scene.py -- <scene.json> --render <目錄>`，輸出俯視與 3/4 視角。
+
 ## 4. 驗證
 
 1. `build_asset_from_plan` 已經對每個 Object 做過 repair 和 profile 驗證，結果在 `r["report"]["objects"]`。`building_shell` 必須是 1 個 component、0 non-manifold。

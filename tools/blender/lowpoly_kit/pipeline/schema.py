@@ -479,15 +479,34 @@ def _check_inside(c, box, size, path):
 # ScenePlan
 # ---------------------------------------------------------------------------
 
+def _validate_materials(doc, c):
+    """materials 陣列（AssetPlan 與 ScenePlan 共用），回傳材質名稱集合。"""
+    materials = c.items(doc, "materials", "", required=False)
+    names = c.unique_ids(materials, key="name")
+    for path, material in materials:
+        hex_value = c.get(material, "hex", path, "str")
+        if hex_value is not None and not HEX_COLOR.match(hex_value):
+            c.error("PLAN_FIELD_TYPE", f"{path}.hex", f"需要 #RRGGBB 格式，拿到 {hex_value!r}")
+        for key in ("roughness", "metallic", "alpha"):
+            c.in_range(c.get(material, key, path, "number", required=False), 0.0, 1.0, f"{path}.{key}")
+    return names
+
+
 def _validate_scene(doc, c):
     c.get(doc, "id", "", "str")
+    material_names = _validate_materials(doc, c)
 
     terrain = c.get(doc, "terrain", "", "dict")
     c.enum(c.get(terrain, "kind", "terrain", "str"), vocab.TERRAIN_KINDS, "terrain.kind")
     terrain_size = c.get(terrain, "size", "terrain", "vec2")
     if terrain_size is not None and any(v <= 0 for v in terrain_size):
         c.error("PLAN_RANGE", "terrain.size", f"必須大於 0，拿到 {terrain_size}")
-    c.get(terrain, "params", "terrain", "dict", required=False)
+    c.ref(c.get(terrain, "material", "terrain", "str", required=False), material_names, "terrain.material", "材質")
+    params = c.get(terrain, "params", "terrain", "dict", required=False, default={})
+    # 地形參數：resolution 太大會爆面（128 × 128 已經是 32768 個三角面），太小則起伏不見
+    c.in_range(c.get(params, "resolution", "terrain.params", "int", required=False), 4, 128, "terrain.params.resolution")
+    for key in ("amplitude", "flatten_margin", "frequency"):
+        c.in_range(c.get(params, key, "terrain.params", "number", required=False), 0.0, None, f"terrain.params.{key}")
 
     roads = c.items(doc, "roads", "", required=False)
     c.unique_ids(roads)
@@ -496,6 +515,12 @@ def _validate_scene(doc, c):
         if len(polyline) < 2 or not all(_type_ok(p, "vec2") for p in polyline):
             c.error("PLAN_FIELD_TYPE", f"{path}.polyline", "需要至少 2 個 [x, y] 點")
         c.in_range(c.get(road, "width", path, "number"), 0, None, f"{path}.width", low_open=True)
+        c.ref(c.get(road, "material", path, "str", required=False), material_names, f"{path}.material", "材質")
+
+    export = c.get(doc, "export", "", "dict", required=False)
+    export_path = c.get(export, "path", "export", "str", required=False)
+    if export_path is not None and not export_path.endswith(".glb"):
+        c.error("PLAN_FIELD_TYPE", "export.path", f"需要 .glb 檔名，拿到 {export_path!r}")
 
     hierarchy = c.get(doc, "hierarchy", "", "list", default=[])
     groups = set()
