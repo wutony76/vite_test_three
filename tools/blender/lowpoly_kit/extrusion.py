@@ -70,7 +70,17 @@ def extrude(bm, faces, depth, individual=False):
     # 原本的面留著會變成蓋在內部的多餘面（non-manifold），要刪掉
     leftovers = [face for face in faces if face.is_valid]
     if leftovers:
+        inner_edges = {edge for face in leftovers for edge in face.edges}
         bmesh.ops.delete(bm, geom=leftovers, context="FACES_ONLY")
+        # 一次擠出多個相鄰的面時，它們之間的內部邊在刪面後不再屬於任何面，會變成孤立邊；
+        # 只擠出單一面時不會發生（它的邊都還接著側壁），所以要另外清掉
+        wire = [edge for edge in inner_edges if edge.is_valid and not edge.link_faces]
+        if wire:
+            loose = {v for edge in wire for v in edge.verts}
+            bmesh.ops.delete(bm, geom=wire, context="EDGES")
+            stray = [v for v in loose if v.is_valid and not v.link_edges]
+            if stray:
+                bmesh.ops.delete(bm, geom=stray, context="VERTS")
     return new_faces
 
 

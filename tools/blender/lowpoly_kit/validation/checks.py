@@ -6,6 +6,7 @@
 
 import bmesh
 import bpy
+from mathutils.bvhtree import BVHTree
 
 
 def load_bmesh(obj, evaluated=True):
@@ -96,6 +97,36 @@ def count_flipped_faces(bm):
     return flipped
 
 
+def count_self_intersections(bm, same_island_only=False):
+    """互相穿過的面對數（不含共用頂點的相鄰面）。
+
+    沒有開放邊、沒有非流形邊的 mesh 仍然可能「自己穿過自己」：
+    例如兩個交叉的方塊 Join 在一起，或 bevel 寬度太大讓斜面互相穿過。
+    這種 mesh 在 Boolean、匯出後的陰影都會出問題，只看邊的檢查抓不到。
+    """
+    if not bm.faces:
+        return 0
+    bm.faces.ensure_lookup_table()
+    island_of = {}
+    if same_island_only:
+        # 只算同一個島內部的交叉：多島零件（窗框 + 窗台、花盆 + 葉團）的島之間本來就刻意重疊
+        for index, members in enumerate(find_islands(bm)):
+            for vert in members:
+                island_of[vert.index] = index
+    tree = BVHTree.FromBMesh(bm, epsilon=0.0)
+    count = 0
+    for a, b in tree.overlap(tree):
+        if a >= b:
+            continue
+        if same_island_only and island_of[bm.faces[a].verts[0].index] != island_of[bm.faces[b].verts[0].index]:
+            continue
+        # 相鄰的面共用頂點，本來就互相接觸，不算交叉
+        if {v.index for v in bm.faces[a].verts} & {v.index for v in bm.faces[b].verts}:
+            continue
+        count += 1
+    return count
+
+
 def run_all_checks(obj, merge_dist=1e-4, evaluated=True, island_limit=20):
     bm = load_bmesh(obj, evaluated)
     merged = None
@@ -142,6 +173,13 @@ def run_all_checks(obj, merge_dist=1e-4, evaluated=True, island_limit=20):
             # 開放的 Mesh 沒有「內外」可言，不判定朝向，回傳 None
             "flipped_faces": count_flipped_faces(merged) if closed_after_merge else None,
             "has_modifiers": len(obj.modifiers) > 0 and evaluated,
+            "self_intersections": count_self_intersections(merged),
+            "self_intersections_within_islands": count_self_intersections(merged, same_island_only=True),
+            # pole：接了 6 條以上邊的頂點，只回報數值（low poly 的尖頂、扇形端面本來就會有）
+            "poles": sum(1 for vert in merged.verts if len(vert.link_edges) >= 6),
+            "scale": [round(s, 4) for s in obj.scale],
+            "negative_scale": any(s < 0 for s in obj.scale),
+            "nonuniform_scale": max(abs(s) for s in obj.scale) - min(abs(s) for s in obj.scale) > 1e-4,
         }
     finally:
         bm.free()

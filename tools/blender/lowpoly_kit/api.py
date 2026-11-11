@@ -8,6 +8,8 @@
 驗證用的 profile：參數 profile 優先，其次是 Object 的 custom property `lowpoly_profile`。
 """
 
+import os
+
 import bmesh
 import bpy
 
@@ -15,6 +17,7 @@ from . import backup as _backup
 from . import boolean_engine, extrusion, lowpoly, mesh_builder, remesh_engine, repair
 from .evaluate import ensure_object_mode, resolve_mesh, resolve_object
 from .export import export_glb, glb_stats
+from .pipeline import validate_plan as _validate_plan
 from .result import KitError, add_error, make_result, safe_call
 from .validation import DEFAULT_PROFILE, evaluate, get_profile, list_profiles, run_all_checks, summarize
 
@@ -31,6 +34,10 @@ __all__ = [
     "prepare_for_gltf",
     "list_profiles",
     "clear_backups",
+    "validate_plan",
+    "build_asset_from_plan",
+    "validate_asset_geometry",
+    "validate_visual",
 ]
 
 
@@ -315,6 +322,79 @@ def prepare_for_gltf(root, filepath, apply_modifiers=True, validate=True):
     exported = export_glb(root, filepath, apply_modifiers)
     result["changes"].update({"filepath": filepath, "objects": exported, "export": glb_stats(filepath)})
     return result
+
+
+@safe_call
+def build_asset_from_plan(plan_or_path, location=(0.0, 0.0, 0.0), export=False, preset=None, repo_root=None):
+    """依 AssetPlan 建出完整資產：所有元件掛在 `<plan id>_Root` 底下，每個 Object 都經過 profile 驗證。
+
+    - 同一份 plan 重複執行會先清掉上一次的結果，結果完全相同
+    - preset：暫時改用其他 DetailConfig 預設等級（例如 "preview" 快速看比例）
+    - export=True：全部通過驗證後匯出到 plan 的 export.path（相對 repo 根目錄）
+    報告在 result["report"]["objects"]；任何元件失敗都會列在 errors（附 component id）。
+    """
+    from .build.orchestrator import build_asset
+    return build_asset(plan_or_path, location=location, export=export, preset=preset, repo_root=repo_root)
+
+
+@safe_call
+def validate_asset_geometry(plan_or_path, root=None):
+    """Geometry QA（只讀）：對照 plan 檢查建好的資產，包括超出 bounds、尺寸明顯不足、懸空。
+
+    root 省略時使用 `<plan id>_Root`。適合在使用者手動移動、修改零件之後重新檢查。
+    """
+    from .pipeline import load_plan
+    from .qa.geometry import check_asset_geometry
+
+    if isinstance(plan_or_path, (str, os.PathLike)):
+        plan, error = load_plan(os.fspath(plan_or_path))
+        if error:
+            raise KitError("PLAN_FILE_INVALID", error)
+    else:
+        plan = plan_or_path
+    root = resolve_object(root or f"{plan['id']}_Root")
+    bpy.context.view_layer.update()
+    report = check_asset_geometry(plan, root)
+    result = make_result(root.name)
+    result["report"] = report
+    for item in report["issues"]:
+        if item["level"] == "fail":
+            add_error(result, f"GEOMETRY_{item['code']}", item["message"])
+    return result
+
+
+@safe_call
+def validate_visual(plan_path, out_dir, root=None):
+    """Visual QA（只讀，會暫時改渲染設定並在結束時還原）：和參考圖比較輪廓、元件位置、顏色。
+
+    需要 plan 的檔案路徑（用來找 reference）。輸出 front／silhouette／overlay／compare.png 與
+    visual_report.json 到 out_dir。輪廓或位置低於門檻才算失敗；顏色差只提醒。
+    """
+    from .pipeline import load_plan
+    from .qa.visual import run_visual_qa
+
+    plan, error = load_plan(os.fspath(plan_path))
+    if error:
+        raise KitError("PLAN_FILE_INVALID", error)
+    root = resolve_object(root or f"{plan['id']}_Root")
+    bpy.context.view_layer.update()
+    report = run_visual_qa(plan, plan_path, root, os.path.abspath(out_dir))
+    result = make_result(root.name)
+    result["report"] = report
+    for item in report.get("issues", []):
+        if item["level"] == "fail":
+            add_error(result, f"VISUAL_{item['code']}", item["message"])
+    return result
+
+
+@safe_call
+def validate_plan(plan_or_path, base_dir=None):
+    """驗證 ReferenceSpec／AssetPlan／ScenePlan（dict 或 JSON 檔路徑），只讀。
+
+    建模前一定先呼叫：plan 有錯就在這裡擋下，不要建到一半才失敗。
+    實作在 pipeline（不依賴 bpy），這裡只多包一層 safe_call，讓非預期錯誤也回傳 ok=False。
+    """
+    return _validate_plan(plan_or_path, base_dir)
 
 
 def clear_backups(obj):

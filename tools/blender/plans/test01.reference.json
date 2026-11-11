@@ -1,0 +1,62 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "test01",
+  "image": {"path": "tools/img/test01.jpg", "width": 736, "height": 1308},
+  "medium": "watercolor + ink illustration",
+  "view": {"type": "front_ortho", "source": "observed", "confidence": 0.9},
+  "scale_anchor": {"component": "door", "axis": "height", "meters": 2.1},
+  "silhouette": {
+    "outline": [[0.17, 0.04], [0.82, 0.04], [0.82, 0.92], [0.19, 0.92], [0.19, 0.06], [0.17, 0.06]],
+    "source": "observed",
+    "confidence": 0.75
+  },
+  "palette": [
+    {"name": "lime_paint", "hex": "#D6DE24", "usage": "外牆灰泥", "sample": [0.55, 0.35, 0.62, 0.39]},
+    {"name": "door_lime", "hex": "#E1E201", "usage": "門、門框", "sample": [0.58, 0.78, 0.70, 0.83]},
+    {"name": "awning_yellow", "hex": "#FCDB05", "usage": "雨棚", "sample": [0.25, 0.49, 0.45, 0.53]},
+    {"name": "brick", "hex": "#94471C", "usage": "左側磚柱、剝落磚面", "sample": [0.20, 0.62, 0.27, 0.70]},
+    {"name": "coping", "hex": "#935843", "usage": "女兒牆壓頂（取樣框 2026-11-11 Phase 5 修正：原框落在紙上）", "sample": [0.30, 0.051, 0.70, 0.058]},
+    {"name": "sign_brown", "hex": "#6C5930", "usage": "圓形招牌", "sample": [0.55, 0.51, 0.59, 0.53]},
+    {"name": "lamp_glow", "hex": "#F0DC24", "usage": "燈罩發光", "sample": [0.70, 0.21, 0.74, 0.24]},
+    {"name": "glass_dark", "hex": "#302611", "usage": "門窗玻璃", "sample": [0.58, 0.60, 0.70, 0.70]},
+    {"name": "chalk_dark", "hex": "#645945", "usage": "黑板、鐵件、貓", "sample": [0.29, 0.83, 0.37, 0.88]},
+    {"name": "step_gray", "hex": "#B5B196", "usage": "台階", "sample": [0.55, 0.87, 0.75, 0.89]},
+    {"name": "leaf_green", "hex": "#7D991E", "usage": "植物", "sample": [0.85, 0.86, 0.92, 0.89]}
+  ],
+  "components": [
+    {"id": "facade", "kind": "wall_block", "tier": "primary", "bbox": [0.19, 0.05, 0.82, 0.92], "material_hint": "lime_paint", "source": "observed", "confidence": 0.9},
+    {"id": "coping", "kind": "coping", "tier": "primary", "bbox": [0.17, 0.04, 0.82, 0.06], "material_hint": "coping", "parent": "facade", "source": "observed", "confidence": 0.8},
+    {"id": "brick_pillar", "kind": "pillar", "tier": "secondary", "bbox": [0.19, 0.06, 0.29, 0.80], "material_hint": "brick", "parent": "facade", "source": "observed", "confidence": 0.8},
+    {"id": "brick_patch", "kind": "brick_patch", "tier": "secondary", "bbox": [0.19, 0.30, 0.48, 0.46], "material_hint": "brick", "parent": "facade", "source": "observed", "confidence": 0.7},
+    {"id": "upper_window", "kind": "window", "tier": "secondary", "bbox": [0.30, 0.18, 0.53, 0.33], "material_hint": "glass_dark", "parent": "facade", "source": "observed", "confidence": 0.85},
+    {"id": "upper_canopy", "kind": "canopy", "tier": "secondary", "bbox": [0.25, 0.145, 0.59, 0.16], "material_hint": "coping", "parent": "facade", "source": "observed", "confidence": 0.75},
+    {"id": "window_planter", "kind": "planter_box", "tier": "tertiary", "bbox": [0.29, 0.25, 0.53, 0.33], "material_hint": "leaf_green", "parent": "upper_window", "source": "observed", "confidence": 0.8},
+    {"id": "awning_beam", "kind": "beam", "tier": "secondary", "bbox": [0.19, 0.455, 0.82, 0.47], "material_hint": "coping", "parent": "facade", "source": "observed", "confidence": 0.8},
+    {"id": "awning", "kind": "awning", "tier": "secondary", "bbox": [0.20, 0.46, 0.82, 0.57], "material_hint": "awning_yellow", "parent": "facade", "source": "observed", "confidence": 0.9},
+    {"id": "sign_disc", "kind": "sign_disc", "tier": "tertiary", "bbox": [0.51, 0.485, 0.63, 0.555], "material_hint": "sign_brown", "parent": "awning", "source": "observed", "confidence": 0.9},
+    {"id": "door", "kind": "door", "tier": "secondary", "bbox": [0.53, 0.57, 0.75, 0.85], "material_hint": "door_lime", "parent": "facade", "source": "observed", "confidence": 0.9},
+    {"id": "shop_window", "kind": "shop_window", "tier": "secondary", "bbox": [0.27, 0.57, 0.50, 0.80], "material_hint": "glass_dark", "parent": "facade", "source": "observed", "confidence": 0.85},
+    {"id": "steps", "kind": "steps", "tier": "secondary", "bbox": [0.50, 0.85, 0.79, 0.92], "material_hint": "step_gray", "parent": "facade", "source": "observed", "confidence": 0.8},
+    {"id": "wall_lamp", "kind": "wall_lamp", "tier": "tertiary", "bbox": [0.67, 0.18, 0.77, 0.34], "material_hint": "lamp_glow", "parent": "facade", "source": "observed", "confidence": 0.85},
+    {"id": "top_light", "kind": "wall_light", "tier": "tertiary", "bbox": [0.68, 0.085, 0.72, 0.115], "material_hint": "lamp_glow", "parent": "facade", "source": "observed", "confidence": 0.7},
+    {"id": "cat", "kind": "cat_silhouette", "tier": "tertiary", "bbox": [0.59, 0.405, 0.66, 0.455], "material_hint": "chalk_dark", "parent": "awning", "source": "observed", "confidence": 0.85},
+    {"id": "chalkboard", "kind": "chalkboard_sign", "tier": "tertiary", "bbox": [0.26, 0.80, 0.40, 0.93], "material_hint": "chalk_dark", "source": "observed", "confidence": 0.85},
+    {"id": "street_lamp", "kind": "street_lamp", "tier": "tertiary", "bbox": [0.815, 0.26, 0.92, 0.92], "material_hint": "chalk_dark", "source": "observed", "confidence": 0.85},
+    {"id": "pot_left", "kind": "pot_plant", "tier": "tertiary", "bbox": [0.07, 0.78, 0.26, 0.91], "material_hint": "leaf_green", "source": "observed", "confidence": 0.8},
+    {"id": "pot_door", "kind": "pot_plant", "tier": "tertiary", "bbox": [0.40, 0.81, 0.50, 0.91], "material_hint": "leaf_green", "source": "observed", "confidence": 0.7},
+    {"id": "pot_right", "kind": "pot_plant", "tier": "tertiary", "bbox": [0.80, 0.80, 0.95, 0.93], "material_hint": "leaf_green", "source": "observed", "confidence": 0.75},
+    {"id": "vine_right", "kind": "vine", "tier": "tertiary", "bbox": [0.80, 0.72, 0.87, 0.85], "material_hint": "leaf_green", "source": "observed", "confidence": 0.6}
+  ],
+  "hidden": [
+    {"id": "depth", "assumption": "建築深度 = 正面寬度 × 1.6（窄店面常見比例）", "source": "inferred", "confidence": 0.4},
+    {"id": "side_back_walls", "assumption": "側面與背面使用和正面相同的萊姆綠灰泥，沒有開口", "source": "inferred", "confidence": 0.5},
+    {"id": "roof", "assumption": "平屋頂，女兒牆高 0.4 m，壓頂往外突出約 5 cm", "source": "inferred", "confidence": 0.6},
+    {"id": "chimney", "assumption": "圖上看不到；依 Test A 需求放在屋頂後側，正面被女兒牆擋住", "source": "inferred", "confidence": 0.3},
+    {"id": "awning_ribs", "assumption": "雨棚做成瓦楞條紋，取代 Test A 要求的屋瓦（使用者 2026-11-11 選定方案 a）", "source": "inferred", "confidence": 0.6}
+  ],
+  "excluded": [
+    {"what": "背景青色水彩色塊", "reason": "不是場景中的物體"},
+    {"what": "電線", "reason": "細長幾何會增加 draw call 並在遠處閃爍"},
+    {"what": "招牌與海報上的文字", "reason": "改用 palette 色塊表示，不做文字幾何"}
+  ]
+}

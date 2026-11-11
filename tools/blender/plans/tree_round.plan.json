@@ -1,0 +1,42 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "tree_round",
+  "notes": "小鎮用的圓頂樹，只有文字 prompt、沒有參考圖。樹冠是唯一允許 Voxel Remesh 的 organic 物件。場景中以 instancing 重複使用。",
+  "dimensions": {
+    "w": 2.4,
+    "d": 2.4,
+    "h": 4.0
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {
+      "tertiary_density": 0.0
+    }
+  },
+  "style": {
+    "edge_wobble": 0.03
+  },
+  "materials": [
+    {
+      "name": "bark",
+      "hex": "#6B4A2F",
+      "roughness": 0.9
+    },
+    {
+      "name": "leaf",
+      "hex": "#7D991E",
+      "roughness": 0.85
+    }
+  ],
+  "budget": {
+    "max_tris": 600,
+    "max_primitives": 2
+  },
+  "components": [
+    {"id": "trunk", "kind": "tree_trunk", "tier": "primary", "method": "custom_mesh", "profile": "vegetation", "material": "bark", "params": {"segments_from": "geometry_complexity", "taper": 0.7}, "bounds": [[-0.18, -0.18, 0.0], [0.18, 0.18, 1.8]], "source": "inferred", "confidence": 0.7, "assumption": "文字 prompt：卡通圓頂樹，樹幹略收細"},
+    {"id": "canopy", "kind": "tree_canopy", "tier": "primary", "method": "remesh", "profile": "organic", "material": "leaf", "params": {"blobs": 3, "voxel_size": 0.3}, "bounds": [[-1.2, -1.2, 1.4], [1.2, 1.2, 4.0]], "source": "inferred", "confidence": 0.7, "assumption": "3 顆球融合後 Voxel Remesh，保留塊面感"}
+  ],
+  "export": {
+    "path": "public/models/tree_round/tree_round.glb"
+  }
+}

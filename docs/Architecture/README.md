@@ -32,11 +32,22 @@ vite_test_three/
 │  └─ models/
 │     ├─ shoe/                商品模型 shoe.glb（meshopt + WebP 壓縮）與授權說明
 │     ├─ project_room/        world 場景的 Blender 小屋
-│     └─ lowpoly_house/       lowpoly_kit 產生的驗收用小屋（tools/blender/scripts/build_house.py）
+│     ├─ lowpoly_house/       lowpoly_kit 產生的驗收用小屋（tools/blender/scripts/build_house.py）
+│     ├─ test01_shop/         Test A 店面，依 plans/test01_shop.plan.json 產生（build_from_plan.py）
+│     └─ tree_round/          小鎮用樹（organic + Voxel Remesh 示範）
 ├─ tools/
+│  ├─ img/                    建模用參考圖（test01.jpg = Test A）
 │  └─ blender/                Blender 建模工具（Python，不參與 Vite build）
+│     ├─ WORKFLOW.md          AI 建模流程的單一來源（Cursor rule、Claude Code skill 都指向它）
 │     ├─ lowpoly_kit/         Low Poly 建模 + 拓撲驗證函式庫，透過 MCP 的 execute_blender_code 載入
-│     ├─ scripts/             背景模式產生模型的腳本
+│     │  ├─ pipeline/         plan JSON 的 schema 與驗證（不依賴 bpy）
+│     │  ├─ shapes.py         幾何產生器 grid_slab／prism／loft／lathe／sweep／blob（不依賴 bpy）
+│     │  ├─ components/       零件庫：kind → builder（不依賴 bpy）
+│     │  ├─ build/            依 plan 建模的 orchestrator、材質、wobble、bevel（Blender）
+│     │  ├─ appearance/       palette atlas 色格配置（不依賴 bpy）
+│     │  └─ qa/               Geometry QA、Visual QA（Blender）；metrics（不依賴 bpy）
+│     ├─ plans/               ReferenceSpec／AssetPlan／ScenePlan JSON
+│     ├─ scripts/             背景模式產生模型、參考圖疊圖校正的腳本
 │     └─ tests/               headless Blender 測試 + Three.js 載入檢查
 ├─ src/
 │  ├─ main.ts                 方塊練習：方陣、Raycaster 點擊變色、波浪動畫、效能面板
@@ -180,10 +191,22 @@ vite_test_three/
 | `npm run build` | `tsc` 型別檢查 + `vite build` 輸出至 `dist/` |
 | `npm run preview` | 預覽 build 結果 |
 | `Blender --background --factory-startup --python-exit-code 1 --python tools/blender/tests/run.py` | lowpoly_kit 測試（詳見 `tools/blender/README.md`） |
+| `python3 -m unittest discover -s tools/blender/tests -p "test_plan_schema.py"` | plan 驗證測試（不需要 Blender） |
+| `python3 -m unittest discover -s tools/blender/tests -p "test_shapes.py"` | 幾何產生器與零件庫拓撲測試（不需要 Blender） |
+| `python3 -m unittest discover -s tools/blender/tests -p "test_visual_metrics.py"` | Visual QA 計算與 atlas 配置測試（不需要 Blender） |
+| `node tools/blender/tests/threejs_plan_check.mjs <plan.json>` | 依 plan 檢查 GLB 在 Three.js 的結構、射線、draw call |
 
 ## 4.1 Blender 建模流程
 
-AI 透過 MCP for Blender 建模時，一律使用 `tools/blender/lowpoly_kit`：Custom Mesh／Extrude／Inset／Boolean Union 建出連續拓撲，依 profile（`building_shell`、`opening`、`glass`、`water_surface`、`decoration`、`organic`）以程式驗證 9 項拓撲指標（含 Connected Components），全部通過才匯出 GLB。每棟建築一個根 Empty，需要點擊或動畫的零件保留為獨立 Object。
+AI 透過 MCP for Blender 建模時，一律使用 `tools/blender/lowpoly_kit`：Custom Mesh／Extrude／Inset／Boolean Union 建出連續拓撲，依 12 種 profile（`building_shell`、`roof`、`trim`、`opening`、`glass`、`decoration`、`vegetation`、`tile_array`、`organic`、`terrain`、`road`、`water_surface`）以程式驗證拓撲指標（含 Connected Components、自我交叉、島數／三角面上限、縮放），並以 Geometry QA 對照 plan 檢查位置與懸空，全部通過才匯出 GLB。每棟建築一個根 Empty，需要點擊或動畫的零件保留為獨立 Object。
+
+建模前先規劃：AI 分析參考圖後輸出 `ReferenceSpec`，再輸出 `AssetPlan`／`ScenePlan` JSON（`tools/blender/plans/`）。每個欄位都標示 observed／inferred；用 `api.validate_plan` 驗證，使用者確認後才建模。細節程度由 `DetailConfig` 的 7 個參數分別控制。流程寫在 `tools/blender/WORKFLOW.md`，`.cursor/rules/blender-modeling.mdc` 與 `.claude/skills/blender-modeling/SKILL.md` 都指向它。Phase 路線見 `openspec/changes/add-asset-plan-schema/design.md` §0。
+
+建模由 `api.build_asset_from_plan` 依 plan 確定性產生：
+
+- 零件庫（`components/`）的每個 kind 都用 `shapes.py` 的產生器建出封閉流形，不用 primitive 堆疊。
+- orchestrator 依序：建立 Object → 編輯 parent（屋頂、磚面）→ Boolean Union（煙囪）→ wobble（手繪感）→ bevel（稜角高光）→ 外觀（palette atlas + vertex color）→ profile 驗證 → Geometry QA → 預算檢查 → 匯出 GLB。
+- Visual QA（`api.validate_visual`）和正面參考圖比較輪廓 IoU、元件位置 IoU、色差，並輸出疊圖給 AI 寫評語；判定只看數字。
 
 ## 5. 開發規範重點
 

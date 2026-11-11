@@ -41,6 +41,10 @@ def export_glb(root, filepath, apply_modifiers=True):
     }
     if "export_extras" in props:
         kwargs["export_extras"] = True
+    if "export_vertex_color" in props:
+        # ACTIVE：匯出作用中的 color attribute 成 COLOR_0（palette_vc 的明暗起伏）。
+        # 預設的 MATERIAL 只在 exporter 認得材質節點組合時才匯出，貼圖 × vertex color 的組合不一定認得
+        kwargs["export_vertex_color"] = "ACTIVE"
 
     os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
     try:

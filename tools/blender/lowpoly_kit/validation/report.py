@@ -38,6 +38,21 @@ def evaluate(checks, profile_name):
             f"（合併重複頂點後 {checks['components_after_merge']} 個）",
         )
 
+    limit = rule.get("max_components")
+    if limit is not None and expected is None and checks["components"] > limit:
+        fail("components", f"有 {checks['components']} 個幾何島，超過上限 {limit} 個（零件太碎，可能是 primitive 堆疊）")
+
+    if checks["triangles"] > rule.get("max_tris", float("inf")):
+        fail("triangles", f"{checks['triangles']} 個三角面，超過此類型的上限 {rule['max_tris']}")
+
+    if checks.get("self_intersections") and rule.get("self_intersection") == "fail":
+        fail("self_intersection", f"{checks['self_intersections']} 對面互相穿過（自我交叉）")
+
+    if checks.get("negative_scale"):
+        fail("scale", f"負縮放 {checks['scale']}：法線會反，Three.js 的光照會錯")
+    elif checks.get("nonuniform_scale"):
+        warn("scale", f"非等比縮放 {checks['scale']}")
+
     if rule["normals"]:
         if checks["inconsistent_normal_edges"] > 0:
             fail("normals", f"{checks['inconsistent_normal_edges']} 條邊兩側的法線方向不一致")

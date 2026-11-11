@@ -1,67 +1,15 @@
 ---
-description: 用 Blender MCP 建立或修改 3D 模型時必走的 Low Poly 建模流程（lowpoly_kit、拓撲驗證、GLB 匯出）
+description: 用 Blender MCP 建立或修改 3D 模型時必走的 Low Poly 建模流程（reference 分析、plan JSON、lowpoly_kit、拓撲驗證、GLB 匯出）
 globs: tools/blender/**,public/models/**
 alwaysApply: false
 ---
 
 # Blender 建模流程
 
-用 Blender MCP（`execute_blender_code`）建模時，一律透過 `tools/blender/lowpoly_kit` 建模與驗證。
-**禁止**用 `primitive_cube_add` / cylinder / sphere 堆疊後 Join：外觀相連但拓撲不連接，屋頂會變成十幾個幾何島。
+**動手前先完整讀 `tools/blender/WORKFLOW.md`，照它的步驟走。** 流程只維護在那份文件，Claude Code 也讀同一份。
 
-完整 API 與 profile 說明見 `tools/blender/README.md`，動手前先讀。
+最重要的三條：
 
-## 0. 開工前
-
-1. 呼叫 `get_addon_status`、`get_scene_info`，確認 Blender 版本與目前場景。
-2. 不要假設 MCP 有沒確認過的工具；建模只透過 `execute_blender_code` 載入 lowpoly_kit：
-
-```python
-import sys
-sys.path.insert(0, "/Users/tony.wu/SelfCode/Self/git_proj/vite_test_three/tools/blender")
-import lowpoly_kit
-lowpoly_kit = lowpoly_kit.reload_all()  # 程式碼改過才需要
-api = lowpoly_kit.api
-```
-
-## 1. 拆解（先給使用者確認再動手）
-
-列出每個部件、要用的方法、要套的 profile，使用者確認後才開始建模：
-
-| 部件類型 | 方法 | profile |
-|---|---|---|
-| 建築主體、屋頂、地基、平台、地形 | `create_connected_mesh` + `extrude_mesh_region` | `building_shell` |
-| 結構交接處（煙囪接屋頂等） | `boolean_union_objects` | 依目標物件 |
-| 門、窗框 | `create_connected_mesh` | `opening` |
-| 玻璃 | 獨立 Object | `glass` |
-| 海面 | 開放平面 | `water_surface` |
-| 裝飾 | 獨立 Mesh | `decoration` |
-| 岩石、小島（只有這類） | `remesh_organic_mesh` | `organic` |
-
-需要銳角的建築**不可以**用 Voxel Remesh。
-
-## 2. 建模
-
-- 每次呼叫都檢查回傳的 `ok`；`ok` 為 False 時讀 `errors`，模型已自動還原，修正參數再試，不可忽略。
-- Low Poly 風格：Flat Shading、保留稜角、不加 Subdivision、不加沒用的 edge loop。建完呼叫 `optimize_lowpoly_mesh`。
-- 面數少不是唯一目標，拓撲正確優先。
-
-## 3. 驗證（不能只靠 `look` 目測）
-
-1. `repair_mesh_topology` 修安全可修的問題（不確定時先 `dry_run=True`）。
-2. 每個 Mesh 都呼叫 `validate_mesh_topology(obj, profile=...)`，9 項檢查全部要過：
-   non-manifold、boundary、loose、重複頂點、退化面、法線方向、connected components、面數、ngon。
-3. 建築類（`building_shell`）必須 **1 個 component、0 non-manifold**。
-4. `look` 只用來確認外觀，不能當作拓撲通過的依據。
-
-## 4. 匯出給 Three.js
-
-1. 所有部件放在**一個根 Empty** 底下；每個部件保留成獨立 Object（Raycaster 才點得到、才能單獨做動畫）。
-2. **不可以**把整個場景合併成單一 Mesh；也不要拆得太碎，注意 draw call 數量。
-3. 用 `prepare_for_gltf(root, filepath)` 匯出到 `public/models/<名稱>/<名稱>.glb`，全部驗證通過才會輸出。
-4. 確認結果沒問題後再呼叫 `clear_backups`。
-
-## 5. 回報
-
-最後給使用者一份品質報告表格：每個 Object 的 profile、components、non-manifold、面數、ngon、是否通過，以及 GLB 路徑、primitive 數、三角面數。
-沒通過的項目要明講，不可以把「有建出來」說成「驗證通過」。
+1. 禁止用 primitive 堆疊後 Join，也禁止用頂點拼出 box／sphere 再塞進同一個 mesh。
+2. 先輸出 plan JSON，用 `api.validate_plan` 驗證，**等使用者確認**後才可以建模。
+3. 拓撲必須以 `validate_mesh_topology` 驗證通過；`look` 目測不算數。

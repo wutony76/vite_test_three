@@ -1,0 +1,151 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "test01_shop",
+  "reference": "test01",
+  "notes": "Test A。尺寸由 test01.reference.json 的 bbox 以門高 2.1 m 換算（1 px ≈ 5.73 mm）；原點在建築 footprint 中心的地面，正面朝 -Y。 primitive 預算 32：Phase 5 palette atlas 後，不透明零件共用 1 個材質。",
+  "dimensions": {
+    "w": 3.9,
+    "d": 6.0,
+    "h": 7.1
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {}
+  },
+  "style": {
+    "edge_wobble": 0.02,
+    "palette": "test01"
+  },
+  "materials": [
+    {
+      "name": "lime_paint",
+      "hex": "#D6DE24",
+      "roughness": 0.85
+    },
+    {
+      "name": "door_lime",
+      "hex": "#E1E201",
+      "roughness": 0.7
+    },
+    {
+      "name": "awning_yellow",
+      "hex": "#FCDB05",
+      "roughness": 0.75
+    },
+    {
+      "name": "brick",
+      "hex": "#94471C",
+      "roughness": 0.9
+    },
+    {
+      "name": "coping",
+      "hex": "#935843",
+      "roughness": 0.8
+    },
+    {
+      "name": "sign_brown",
+      "hex": "#6C5930",
+      "roughness": 0.7
+    },
+    {
+      "name": "lamp_glow",
+      "hex": "#F0DC24",
+      "roughness": 0.4,
+      "emissive": true
+    },
+    {
+      "name": "glass",
+      "hex": "#302611",
+      "roughness": 0.1,
+      "alpha": 0.45
+    },
+    {
+      "name": "niche_dark",
+      "hex": "#302611",
+      "roughness": 0.9
+    },
+    {
+      "name": "iron",
+      "hex": "#2E2C2A",
+      "roughness": 0.5,
+      "metallic": 0.6
+    },
+    {
+      "name": "chalk_dark",
+      "hex": "#645945",
+      "roughness": 0.9
+    },
+    {
+      "name": "step_gray",
+      "hex": "#B5B196",
+      "roughness": 0.9
+    },
+    {
+      "name": "leaf_green",
+      "hex": "#7D991E",
+      "roughness": 0.85
+    },
+    {
+      "name": "terracotta",
+      "hex": "#C9683A",
+      "roughness": 0.85
+    }
+  ],
+  "budget": {
+    "max_tris": 5000,
+    "max_primitives": 32
+  },
+  "components": [
+    {"id": "facade", "kind": "wall_block", "tier": "primary", "method": "component", "profile": "building_shell", "material": "lime_paint", "params": {"openings": ["upper_window", "door", "shop_window"], "reveal": 0.18, "niche_material": "niche_dark"}, "bounds": [[-1.329, -2.125, 0.0], [1.329, 2.125, 6.45]], "source": "observed", "confidence": 0.9},
+    {"id": "roof_flat", "kind": "roof_flat", "tier": "primary", "method": "inset_extrude", "profile": "building_shell", "material": "coping", "parent": "facade", "params": {"inset": 0.12, "depth": -0.4, "face": "top"}, "bounds": [[-1.209, -2.005, 6.05], [1.209, 2.005, 6.45]], "source": "inferred", "confidence": 0.6, "assumption": "正面看不到屋頂；頂面內縮 12 cm 再往下壓 40 cm，做出女兒牆和平屋頂"},
+    {"id": "coping", "kind": "coping", "tier": "primary", "method": "custom_mesh", "profile": "building_shell", "material": "coping", "bounds": [[-1.414, -2.175, 6.45], [1.379, 2.175, 6.6]], "source": "observed", "confidence": 0.8},
+    {"id": "foundation", "kind": "foundation", "tier": "primary", "method": "custom_mesh", "profile": "building_shell", "material": "step_gray", "bounds": [[-1.359, -2.155, 0.0], [1.359, 2.155, 0.18]], "source": "inferred", "confidence": 0.4, "assumption": "地面線模糊；依 Test A 需求加 18 cm 低矮石基座，和台階同材質"},
+    {"id": "chimney", "kind": "chimney", "tier": "secondary", "method": "boolean_union", "profile": "building_shell", "material": "brick", "union_into": "facade", "bounds": [[0.4, 1.2, 6.05], [0.85, 1.65, 7.0]], "source": "inferred", "confidence": 0.3, "assumption": "圖上看不到；依 Test A 需求放在屋頂後側，正面輪廓只會多出約 1% 面積"},
+    {"id": "brick_pillar", "kind": "pillar", "tier": "secondary", "method": "component", "profile": "trim", "material": "brick", "bounds": [[-1.329, -2.165, 0.9], [-0.907, -2.115, 6.45]], "source": "observed", "confidence": 0.8},
+    {"id": "brick_patch", "kind": "brick_patch", "tier": "secondary", "method": "inset_extrude", "profile": "building_shell", "material": "brick", "parent": "facade", "params": {"depth": -0.015, "outline": "diagonal_peel", "face": "front", "note": "左緣從磚柱右緣開始、上緣收到窗台下方 6 cm：凹槽碰到牆的外緣或和窗洞重疊時，會和側面／窗洞側壁重疊（Phase 4 自我交叉檢查發現）"}, "bounds": [[-0.907, -2.135, 3.45], [-0.106, -2.11, 4.365]], "source": "observed", "confidence": 0.7},
+    {"id": "upper_window", "kind": "window", "tier": "secondary", "method": "component", "profile": "opening", "material": "step_gray", "params": {"panes": [2, 2], "sill": true}, "bounds": [[-0.865, -2.205, 4.425], [0.106, -2.045, 5.55]], "source": "observed", "confidence": 0.85},
+    {"id": "upper_window_glass", "kind": "glass_pane", "tier": "secondary", "method": "component", "profile": "glass", "material": "glass", "parent": "upper_window", "bounds": [[-0.823, -2.095, 4.5], [0.063, -2.075, 5.475]], "source": "observed", "confidence": 0.8},
+    {"id": "upper_canopy", "kind": "canopy", "tier": "secondary", "method": "component", "profile": "trim", "material": "coping", "bounds": [[-1.076, -2.525, 5.7], [0.359, -2.125, 5.813]], "source": "observed", "confidence": 0.75},
+    {"id": "window_planter", "kind": "planter_box", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "step_gray", "parent": "upper_window", "bounds": [[-0.907, -2.425, 4.425], [0.106, -2.125, 5.025]], "source": "observed", "confidence": 0.8, "params": {"plant_material": "leaf_green"}},
+    {"id": "awning_beam", "kind": "beam", "tier": "secondary", "method": "component", "profile": "trim", "material": "coping", "bounds": [[-1.329, -2.245, 3.375], [1.329, -2.125, 3.488]], "source": "observed", "confidence": 0.8},
+    {"id": "awning", "kind": "awning", "tier": "secondary", "method": "component", "profile": "building_shell", "material": "awning_yellow", "params": {"corrugated": true, "ribs": 9, "slope_deg": 15, "side_return": true}, "bounds": [[-1.287, -2.805, 2.625], [1.329, -2.125, 3.45]], "source": "observed", "confidence": 0.9},
+    {"id": "sign_disc", "kind": "sign_disc", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "sign_brown", "parent": "awning", "bounds": [[0.021, -2.8449999999999998, 2.738], [0.528, -2.805, 3.263]], "source": "observed", "confidence": 0.9},
+    {"id": "door", "kind": "door", "tier": "secondary", "method": "component", "profile": "opening", "material": "door_lime", "params": {"glass_upper": true, "handle": true, "handle_material": "iron", "glass_niche_material": "niche_dark"}, "bounds": [[0.106, -2.145, 0.525], [1.034, -2.045, 2.625]], "source": "observed", "confidence": 0.9},
+    {"id": "door_glass", "kind": "glass_pane", "tier": "secondary", "method": "component", "profile": "glass", "material": "glass", "parent": "door", "bounds": [[0.274, -2.115, 1.275], [0.865, -2.095, 2.475]], "source": "observed", "confidence": 0.85},
+    {"id": "shop_window", "kind": "shop_window", "tier": "secondary", "method": "component", "profile": "opening", "material": "sign_brown", "params": {"mullions": [1, 2]}, "bounds": [[-0.992, -2.205, 0.9], [-0.021, -2.045, 2.625]], "source": "observed", "confidence": 0.85},
+    {"id": "shop_window_glass", "kind": "glass_pane", "tier": "secondary", "method": "component", "profile": "glass", "material": "glass", "parent": "shop_window", "bounds": [[-0.95, -2.115, 0.975], [-0.063, -2.095, 2.55]], "source": "observed", "confidence": 0.8},
+    {"id": "display_posters", "kind": "poster", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "awning_yellow", "parent": "shop_window", "bounds": [[-0.907, -2.065, 1.05], [-0.106, -2.005, 2.4]], "source": "observed", "confidence": 0.6, "params": {"accent_materials": ["awning_yellow", "coping", "lamp_glow"]}},
+    {"id": "steps", "kind": "steps", "tier": "secondary", "method": "component", "profile": "building_shell", "material": "step_gray", "params": {"count": 3}, "bounds": [[-0.021, -2.605, 0.0], [1.203, -2.125, 0.525]], "source": "observed", "confidence": 0.8},
+    {"id": "wall_lamp", "kind": "wall_lamp", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "iron", "params": {"glow_material": "lamp_glow"}, "bounds": [[0.696, -2.455, 4.35], [1.118, -2.125, 5.55]], "source": "observed", "confidence": 0.85},
+    {"id": "top_light", "kind": "wall_light", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "lamp_glow", "bounds": [[0.739, -2.205, 6.038], [0.907, -2.125, 6.263]], "source": "observed", "confidence": 0.7, "params": {"base_material": "iron"}},
+    {"id": "cat", "kind": "cat_silhouette", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "iron", "parent": "awning", "bounds": [[0.359, -2.245, 3.488], [0.654, -2.145, 3.863]], "source": "observed", "confidence": 0.85},
+    {"id": "chalkboard", "kind": "chalkboard_sign", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "chalk_dark", "bounds": [[-1.034, -3.0, 0.0], [-0.443, -2.62, 0.9]], "source": "observed", "confidence": 0.85, "params": {"frame_material": "sign_brown"}},
+    {"id": "street_lamp", "kind": "street_lamp", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "iron", "params": {"glow_material": "lamp_glow"}, "bounds": [[1.308, -3.0, 0.0], [1.751, -2.6, 4.95]], "source": "observed", "confidence": 0.85},
+    {"id": "vine_right", "kind": "vine", "tier": "tertiary", "method": "component", "profile": "vegetation", "material": "leaf_green", "parent": "street_lamp", "bounds": [[1.245, -2.85, 0.525], [1.54, -2.6, 1.5]], "source": "observed", "confidence": 0.6, "params": {"plant_material": "leaf_green"}},
+    {"id": "pot_left", "kind": "pot_plant", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "terracotta", "bounds": [[-1.836, -2.95, 0.0], [-1.034, -2.45, 1.05]], "source": "observed", "confidence": 0.8, "params": {"plant_material": "leaf_green"}},
+    {"id": "pot_door", "kind": "pot_plant", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "terracotta", "bounds": [[-0.443, -2.6, 0.0], [-0.021, -2.2, 0.825]], "source": "observed", "confidence": 0.7, "params": {"plant_material": "leaf_green"}},
+    {"id": "pot_right", "kind": "pot_plant", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "terracotta", "bounds": [[1.245, -2.95, 0.0], [1.878, -2.45, 0.9]], "source": "observed", "confidence": 0.75, "params": {"plant_material": "leaf_green"}}
+  ],
+  "export": {
+    "path": "public/models/test01_shop/test01_shop.glb",
+    "clickable": [
+      "door",
+      "awning",
+      "shop_window"
+    ],
+    "anim_groups": {
+      "lamp_glow": [
+        "wall_lamp",
+        "top_light",
+        "street_lamp"
+      ]
+    },
+    "instance_groups": {
+      "pot_plant": [
+        "pot_left",
+        "pot_door",
+        "pot_right"
+      ]
+    }
+  }
+}
