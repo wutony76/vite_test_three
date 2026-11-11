@@ -57,28 +57,70 @@ AI 要建模時，常常不讀文件就直接用 primitive 堆疊。所以把流
 
 同一時間只讓一個 AI 工具操作 Blender，例如不要讓 Cursor 和 Claude Code 同時連。
 
-**2. 叫 Cursor 建模**
-
-rule 是 `alwaysApply: false`，Cursor 會依 rule 的描述判斷要不要載入。在訊息裡寫出 rule 名稱最保險：
-
-```
-用 Blender 建一個 Low Poly 的【物件】，照 blender-modeling 規則走
-```
-
-也可以輸入 `@blender-modeling` 強制載入。Cursor 會依序這樣做：
-
-1. 有參考圖時先輸出 `plans/<id>.reference.json`（observed／inferred 分開標示）。
-2. 輸出 `plans/<id>.plan.json`，用 `api.validate_plan` 驗證，列出元件表**等你確認**後才動手。
-3. 用 `create_connected_mesh` / `extrude_mesh_region` / `boolean_union_objects` 建模。
-4. 用 `repair_mesh_topology` 修正，再用 `validate_mesh_topology` 驗證。
-5. 用 `prepare_for_gltf` 匯出到 plan 的 `export.path`。
-6. 輸出品質報告表格。
+**2. 叫 Cursor 建模**：在訊息開頭加 `@blender-modeling`，說法見下方「怎麼叫 AI 建模」。
 
 ### Claude Code
 
-MCP 設定：`claude mcp add blender -- uvx mcp-for-blender`。
+需要兩個設定：
 
-流程由 project skill `.claude/skills/blender-modeling/SKILL.md` 觸發（有進版控）。Claude Code 會依 skill 的 description 自動載入；也可以輸入 `/blender-modeling` 強制載入。
+| 檔案 | 作用 | 進版控 |
+|---|---|---|
+| `claude mcp add blender -- uvx mcp-for-blender` | 讓 Claude Code 連上你正在使用的 Blender | 否，每台電腦各設一次 |
+| `.claude/skills/blender-modeling/SKILL.md` | 觸發建模流程，內容指向 `tools/blender/WORKFLOW.md` | 是 |
+
+專案的 `.mcp.json` 另外登錄了 `lowpoly` MCP server（背景 Blender，見下方「lowpoly MCP server」）。第一次使用時，Claude Code 會詢問是否信任。
+
+### 會不會自動讀 WORKFLOW.md？
+
+大多數情況會，但這是 AI 依描述自行判斷，**不是系統強制**：
+
+| 編輯器 | 自動載入的條件 | 一定會載入的做法 |
+|---|---|---|
+| Claude Code | 訊息看得出要用 Blender 建模、修改模型、匯出 GLB 時，AI 依 skill 描述載入 `blender-modeling`，skill 的第一條指示就是讀 WORKFLOW.md。`lowpoly` MCP server 的說明也會提醒 | 訊息開頭打 `/blender-modeling`，或寫「照 blender-modeling 流程」 |
+| Cursor | 依 rule 描述判斷；編輯 `tools/blender/**`、`public/models/**` 的檔案時也會載入（globs） | 訊息開頭加 `@blender-modeling` |
+
+描述很模糊時，例如只說「幫我做一個房子」，AI 可能不會把它當成建模需求。所以建議養成在開頭加觸發詞的習慣。
+
+### 怎麼叫 AI 建模（兩個編輯器通用）
+
+AI 會照這個順序走：
+
+1. 分析參考圖（元件框疊圖校正、從原圖取色）
+2. 寫 plan，列出元件表與需要你決定的事，**等你回「確認」才建模**
+3. 建模並自動 QA（拓撲、Geometry、Visual），不通過就修 plan 或零件到通過
+4. 匯出 GLB + manifest，附上和原圖的並排比較圖
+
+常用說法（Cursor 在開頭加 `@blender-modeling`，Claude Code 可加 `/blender-modeling`）：
+
+| 想做的事 | 說法範例 |
+|---|---|
+| 依圖片建新資產 | `幫我建模：tools/img/test03.jpg，是一間麵包店，門高大約 2 m，要放進小鎮` |
+| 只有文字描述 | `建一個 Low Poly 的木造水井，有屋頂和吊桶，高約 3 m` |
+| 修改既有資產 | `test02 石屋的屋頂改矮一點、石堆少兩顆`、`test01 店面的雨棚改成紅色` |
+| 組裝或修改小鎮 | `小鎮加入 test03 麵包店，放在主街北邊；再多 3 棵樹` |
+| 在自己的 Blender 裡看 | `讓我在 Blender 看 test02`（建議先開新檔，避免和原本的物件重疊） |
+| 先看比例 | `用 preview 先建一次給我看比例` |
+| 確認全部沒壞 | `跑一次 e2e` |
+
+修改一律改 plan 再重建，不會直接手改模型，之後隨時能重現。
+
+給越多資訊，來回越少：
+
+| 項目 | 例子 | 沒給時 |
+|---|---|---|
+| 參考圖 | 放在 `tools/img/`，給路徑 | 只依文字建模 |
+| 比例參考 | 門高 2 m、整棟約 6 m 高 | AI 推估後請你確認 |
+| 用途 | 放進小鎮／單獨展示 | 只建資產，不放進場景 |
+| 不要做的部分 | 背景的樹不用做 | AI 列出來請你確認 |
+| 要不要匯出 | 要給 Three.js 用 | 驗收通過後匯出到 `public/models/<名稱>/` |
+
+流程中你只需要回應三件事：
+
+1. **確認 plan**：回「確認」，或直接說要改的地方，例如「門高改 2.2 m」。
+2. **看比較圖**：覺得哪裡不像就直接說，例如「窗戶太小」「顏色太暗」。
+3. **commit／push**：要提交時明確說，AI 不會自己 commit 或 push。
+
+同一時間只讓一個 AI 工具操作你的 Blender（`lowpoly` MCP server 用背景 Blender，不受這個限制）。
 
 ### 搬到其他專案
 
