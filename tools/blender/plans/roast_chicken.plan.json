@@ -1,0 +1,53 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "roast_chicken",
+  "notes": "整隻卡通烤雞（參考 tools/img/roast_chicken.jpg）。正面朝 -Y，原點在 footprint 中心地面。",
+  "dimensions": {"w": 0.26, "d": 0.22, "h": 0.22},
+  "detail": {"preset": "game_default", "overrides": {"tertiary_density": 0}},
+  "style": {"edge_wobble": 0.012},
+  "materials": [
+    {"name": "crust", "hex": "#C46830", "roughness": 0.48},
+    {"name": "bone", "hex": "#E6D9C4", "roughness": 0.52}
+  ],
+  "budget": {"max_tris": 2800, "max_primitives": 4},
+  "components": [
+    {
+      "id": "meat",
+      "kind": "roast_chicken_meat",
+      "tier": "primary",
+      "method": "remesh",
+      "profile": "organic",
+      "material": "crust",
+      "params": {"voxel_size": 0.014},
+      "bounds": [[-0.13, -0.11, 0.0], [0.13, 0.11, 0.17]],
+      "source": "observed",
+      "confidence": 0.92
+    },
+    {
+      "id": "bone_l",
+      "kind": "chicken_bone",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "bone",
+      "bounds": [[-0.12, -0.05, 0.13], [-0.06, 0.01, 0.21]],
+      "source": "observed",
+      "confidence": 0.88
+    },
+    {
+      "id": "bone_r",
+      "kind": "chicken_bone",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "bone",
+      "bounds": [[0.06, -0.05, 0.13], [0.12, 0.01, 0.21]],
+      "source": "observed",
+      "confidence": 0.88
+    }
+  ],
+  "export": {
+    "path": "public/models/roast_chicken/roast_chicken.glb",
+    "compress": true
+  }
+}

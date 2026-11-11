@@ -1,0 +1,31 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "roast_chicken",
+  "image": {"path": "tools/img/roast_chicken.jpg", "width": 512, "height": 512},
+  "medium": "3D vinyl-toy style whole roast chicken render",
+  "view": {"type": "three_quarter", "source": "observed", "confidence": 0.9},
+  "scale_anchor": {"component": "meat", "axis": "height", "meters": 0.17},
+  "silhouette": {
+    "outline": [
+      [0.22, 0.38], [0.78, 0.38], [0.84, 0.52], [0.80, 0.72], [0.20, 0.72], [0.16, 0.52], [0.22, 0.38]
+    ],
+    "source": "observed",
+    "confidence": 0.85
+  },
+  "palette": [
+    {"name": "crust", "hex": "#C46830", "usage": "雞身與雞腿表皮", "sample": [0.35, 0.40, 0.65, 0.70]},
+    {"name": "bone", "hex": "#E6D9C4", "usage": "雞腿骨端", "sample": [0.18, 0.22, 0.28, 0.32]}
+  ],
+  "components": [
+    {"id": "meat", "kind": "roast_chicken_meat", "tier": "primary", "bbox": [0.18, 0.36, 0.82, 0.78], "material_hint": "crust", "source": "observed", "confidence": 0.92},
+    {"id": "bone_l", "kind": "chicken_bone", "tier": "secondary", "bbox": [0.14, 0.18, 0.34, 0.38], "material_hint": "bone", "parent": "meat", "source": "observed", "confidence": 0.88},
+    {"id": "bone_r", "kind": "chicken_bone", "tier": "secondary", "bbox": [0.66, 0.18, 0.86, 0.38], "material_hint": "bone", "parent": "meat", "source": "observed", "confidence": 0.88}
+  ],
+  "hidden": [
+    {"id": "depth", "assumption": "側視厚度約為正面寬度的 0.85（圓潤玩具感）", "source": "inferred", "confidence": 0.55}
+  ],
+  "excluded": [
+    {"what": "地面接觸陰影", "reason": "由場景燈光產生，不做幾何"},
+    {"what": "表皮細碎顆粒", "reason": "低多邊形玩具風，用平滑 Remesh 代替"}
+  ]
+}

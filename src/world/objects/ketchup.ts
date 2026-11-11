@@ -1,5 +1,65 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { createSplash } from './splash';
+
+const ROAST_CHICKEN_URL = `${import.meta.env.BASE_URL}models/roast_chicken/roast_chicken.glb`;
+// 薯條：細長方塊（不載入 GLB）；長邊與碰撞半徑以 REFERENCE 比例縮放
+const FRY_REFERENCE_LENGTH = 0.06;
+const FRY_REFERENCE_REACH = 0.038;
+const FRY_REFERENCE_THICKNESS = 0.014;
+// 長邊露出醬面的比例（舊 -0.026/0.06 縮放後小薯條幾乎全沉）
+const FRY_EXPOSED_FRACTION = 0.42;
+
+/** 醬海薯條外觀（控制面板可調） */
+export type FryFoodSettings = {
+  /** 薯條長邊公尺（截面依 REFERENCE 比例） */
+  size: number;
+};
+
+const fryFoodSettings: FryFoodSettings = {
+  size: 0.027,
+};
+
+function fryCollisionReach() {
+  return fryFoodSettings.size * (FRY_REFERENCE_REACH / FRY_REFERENCE_LENGTH);
+}
+
+function frySurfaceLift() {
+  const half = fryFoodSettings.size * 0.5;
+  const exposed = fryFoodSettings.size * FRY_EXPOSED_FRACTION;
+  return exposed - half;
+}
+
+/** 醬海烤雞外觀（控制面板可調） */
+export type ChickenFoodSettings = {
+  /** 最長邊公尺，約 0.04 = 4cm */
+  size: number;
+  boneColor: string;
+};
+
+const CHICKEN_CRUST_PALETTE = ['#a35205', '#d27219', '#7e4120'] as const;
+
+const chickenFoodSettings: ChickenFoodSettings = {
+  size: 0.065,
+  boneColor: '#fff8f0',
+};
+
+function pickChickenCrustColor(seed: number) {
+  const random = createRandom(8800 + seed * 131);
+  const index = Math.floor(random() * CHICKEN_CRUST_PALETTE.length);
+  return CHICKEN_CRUST_PALETTE[index];
+}
+
+let chickenSourceRoot: THREE.Object3D | null = null;
+
+function chickenCollisionReach() {
+  return chickenFoodSettings.size * 0.9;
+}
+
+function chickenSurfaceLift() {
+  return -chickenFoodSettings.size * 0.4;
+}
 
 // 番茄醬緞帶：沿著「繞球、上下起伏」的曲線長出一條管子，再用 shader 讓它流動
 
@@ -37,14 +97,14 @@ const RING_OFFSET_Y = 0.38;
 const RING_OFFSET_Z = 0.13;
 // 噴濺效果開關：false = 不建立醬滴、也不跑噴濺的模擬，效能完全不受影響
 const SPLASH_ENABLED = false;
-// 雞塊加薯條的總數。控制面板可以改，這裡是一打開畫面時的數量
-const FOOD_COUNT = 7;
+// 醬海裡烤雞的數量。控制面板可以改，這裡是一打開畫面時的數量
+const FOOD_COUNT = 11;
 // 滑桿上限。形狀和材質是共用的，不會每一塊都做一份新的
 const FOOD_COUNT_MAX = 150;
 // 番茄醬海：三角魚鰭（鯊魚），沿環較快游動
 const SHARK_FIN_ENABLED = true;
 const SHARK_FIN_COLOR = 0xc07ab8;
-// 整圈進度 / 秒；雞塊薯條約 0.006~0.046，鰭快很多才有「掠過醬海」的感覺
+// 整圈進度 / 秒；烤雞約 0.006~0.046，鰭快很多才有「掠過醬海」的感覺
 const SHARK_FIN_DRIFT = 0.115;
 /** 沿醬環截面左右擺（弧度上限），0 = 貼外緣直線游 */
 const SHARK_FIN_CURVE_AMP = 0.6;
@@ -286,9 +346,12 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   };
 
   const mesh = new THREE.Mesh(geometry, material);
-  // 雞塊、薯條掛在緞帶自己身上：mesh 繞 y 軸轉的時候，它們會跟著醬一起繞，不用另外算位置
+  // 烤雞掛在緞帶自己身上：mesh 繞 y 軸轉的時候，它們會跟著醬一起繞，不用另外算位置
   // 用 let：控制面板改數量時會換掉這份清單，update 每幀讀到的才是新的
   let riders = createRiders(mesh, FOOD_COUNT);
+  loadFoodPrototypes(() => {
+    for (const rider of riders) upgradeRiderMesh(rider);
+  });
   const sharkFinSettings: SharkFinSettings = {
     enabled: SHARK_FIN_ENABLED,
     drift: SHARK_FIN_DRIFT,
@@ -318,6 +381,38 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   const foodSettings = { count: FOOD_COUNT };
   const visualSettings: KetchupVisualSettings = { opacity: 1 };
 
+  function applyChickenFoodSettings() {
+    rebuildChickenPrototype();
+    for (const rider of riders) {
+      if (rider.kind !== 'nugget') continue;
+      rider.reach = chickenCollisionReach();
+      rider.lift = chickenSurfaceLift();
+      if (nuggetPrototype) upgradeRiderMesh(rider);
+      else applyChickenAppearance(rider.mesh, rider.crustColor);
+    }
+    if (sharkFin) setWrap(uniforms.uWrap.value);
+  }
+
+  function applyFryFoodSettings() {
+    ensureFryGeometry();
+    for (const rider of riders) {
+      if (rider.kind !== 'fry') continue;
+      rider.reach = fryCollisionReach();
+      rider.lift = frySurfaceLift();
+      upgradeRiderMesh(rider);
+    }
+    if (sharkFin) setWrap(uniforms.uWrap.value);
+  }
+
+  function rerollChickenCrustColors() {
+    let salt = Math.floor(Math.random() * 1e6);
+    for (const rider of riders) {
+      if (rider.kind !== 'nugget') continue;
+      rider.crustColor = pickChickenCrustColor(rider.progress * 1e4 + salt++);
+      applyChickenAppearance(rider.mesh, rider.crustColor);
+    }
+  }
+
   function applyVisualSettings() {
     const o = THREE.MathUtils.clamp(visualSettings.opacity, 0, 1);
     visualSettings.opacity = o;
@@ -341,7 +436,9 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     const mat = sharkFinMaterial ?? sharedSharkFinMaterial();
     mat.color.set(sharkFinSettings.color);
     mat.emissive.set(sharkFinSettings.color).multiplyScalar(0.55);
-    sharkFin.mesh.geometry = sharedSharkFinGeometry(sharkFinSettings.depth);
+    if (sharkFin.mesh instanceof THREE.Mesh) {
+      sharkFin.mesh.geometry = sharedSharkFinGeometry(sharkFinSettings.depth);
+    }
     setWrap(uniforms.uWrap.value);
   }
 
@@ -352,7 +449,11 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
       const removed = riders.pop();
       if (removed) disposeRider(removed);
     }
-    while (riders.length < next) riders.push(createRider(mesh, riders.length));
+    while (riders.length < next) {
+      const rider = createRider(mesh, riders.length);
+      riders.push(rider);
+      upgradeRiderMesh(rider);
+    }
     foodSettings.count = next;
   }
 
@@ -624,6 +725,11 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     applyVisualSettings,
     foodSettings,
     setFoodCount,
+    chickenFoodSettings,
+    applyChickenFoodSettings,
+    rerollChickenCrustColors,
+    fryFoodSettings,
+    applyFryFoodSettings,
     sharkFinSettings,
     applySharkFinSettings,
     sharkFinWaveSettings,
@@ -714,7 +820,7 @@ function sauceSwell(progress: number, surface: THREE.Vector3, uTime: number) {
 type RiderKind = 'nugget' | 'fry' | 'sharkFin';
 
 type Rider = {
-  mesh: THREE.Mesh;
+  mesh: THREE.Object3D;
   kind: RiderKind;
   // 管子中心線上的點（緞帶自己的座標）。每幀再往「離開球心」推到醬的表面
   center: THREE.Vector3;
@@ -752,6 +858,8 @@ type Rider = {
   yieldClimbDir: number;
   /** 被鯊魚撞過：不再用上下擺動把 climb 拉回環外緣中線 */
   freeSectionAfterShark: boolean;
+  /** 表皮色（從 CHICKEN_CRUST_PALETTE 隨機，僅 nugget） */
+  crustColor: string;
 };
 
 /**
@@ -779,12 +887,170 @@ function darkenSunkSide(geometry: THREE.BufferGeometry) {
 }
 
 function disposeRider(rider: Rider) {
-  // 形狀和材質是所有同類食物共用的，拿掉一塊時不能一起丟掉
+  // GLB 原型是共用的，只拆掉這一顆的實例
   rider.mesh.removeFromParent();
+  if (rider.kind === 'nugget' || rider.kind === 'fry') disposeFoodInstance(rider.mesh);
+}
+
+type FoodPrototype = { clone: () => THREE.Object3D };
+
+let nuggetPrototype: FoodPrototype | null = null;
+let foodPrototypeLoadStarted = false;
+
+function enhanceFoodMaterial(mesh: THREE.Mesh, crustColor: string) {
+  const isBone = mesh.name.toLowerCase().includes('bone');
+  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  for (const material of materials) {
+    if (!('emissive' in material)) continue;
+    const m = material as THREE.MeshStandardMaterial;
+    if (isBone) {
+      m.color.set(chickenFoodSettings.boneColor);
+      m.emissive.set(chickenFoodSettings.boneColor);
+      m.emissive.multiplyScalar(0.92);
+      m.emissiveIntensity = 0.72;
+    } else {
+      m.color.set(crustColor);
+      m.emissive.set(crustColor);
+      m.emissive.multiplyScalar(0.62);
+      m.emissiveIntensity = 0.88;
+    }
+    m.metalness = 0;
+    m.roughness = 0.5;
+    m.envMapIntensity = 0.08;
+    m.polygonOffset = true;
+    m.polygonOffsetFactor = -2;
+    m.polygonOffsetUnits = -2;
+  }
+}
+
+function applyChickenAppearance(object: THREE.Object3D, crustColor: string) {
+  object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (mesh.isMesh) enhanceFoodMaterial(mesh, crustColor);
+  });
+}
+
+function rebuildChickenPrototype() {
+  if (!chickenSourceRoot) return;
+  nuggetPrototype = prepareFoodPrototype(chickenSourceRoot.clone(true), chickenFoodSettings.size);
+}
+
+function fitFoodPrototype(root: THREE.Object3D, targetMax: number, layChickenFlat = false) {
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const scale = targetMax / Math.max(size.x, size.y, size.z, 1e-6);
+  root.scale.setScalar(scale);
+  root.position.copy(center).multiplyScalar(-scale);
+  if (layChickenFlat) root.rotation.x = Math.PI / 2;
+}
+
+function foodPrototypeFromRoot(
+  root: THREE.Object3D,
+  targetMax: number,
+  layChickenFlat: boolean,
+  tint: (mesh: THREE.Mesh) => void,
+): FoodPrototype {
+  root.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    tint(mesh);
+  });
+  fitFoodPrototype(root, targetMax, layChickenFlat);
+  return {
+    clone: () => {
+      const instance = root.clone(true);
+      instance.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        if (Array.isArray(mesh.material)) {
+          mesh.material = mesh.material.map((m) => m.clone());
+        } else {
+          mesh.material = mesh.material.clone();
+        }
+      });
+      return instance;
+    },
+  };
+}
+
+function prepareFoodPrototype(source: THREE.Object3D, targetMax: number): FoodPrototype {
+  const root = source.clone(true);
+  return foodPrototypeFromRoot(root, targetMax, true, (mesh) => {
+    enhanceFoodMaterial(mesh, CHICKEN_CRUST_PALETTE[0]);
+  });
+}
+
+function loadFoodPrototypes(onReady: () => void) {
+  if (foodPrototypeLoadStarted) return;
+  foodPrototypeLoadStarted = true;
+  const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  loader.load(
+    ROAST_CHICKEN_URL,
+    (gltf) => {
+      chickenSourceRoot = gltf.scene;
+      rebuildChickenPrototype();
+      onReady();
+    },
+    undefined,
+    (error) => {
+      console.error(`[ketchup] 烤雞模型載入失敗：${ROAST_CHICKEN_URL}`, error);
+      onReady();
+    },
+  );
+}
+
+function createFoodMesh(kind: 'nugget' | 'fry') {
+  if (kind === 'nugget' && nuggetPrototype) return nuggetPrototype.clone();
+  return new THREE.Mesh(sharedFoodGeometry(kind), sharedFoodMaterial(kind));
+}
+
+function disposeFoodInstance(object: THREE.Object3D) {
+  if (
+    object instanceof THREE.Mesh &&
+    (object.geometry === nuggetGeometry || object.geometry === fryGeometry)
+  ) {
+    return;
+  }
+  object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    mesh.geometry?.dispose();
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) material.dispose();
+  });
+}
+
+function upgradeRiderMesh(rider: Rider) {
+  if (rider.kind !== 'nugget' && rider.kind !== 'fry') return;
+  const parent = rider.mesh.parent;
+  if (!parent) return;
+  const position = rider.mesh.position.clone();
+  const quaternion = rider.mesh.quaternion.clone();
+  const visible = rider.mesh.visible;
+  disposeFoodInstance(rider.mesh);
+  rider.mesh.removeFromParent();
+  const next = createFoodMesh(rider.kind);
+  next.position.copy(position);
+  next.quaternion.copy(quaternion);
+  next.visible = visible;
+  parent.add(next);
+  rider.mesh = next;
+  if (rider.kind === 'nugget') {
+    rider.reach = chickenCollisionReach();
+    rider.lift = chickenSurfaceLift();
+    applyChickenAppearance(next, rider.crustColor);
+  } else {
+    rider.reach = fryCollisionReach();
+    rider.lift = frySurfaceLift();
+  }
 }
 
 let nuggetGeometry: THREE.BoxGeometry | null = null;
 let fryGeometry: THREE.BoxGeometry | null = null;
+let fryGeometryLength = NaN;
 let sharkFinGeometry: THREE.BufferGeometry | null = null;
 let sharkFinGeometryDepth = NaN;
 let nuggetMaterial: THREE.MeshPhongMaterial | null = null;
@@ -839,9 +1105,17 @@ function sharedFoodGeometry(kind: RiderKind) {
     }
     return nuggetGeometry;
   }
-  if (!fryGeometry) {
-    fryGeometry = new THREE.BoxGeometry(0.014, 0.06, 0.014);
+  return ensureFryGeometry();
+}
+
+function ensureFryGeometry() {
+  const length = fryFoodSettings.size;
+  const thick = length * (FRY_REFERENCE_THICKNESS / FRY_REFERENCE_LENGTH);
+  if (!fryGeometry || fryGeometryLength !== length) {
+    fryGeometry?.dispose();
+    fryGeometry = new THREE.BoxGeometry(thick, length, thick);
     darkenSunkSide(fryGeometry);
+    fryGeometryLength = length;
   }
   return fryGeometry;
 }
@@ -876,7 +1150,7 @@ function sharedFoodMaterial(kind: RiderKind) {
 }
 
 /**
- * 少量雞塊（正方體）和薯條（細長方體），散在緞帶外緣
+ * 烤雞（GLB）與薯條（方塊），散在緞帶外緣
  * 每一塊用自己的編號當種子：加數量時只多出新的，原來那幾塊位置不變
  */
 function createRiders(parent: THREE.Object3D, count: number) {
@@ -886,13 +1160,25 @@ function createRiders(parent: THREE.Object3D, count: number) {
 }
 
 /**
- * 前 7 塊沿用原來的亂數順序，畫面才不會因為加了滑桿而整批換位置
- * 第 8 塊以後各自用編號當種子，加數量時不會牽動前面那些
+ * 前 FOOD_COUNT 塊沿用原來的亂數順序，畫面才不會因為加了滑桿而整批換位置
+ * 超過 FOOD_COUNT 的各自用編號當種子，加數量時不會牽動前面那些
  */
 function riderSpec(index: number) {
   if (index < FOOD_COUNT) {
     const random = createRandom(11);
-    const kinds = ['nugget', 'nugget', 'nugget', 'fry', 'fry', 'fry', 'fry'];
+    const kinds = [
+      'nugget',
+      'nugget',
+      'nugget',
+      'fry',
+      'fry',
+      'fry',
+      'fry',
+      'fry',
+      'fry',
+      'fry',
+      'fry',
+    ];
     for (let i = kinds.length - 1; i > 0; i--) {
       const j = Math.floor(random() * (i + 1));
       [kinds[i], kinds[j]] = [kinds[j], kinds[i]];
@@ -909,7 +1195,7 @@ function riderSpec(index: number) {
     return spec!;
   }
   const random = createRandom(11 + index * 97);
-  const kind = index % 7 < 3 ? 'nugget' : 'fry';
+  const kind = index % FOOD_COUNT < 3 ? 'nugget' : 'fry';
   const angle = random() * Math.PI * 2;
   return oneSpec(kind, angle, random);
 }
@@ -1094,6 +1380,7 @@ function createSharkFinRider(parent: THREE.Object3D, settings: SharkFinSettings)
     sharkYieldUntil: 0,
     yieldClimbDir: 1,
     freeSectionAfterShark: false,
+    crustColor: '',
   };
 }
 
@@ -1117,8 +1404,10 @@ function oneSpec(kind: 'nugget' | 'fry', angle: number, random: () => number) {
 function createRider(parent: THREE.Object3D, index: number): Rider {
   const spec = riderSpec(index);
   const { kind, angle } = spec;
-  // 正方體 = 雞塊；細長的長方體 = 薯條。形狀共用，數量很大時才不會每一塊都做一份
-  const mesh = new THREE.Mesh(sharedFoodGeometry(kind), sharedFoodMaterial(kind));
+  const crustColor = kind === 'nugget' ? pickChickenCrustColor(index) : '';
+  // 載入完成前先用方塊占位；原型就緒後會 upgradeRiderMesh 換成 GLB
+  const mesh = createFoodMesh(kind);
+  if (kind === 'nugget') applyChickenAppearance(mesh, crustColor);
 
   // 一開始的位置。之後每幀會沿著圈圈改這個點
   const center = new THREE.Vector3(Math.cos(angle) * ORBIT_RADIUS, 0, Math.sin(angle) * ORBIT_RADIUS);
@@ -1127,11 +1416,12 @@ function createRider(parent: THREE.Object3D, index: number): Rider {
 
   return {
     mesh,
+    crustColor,
     center,
     progress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
     // 有的幾乎停在醬裡，有的漂得比較快，才不會永遠保持同樣的間距
     // 薯條較長，轉到順著圈時比較容易碰到旁邊那塊
-    reach: kind === 'nugget' ? 0.032 : 0.038,
+    reach: kind === 'nugget' ? chickenCollisionReach() : fryCollisionReach(),
     drift: spec.drift,
     driftPhase: spec.driftPhase,
     yawSpeed: spec.yawSpeed,
@@ -1140,7 +1430,7 @@ function createRider(parent: THREE.Object3D, index: number): Rider {
     climbSpeed: spec.climbSpeed,
     climbRate: spec.climbRate,
     // 負得比半高少一點：大部分埋在醬的外側，只留一截露出來
-    lift: kind === 'nugget' ? -0.016 : -0.026,
+    lift: kind === 'nugget' ? chickenSurfaceLift() : frySurfaceLift(),
     kind,
     yaw: spec.yaw,
     // 薯條只微微傾斜。斜太多時兩端會翹出醬面，整根看起來浮在空中

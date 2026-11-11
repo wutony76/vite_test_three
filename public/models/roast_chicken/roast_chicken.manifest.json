@@ -1,0 +1,23 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "roast_chicken",
+  "glb": "roast_chicken.glb",
+  "requires": [
+    "EXT_meshopt_compression"
+  ],
+  "root": "roast_chicken_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 1980,
+    "primitives": 3,
+    "meshes": 3,
+    "materials": 1,
+    "file_bytes": 79500
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass"
+  }
+}

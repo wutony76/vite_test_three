@@ -6,6 +6,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { createKetchup } from './ketchup';
 import { createHouse, type HouseSettings } from './house';
 import { createCartoonRainbow } from './rainbow';
+import { createGameHallLights, type GameHallLights } from './gameHallLights';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -14,6 +15,7 @@ const MODEL_URL = `${import.meta.env.BASE_URL}models/chicken_leg/chicken_leg.glb
 
 // projectRoom 的外觀：用 Blender 做的 low poly 房子（匯出時已拿掉底下那塊平的地面，才能種在球面上）
 const PROJECT_ROOM_MODEL_URL = `${import.meta.env.BASE_URL}models/project_room/project_room.glb`;
+const GAME_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/game_hall/gameHall.glb`;
 
 // true = 載入網路下載的模型；false = 顯示原本的綠色球
 const USE_MODEL = false;
@@ -147,11 +149,10 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
 
   const Gamehall = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   Object.assign(Gamehall.settings, {
-    // 38° 會掉到畫面右緣外面，收到坡上才跟其他棟是同一座
     angleFromTopDegrees: 24,
     azimuthDegrees: 49,
-    spinDegrees: 74,
-    sink: 0.03,
+    spinDegrees: 99,
+    sink: 0,
     scale: 0.15,
     width: 1.25,
     height: 0.95,
@@ -160,8 +161,11 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   });
   Gamehall.applySettings();
   ground.add(Gamehall.object);
+  const gameHallLights = createGameHallLights();
 
-
+  attachHouseModel(Gamehall, GAME_HALL_MODEL_URL, (model) => {
+    gameHallLights.bind(model);
+  });
 
 
   const introHouses = [mainHall, projectRoom, bgRoom, twRoom, Gamehall];
@@ -311,6 +315,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     }
 
     rainbow.update(deltaTime);
+    gameHallLights?.update(time);
   }
 
   function isHouseGrown(object: THREE.Object3D) {
@@ -348,6 +353,12 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     ketchupVisual: { settings: ketchup.visualSettings, apply: ketchup.applyVisualSettings },
     // 食物數量：面板上的滑桿改這個，再叫 apply 把多出來或少掉的塊數補上
     ketchupFood: { settings: ketchup.foodSettings, apply: () => ketchup.setFoodCount(ketchup.foodSettings.count) },
+    ketchupChicken: {
+      settings: ketchup.chickenFoodSettings,
+      apply: ketchup.applyChickenFoodSettings,
+      rerollColors: ketchup.rerollChickenCrustColors,
+    },
+    ketchupFry: { settings: ketchup.fryFoodSettings, apply: ketchup.applyFryFoodSettings },
     ketchupShark: { settings: ketchup.sharkFinSettings, apply: ketchup.applySharkFinSettings },
     ketchupSharkWaves: { settings: ketchup.sharkFinWaveSettings, apply: ketchup.applySharkFinWaveSettings },
     rainbow: { settings: rainbow.settings, apply: rainbow.applyRainbowSettings },
@@ -359,6 +370,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     isIntroComplete: () => introDone,
     introSettings,
     replayIntro,
+    gameHallLights,
     houses: [
       exposeHouse('mainHall', mainHall),
       exposeHouse('projectRoom', projectRoom),
@@ -509,13 +521,18 @@ function loadModel(all: THREE.Object3D) {
  * 長方體不刪：種在球面上的位置、拖曳點選、控制面板、入場長大，全都是靠它算的
  * 所以只把它「藏起來」，模型當成它的子物件，長方體怎麼移動、縮放，模型都會跟著走
  */
-function attachHouseModel(house: ReturnType<typeof createHouse>, url: string) {
+function attachHouseModel(
+  house: ReturnType<typeof createHouse>,
+  url: string,
+  onLoaded?: (model: THREE.Object3D) => void,
+) {
   // material.visible = false：畫面上不畫、也不投影子（不然會多一塊方形的影子）
   // 但射線（Raycaster）不看材質可不可見，所以滑鼠還是點得到、拖得動這一棟
   // 不能用 object.visible = false：那會連子物件（模型）一起藏起來
   house.object.material.visible = false;
 
   const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
   loader.load(
     url,
     (gltf) => {
@@ -530,6 +547,7 @@ function attachHouseModel(house: ReturnType<typeof createHouse>, url: string) {
       });
       house.object.add(model);
       house.applySettings();
+      onLoaded?.(model);
     },
     undefined,
     (error) => {

@@ -162,6 +162,8 @@ const {
   ketchupRing,
   ketchupVisual,
   ketchupFood,
+  ketchupChicken,
+  ketchupFry,
   ketchupShark,
   ketchupSharkWaves,
   rainbow,
@@ -173,6 +175,7 @@ const {
   isIntroComplete,
   introSettings,
   replayIntro,
+  gameHallLights,
 } = createObjs({ envMap, camera });
 
 scene.add(all);
@@ -506,6 +509,26 @@ ringFolder.add(ketchupFood.settings, 'count', 0, 150, 1).name('食物數量').on
   console.log(`const FOOD_COUNT = ${ketchupFood.settings.count};`);
 });
 
+const chickenFood = ketchupChicken.settings;
+ringFolder
+  .add(chickenFood, 'size', 0.015, 0.12, 0.001)
+  .name('烤雞大小 (m)')
+  .onChange(ketchupChicken.apply)
+  .onFinishChange(logKetchupChicken);
+ringFolder
+  .addColor(chickenFood, 'boneColor')
+  .name('烤雞骨頭色')
+  .onChange(ketchupChicken.apply)
+  .onFinishChange(logKetchupChicken);
+ringFolder.add({ 重新隨機表皮色: () => ketchupChicken.rerollColors() }, '重新隨機表皮色').name('重新隨機表皮色');
+
+const fryFood = ketchupFry.settings;
+ringFolder
+  .add(fryFood, 'size', 0.02, 0.1, 0.001)
+  .name('薯條長邊 (m)')
+  .onChange(ketchupFry.apply)
+  .onFinishChange(logKetchupFry);
+
 const sharkFolder = gui.addFolder('番茄醬海・鯊魚');
 const shark = ketchupShark.settings;
 sharkFolder.add(shark, 'enabled').name('顯示魚鰭').onChange(ketchupShark.apply);
@@ -599,6 +622,40 @@ function bindHousePanel(entry: WorldHouse) {
   houseFolder.add(settings, 'height', 0.1, 5, 0.1).name('高 HOUSE_HEIGHT').onChange(apply).onFinishChange(logHouse);
   houseFolder.add(settings, 'depth', 0.1, 5, 0.1).name('深 HOUSE_DEPTH').onChange(apply).onFinishChange(logHouse);
   houseFolder.addColor(settings, 'color').name('顏色 HOUSE_COLOR').onChange(apply).onFinishChange(logHouse);
+
+  if (entry.label === 'Gamehall') {
+    const lights = gameHallLights.settings;
+    const lightFolder = houseFolder.addFolder('招牌與燈');
+    lightFolder.add(lights, 'neonMaster', 0, 1, 0.01).name('霓虹總亮度');
+    lightFolder.add(lights, 'neonEmissive', 0, 1.5, 0.01).name('霓虹發光');
+    lightFolder.add(lights, 'neonPoint', 0, 1.2, 0.01).name('霓虹點光');
+    lightFolder.add(lights, 'lampMaster', 0, 1, 0.01).name('店燈總亮度');
+    lightFolder.add(lights, 'lampEmissive', 0, 1, 0.01).name('店燈發光');
+    lightFolder.add(lights, 'lampPoint', 0, 1, 0.01).name('店燈點光');
+    lightFolder
+      .add(lights, 'mode', { 恆亮: 'steady', 呼吸: 'breathe', 追逐: 'chase', 閃爍: 'flicker' })
+      .name('霓虹變化');
+    lightFolder.add(lights, 'speed', 0.1, 3, 0.05).name('變化速度').onFinishChange(logGameHallLights);
+    lightFolder.controllers.forEach((c) => {
+      if (c.property !== 'speed') c.onFinishChange(logGameHallLights);
+    });
+    lightFolder.open();
+  }
+}
+
+function logGameHallLights() {
+  const lights = gameHallLights.settings;
+  console.log(
+    `// Gamehall 燈光\n` +
+      `neonMaster: ${lights.neonMaster.toFixed(2)},\n` +
+      `neonEmissive: ${lights.neonEmissive.toFixed(2)},\n` +
+      `neonPoint: ${lights.neonPoint.toFixed(2)},\n` +
+      `lampMaster: ${lights.lampMaster.toFixed(2)},\n` +
+      `lampEmissive: ${lights.lampEmissive.toFixed(2)},\n` +
+      `lampPoint: ${lights.lampPoint.toFixed(2)},\n` +
+      `mode: '${lights.mode}',\n` +
+      `speed: ${lights.speed.toFixed(2)},`,
+  );
 }
 
 /** 選中的那一棟自己發光，才分得出面板上的數字是哪一棟的 */
@@ -733,6 +790,19 @@ function logKetchupRing() {
     `const RING_OFFSET_Y = ${ring.offsetY.toFixed(2)};\n` +
     `const RING_OFFSET_Z = ${ring.offsetZ.toFixed(2)};`
   );
+}
+
+function logKetchupChicken() {
+  const c = ketchupChicken.settings;
+  console.log(
+    `chickenFoodSettings: { size: ${c.size.toFixed(3)}, boneColor: '${c.boneColor}' };\n` +
+    `CHICKEN_CRUST_PALETTE = ['#a35205', '#d27219', '#7e4120'];`,
+  );
+}
+
+function logKetchupFry() {
+  const f = ketchupFry.settings;
+  console.log(`fryFoodSettings: { size: ${f.size.toFixed(3)} };`);
 }
 
 
