@@ -24,6 +24,10 @@ function curtainColor() {
 
 let playing: Promise<void> | null = null;
 
+export function isHouseTransitionPlaying() {
+  return playing !== null;
+}
+
 /** 播放轉場。已經在播就沿用同一個，不要疊兩層黑幕 */
 export function playHouseTransition() {
   if (playing) return playing;

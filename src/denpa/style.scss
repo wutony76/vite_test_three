@@ -1,0 +1,51 @@
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  background: #07080c;
+  overflow: hidden;
+}
+
+#app canvas {
+  display: block;
+}
+
+.title {
+  position: fixed;
+  top: 16px;
+  left: 18px;
+  z-index: 2;
+  color: #f2d7b8;
+  font-family: "PingFang TC", "Noto Sans TC", sans-serif;
+
+  a {
+    color: #c9b39a;
+    font-size: 13px;
+    text-decoration: none;
+  }
+
+  h1 {
+    margin: 4px 0 0;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+  }
+}
+
+.hint,
+.error {
+  position: fixed;
+  left: 18px;
+  bottom: 16px;
+  z-index: 2;
+  margin: 0;
+  color: #c9b39a;
+  font: 13px/1.4 "PingFang TC", "Noto Sans TC", sans-serif;
+  pointer-events: none;
+}
+
+.error {
+  color: #ffb4a2;
+  pointer-events: auto;
+}

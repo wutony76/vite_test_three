@@ -16,6 +16,7 @@ export default defineConfig({
         market: 'market.html',
         drive: 'drive.html',
         world: 'world.html',
+        denpa: 'denpa.html',
       },
     },
   },

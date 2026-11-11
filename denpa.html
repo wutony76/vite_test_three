@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="霓虹招牌「電 • 波 • 町」。可分別調整每個字、圓點、內框和內壁的顏色、亮度與變化。" />
+    <title>電 • 波 • 町</title>
+    <link rel="preload" href="/models/denpa_sign/denpa_sign.glb" as="fetch" type="model/gltf-binary" crossorigin />
+  </head>
+  <body>
+    <div id="app"></div>
+    <header class="title">
+      <a href="/lights.html">← 燈光</a>
+      <h1>電 • 波 • 町</h1>
+    </header>
+    <p class="hint">拖曳旋轉 · 右側面板可改各盞燈的顏色、亮度與變化</p>
+    <p class="error" data-ref="error" hidden>招牌載入失敗</p>
+    <script type="module" src="/src/denpa/main.ts"></script>
+  </body>
+</html>

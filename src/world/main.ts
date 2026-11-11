@@ -13,7 +13,7 @@ import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { enableViewPlaneDrag } from './debug/viewPlaneDrag';
 import { enableSurfaceDrag } from './debug/surfaceDrag';
 import { flyCameraTo, isCameraFlying, type CameraPose } from './cameraFlight';
-import { playHouseTransition, playSceneLoad, transitionSettings } from './houseTransition';
+import { isHouseTransitionPlaying, playHouseTransition, playSceneLoad, transitionSettings } from './houseTransition';
 
 // RENDERER
 /**
@@ -239,12 +239,39 @@ const introViewPose: CameraPose = {
   up: camera.up.clone(),
 };
 
+const worldUiActions = document.getElementById('world-ui-actions');
 const viewIntroButton = document.getElementById('view-intro') as HTMLButtonElement | null;
+const houseEnterSlot = document.getElementById('house-enter-slot');
+const houseEnterButton = document.getElementById('house-enter') as HTMLButtonElement | null;
+
+/** 點過房子才算選好，「進入」才出現 */
+let houseEnterReady = false;
+
+function syncWorldActionButtons() {
+  const busy = isCameraFlying() || isHouseTransitionPlaying();
+  if (viewIntroButton) viewIntroButton.disabled = busy;
+  if (houseEnterSlot) houseEnterSlot.hidden = !houseEnterReady;
+  if (houseEnterButton) houseEnterButton.disabled = busy || !houseEnterReady;
+}
+
+function markHouseSelected() {
+  houseEnterReady = true;
+  syncWorldActionButtons();
+}
+
 viewIntroButton?.addEventListener('click', () => {
-  if (isCameraFlying()) return;
-  viewIntroButton.disabled = true;
+  if (isCameraFlying() || isHouseTransitionPlaying()) return;
+  syncWorldActionButtons();
   void flyCameraTo(camera, controls, introViewPose).finally(() => {
-    if (viewIntroButton) viewIntroButton.disabled = false;
+    syncWorldActionButtons();
+  });
+});
+
+houseEnterButton?.addEventListener('click', () => {
+  if (!houseEnterReady || isCameraFlying() || isHouseTransitionPlaying()) return;
+  syncWorldActionButtons();
+  void playHouseTransition().finally(() => {
+    syncWorldActionButtons();
   });
 });
 
@@ -639,6 +666,7 @@ if (HOUSE_DRAG_ENABLED) {
     onDragStart: (target) => {
       const entry = houses.find((house) => house.object === target.object);
       if (entry) bindHousePanel(entry);
+      markHouseSelected();
     },
     onDrag: (normal, target) => {
       target.setNormal(normal);
@@ -646,9 +674,9 @@ if (HOUSE_DRAG_ENABLED) {
       houseFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
     onDragEnd: logHouse,
-    // 點一下才播轉場。拖曳仍然只是沿著球面移動房子
+    // 點一下只選房子；轉場改按 HUD「進入」
     onClick: () => {
-      void playHouseTransition();
+      markHouseSelected();
     },
   });
 }
@@ -730,7 +758,9 @@ function render(time: number) {
 renderer.setAnimationLoop(render);
 // 場景迴圈開始後才掀開：黑幕底下已經有畫好的畫面，不會旋開到一片空白
 void playSceneLoad().then(() => {
-  viewIntroButton?.removeAttribute('hidden');
+  worldUiActions?.removeAttribute('hidden');
+  // 開場已選 mainHall，不用先點房子才出現「進入」
+  markHouseSelected();
 });
 
 

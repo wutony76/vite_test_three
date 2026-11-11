@@ -96,11 +96,11 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   const projectRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   // 第二棟用面板調過的數值，跟第一棟分開，不改 house.ts 的預設
   Object.assign(projectRoom.settings, {
-    angleFromTopDegrees: 10,
-    azimuthDegrees: 88,
+    angleFromTopDegrees: 7,
+    azimuthDegrees: 68,
     spinDegrees: 89,
-    sink: 0.035,
-    scale: 0.17,
+    sink: 0.015,
+    scale: 0.25,
     width: 0.9,
     height: 1.3,
     depth: 1.1,
@@ -529,6 +529,7 @@ function attachHouseModel(house: ReturnType<typeof createHouse>, url: string) {
         mesh.receiveShadow = true;
       });
       house.object.add(model);
+      house.applySettings();
     },
     undefined,
     (error) => {

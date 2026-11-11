@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { conformChildrenToSphere, conformGeometryToSphere } from './conformToSphere';
 
 // ===== 房子的預設值：用控制面板調到滿意後，把 console 印出來的那幾行貼回這裡 =====
 
@@ -110,6 +111,16 @@ export function createHouse({ groundRadius, up, front }: CreateHouseOptions) {
     mesh.quaternion.setFromUnitVectors(Y_AXIS, normal);
     // 再繞著自己的屋頂方向轉 spin：乘在右邊 = 在「房子自己的座標」裡轉，不會把房子轉倒
     mesh.quaternion.multiply(spin.setFromAxisAngle(Y_AXIS, THREE.MathUtils.degToRad(settings.spinDegrees)));
+
+    const conformOptions = {
+      groundRadius,
+      sink: settings.sink,
+      normal,
+      groundY: 0,
+      groundBand: settings.height * 0.06,
+    };
+    conformGeometryToSphere(mesh.geometry, conformOptions);
+    conformChildrenToSphere(mesh, conformOptions);
   }
   applySettings();
 
@@ -142,8 +153,8 @@ export function createHouse({ groundRadius, up, front }: CreateHouseOptions) {
 
 function createBoxGeometry({ width, height, depth }: HouseSettings) {
   // BoxGeometry：長方體，三個參數依序是 x / y / z 方向的長度
-  // 中心在原點，所以實際範圍是 -寬/2 ~ +寬/2，以此類推
-  const geometry = new THREE.BoxGeometry(width, height, depth);
+  // 底面多加分段，貼球時弧面才光滑（平面四點會像折紙）
+  const geometry = new THREE.BoxGeometry(width, height, depth, 10, 1, 10);
   // 把原點挪到底部中央：整個幾何往上移半個高度，範圍變成 0 ~ 高
   // 這樣「擺在地面上的某一點」就是貼地；少了這步，房子會有一半陷進地裡
   geometry.translate(0, height / 2, 0);
