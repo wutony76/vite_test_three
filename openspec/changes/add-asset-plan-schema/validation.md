@@ -23,10 +23,10 @@
   - 實際結果：`overlay_reference.py` 輸出第 1 版後修正 3 處（見下方問題紀錄），第 2 版 22 個框都和原圖元件對齊
 - [x] `DetailConfig` 的 7 個參數都能各自覆寫，且有範圍檢查
   - 實際結果：`test_override_changes_only_one_field`、`test_range_errors`、`test_detail_rejects_unknown_param_and_preset` 通過
-- [ ] Claude Code 與 Cursor 都能觸發同一份 `WORKFLOW.md`
+- [x] Claude Code 與 Cursor 都能觸發同一份 `WORKFLOW.md`
   - 實際結果：skill 和 rule 檔案已建立，且都指向 WORKFLOW.md
   - Claude Code：已確認（Phase 3 開始建模時，skill 出現在清單中，載入後指向 WORKFLOW.md）
-  - Cursor：**尚待使用者在 Cursor 觸發一次**
+  - Cursor：已確認（使用者 2026-11-11 觸發，流程與數字和 Claude Code 端一致）
 - [x] 既有測試全部通過，`npm run build` 通過
   - 實際結果：headless `74 passed, 0 failed`（exit 0）；`npm run build` exit 0
 
@@ -79,7 +79,7 @@
 
 ## 結論
 
-- 是否通過：**有條件通過**。功能、測試、build 全部通過；只剩「兩個編輯器各實際觸發一次」需要使用者確認。
+- 是否通過：**通過**（2026-11-11 兩個編輯器都已實際觸發確認）
 - 已知限制或風險：
   - `vocab.KINDS` 目前是手寫清單；Phase 3 零件庫完成後要改成從註冊表產生
   - plan 中的 `params` 是 kind 專屬參數，本 change 只驗證 `openings` 參照，其他欄位由 Phase 3 零件庫自行驗證

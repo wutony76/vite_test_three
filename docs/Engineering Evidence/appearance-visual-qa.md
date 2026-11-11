@@ -13,7 +13,7 @@
   - 新增 `tests/test_visual_metrics.py`、`tests/test_appearance.py`；修改 `tests/threejs_plan_check.mjs`、`test_build_plan.py`、`test_shapes.py`
   - 重新匯出 `public/models/test01_shop/`、`public/models/tree_round/`
   - 文件：`tools/blender/README.md`、`WORKFLOW.md`、`docs/Architecture/README.md`、`public/models/test01_shop/README.md`
-- Commit / PR 參考：尚未 commit
+- Commit / PR 參考：`9bfcc7a`（分支 `feat/blender-asset-pipeline`）
 
 ## 驗證佐證
 

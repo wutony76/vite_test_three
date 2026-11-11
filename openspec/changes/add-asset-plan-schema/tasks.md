@@ -32,7 +32,7 @@
 - [x] 縮短 `.cursor/rules/blender-modeling.mdc`，內容指向 WORKFLOW.md
 - [x] 新增 `.claude/skills/blender-modeling/SKILL.md`
 - [x] Claude Code：2026-11-11 Phase 3 建模時，`blender-modeling` skill 出現在清單中，觸發後指向 WORKFLOW.md
-- [ ] Cursor：待使用者在 Cursor 觸發一次確認
+- [x] Cursor：2026-11-11 使用者以 `@blender-modeling` 觸發，Cursor 依 WORKFLOW.md 完成 validate_plan → build_asset_from_plan → Geometry QA → Visual QA，數字和 Claude Code 端完全相同（輪廓 IoU 0.9866、元件位置 IoU 0.8608）
 
 ## 5. 測試
 

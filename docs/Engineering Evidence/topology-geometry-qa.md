@@ -12,7 +12,7 @@
   - 新增 `tests/test_qa.py`；修改 `tests/test_plan_schema.py`、`tests/test_shapes.py`
   - 重新匯出 `public/models/test01_shop/`、`public/models/tree_round/`
   - 文件：`tools/blender/README.md`、`WORKFLOW.md`、`docs/Architecture/README.md`
-- Commit / PR 參考：尚未 commit
+- Commit / PR 參考：`9bfcc7a`（分支 `feat/blender-asset-pipeline`）
 
 ## 驗證佐證
 

@@ -12,11 +12,11 @@
   - 文件：`tools/blender/README.md`、`docs/Architecture/README.md`
   - `openspec/changes/add-asset-plan-schema/*`
   - 參考圖 `tools/img/test01.jpg` 由使用者提供
-- Commit / PR 參考：尚未 commit
+- Commit / PR 參考：`9bfcc7a`（分支 `feat/blender-asset-pipeline`）
 
 ## 驗證佐證
 
-- 對應 `validation.md` 結論：有條件通過（只剩兩個編輯器實際觸發待確認）
+- 對應 `validation.md` 結論：通過（Claude Code、Cursor 都已實際觸發確認）
 - 佐證：
   - `python3 -m unittest discover -s tools/blender/tests -p "test_plan_schema.py"` → `Ran 29 tests ... OK`
   - headless Blender `tests/run.py` → `74 passed, 0 failed, 74 total`（exit 0）
@@ -35,12 +35,11 @@
   - 依賴 AI 讀 WORKFLOW.md；Phase 7 的 MCP server 才會把流程變成正式工具
 - 後續追蹤事項：
   - Phase 3 `build_asset_from_plan`
-  - 在 Claude Code 與 Cursor 各觸發一次 skill／rule
   - Phase 8 前補第二種建築 plan
 
 ## 封存前檢查
 
-- [ ] validation.md 已完成且結論為「通過」（目前為有條件通過）
+- [x] validation.md 已完成且結論為「通過」
 - [x] 變更檔案與風險說明已整理完成
 - [x] `npm run build` 已確認正常（本變更不影響頁面）
 - [x] 已產出 `docs/Engineering Evidence/asset-plan-schema.md`，並已更新 `docs/Architecture/README.md`

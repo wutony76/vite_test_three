@@ -14,7 +14,7 @@
   - 新增 `public/models/test01_shop/`、`public/models/tree_round/`（GLB + README）
   - 文件：`tools/blender/README.md`、`tools/blender/WORKFLOW.md`、`docs/Architecture/README.md`
   - `openspec/changes/add-plan-geometry-engine/*`
-- Commit / PR 參考：尚未 commit
+- Commit / PR 參考：`9bfcc7a`（分支 `feat/blender-asset-pipeline`）
 
 ## 驗證佐證
 
