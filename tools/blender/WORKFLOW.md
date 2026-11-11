@@ -11,6 +11,12 @@ Cursor（`.cursor/rules/blender-modeling.mdc`）和 Claude Code（`.claude/skill
 2. 不可以用頂點拼出 box／sphere 再塞進同一個 mesh。效果等於 Join，只是比較難發現。
 3. 不可以跳過 plan 確認就直接建模，也不可以拿 `look` 目測的結果當作驗證通過的依據。
 
+## 工具選擇
+
+- 有 `lowpoly` MCP 工具時（`lowpoly_validate_plan`、`lowpoly_build_asset`、`lowpoly_build_scene`），**優先使用它們**做驗證、建模、匯出。它們在背景 Blender 執行，結果可以重現，也不會動到使用者的 Blender。
+- 要讓使用者在自己的 Blender 裡看結果、或做即時調整時，才用 mcp-for-blender 的 `execute_blender_code` 載入 lowpoly_kit（見下方第 0 節）。
+- 改完程式或 plan 後，用 `python3 tools/blender/tests/e2e.py` 確認 Test A／B 的驗收條件全部通過。
+
 ## 0. 開工前
 
 1. 呼叫 `get_addon_status`、`get_scene_info`，確認 Blender 版本與目前場景。基準版本是 Blender 5.2 LTS、mcp-for-blender 2.2.7。
@@ -127,7 +133,7 @@ Blender --background --factory-startup --python-exit-code 1 --python tools/blend
 
 1. 所有部件放在**一個根 Empty** 底下；需要點擊或做動畫的部件保留成獨立 Object。
 2. 不可以把整個場景合併成單一 Mesh，也不要拆得太碎。數量對照 plan 的 `budget`。
-3. `build_asset_from_plan(plan, export=True)`：全部驗證通過才會匯出到 plan 的 `export.path`。
+3. `build_asset_from_plan(plan, export=True)`：全部驗證通過才會匯出到 plan 的 `export.path`，同時輸出 `<name>.manifest.json`（可點擊節點、動畫群組、QA 結果）。預設以 meshopt 壓縮，Three.js 端要 `setMeshoptDecoder(MeshoptDecoder)`。
 4. 用 `node tools/blender/tests/threejs_plan_check.mjs <plan.json>` 檢查 Three.js 端：
    - 只有一個根節點
    - clickable 元件是獨立節點

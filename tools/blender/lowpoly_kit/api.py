@@ -297,7 +297,7 @@ def remesh_organic_mesh(obj, voxel_size=0.1, validate=True):
 
 
 @safe_call
-def prepare_for_gltf(root, filepath, apply_modifiers=True, validate=True):
+def prepare_for_gltf(root, filepath, apply_modifiers=True, validate=True, compress=False):
     """驗證 root 底下所有 Mesh，全部通過才匯出 GLB，並回報 draw call 等統計。
 
     不修改場景：modifier 只套用在匯出的資料上。
@@ -320,7 +320,7 @@ def prepare_for_gltf(root, filepath, apply_modifiers=True, validate=True):
         if not result["ok"]:
             return result
 
-    exported = export_glb(root, filepath, apply_modifiers)
+    exported = export_glb(root, filepath, apply_modifiers, compress=compress)
     result["changes"].update({"filepath": filepath, "objects": exported, "export": glb_stats(filepath)})
     return result
 

@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { existsSync } from 'node:fs';
 
 const planPath = resolve(process.argv[2] ?? 'tools/blender/plans/test01_shop.plan.json');
 const plan = JSON.parse(readFileSync(planPath, 'utf8'));
@@ -31,7 +33,8 @@ const stubTextures = (parser) => ({
     return Promise.resolve(texture);
   },
 });
-const loader = new GLTFLoader().register(stubTextures);
+// meshopt 壓縮的 GLB（EXT_meshopt_compression）要先設定 decoder，否則讀不到頂點
+const loader = new GLTFLoader().register(stubTextures).setMeshoptDecoder(MeshoptDecoder);
 const gltf = await new Promise((done, fail) => loader.parse(arrayBuffer, '', done, fail));
 
 const failures = [];
@@ -104,6 +107,25 @@ if (usesAtlas) {
   const opaque = drawCalls - transparent;
   check(textured === opaque && nearest === textured, `不透明 mesh 都使用 atlas 貼圖且為 NEAREST（${textured}/${opaque}）`);
   check(vertexColored === drawCalls, `所有 mesh 都帶 vertex color（${vertexColored}/${drawCalls}）`);
+}
+
+
+// manifest：列出的節點名稱都必須真的存在於 GLB（頁面靠這份清單找可點擊的物件、燈光）
+const manifestPath = file.replace(/\.glb$/, '.manifest.json');
+if (existsSync(manifestPath)) {
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const names = [manifest.root, ...(manifest.clickable ?? []), ...Object.values(manifest.anim_groups ?? {}).flat(),
+    ...(manifest.groups ?? []), ...(manifest.placements ?? []).flatMap((p) => [p.root, ...p.clickable])];
+  const missing = names.filter((name) => !gltf.scene.getObjectByName(name));
+  check(missing.length === 0, `manifest 的 ${names.length} 個節點名稱都存在於 GLB（缺少：${missing.slice(0, 3).join(', ') || '無'}）`);
+  const compressed = manifest.requires.includes('EXT_meshopt_compression');
+  check(compressed, `GLB 使用 meshopt 壓縮（requires：${manifest.requires.join(', ')}）`);
+  if (manifest.kind === 'scene') {
+    const types = new Set(manifest.lights.map((l) => l.type));
+    check(types.has('sun') && (types.has('hemisphere') || types.has('ambient')), `manifest 有日光與環境光（${[...types].join(', ')}）`);
+  }
+} else {
+  check(false, `找不到 manifest：${manifestPath}`);
 }
 
 console.log(`\n${failures.length === 0 ? 'ALL PASS' : `${failures.length} FAILED`}`);

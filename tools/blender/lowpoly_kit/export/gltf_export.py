@@ -18,7 +18,7 @@ def _gltf_props():
     return bpy.ops.export_scene.gltf.get_rna_type().properties
 
 
-def export_glb(root, filepath, apply_modifiers=True, gpu_instances=False):
+def export_glb(root, filepath, apply_modifiers=True, gpu_instances=False, compress=False):
     props = _gltf_props()
     # export_format 是動態 enum（選項由 callback 產生），沒有 context 時讀出來可能是空的。
     # 讀得到就確認 GLB 存在；讀不到就直接用 "GLB"，傳錯時匯出器會丟 TypeError 並列出合法值。
@@ -41,6 +41,12 @@ def export_glb(root, filepath, apply_modifiers=True, gpu_instances=False):
     }
     if "export_extras" in props:
         kwargs["export_extras"] = True
+    if compress and "export_meshopt_compression_enable" in props:
+        # meshopt 壓縮頂點與索引（EXT_meshopt_compression）：檔案通常小一半以上，
+        # 解壓非常快。Three.js 端要呼叫 GLTFLoader.setMeshoptDecoder(MeshoptDecoder) 才讀得到
+        kwargs["export_meshopt_compression_enable"] = True
+        if "export_meshopt_extension" in props:
+            kwargs["export_meshopt_extension"] = "EXT_meshopt_compression"
     if gpu_instances and "export_gpu_instances" in props:
         # 同一個父節點下、共用 mesh 的兄弟物件（場景裡的樹）合併成 EXT_mesh_gpu_instancing，
         # Three.js 會建成 InstancedMesh：8 棵樹 2 次 draw call，而不是 16 次

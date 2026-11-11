@@ -205,6 +205,63 @@ node tools/blender/tests/threejs_plan_check.mjs tools/blender/plans/test01_shop.
 node tools/blender/tests/threejs_scene_check.mjs
 ```
 
+## 匯出給 Three.js（壓縮與 manifest）
+
+- **壓縮**：plan 的 `export.compress`（預設 true）→ meshopt 壓縮（`EXT_meshopt_compression`），檔案大約減半。Three.js 端要設定 decoder：
+
+  ```ts
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  ```
+
+- **manifest**：每個 GLB 旁邊有一份 `<name>.manifest.json`，內容包括：
+  - `requires`（需要的 glTF 擴充）、`root`
+  - `clickable`（可點擊節點）、`anim_groups`（一起亮的燈等）
+  - 場景另有 `placements`（每棟建築的根節點與可點擊元件）、`instanced`（instance 擺放與動畫群組）、`lights`
+  - `stats`、`qa`
+  - 頁面可以先讀 manifest，再決定要綁定哪些互動。
+- **場景燈光**：ScenePlan 的 `lights`（`sun`／`hemisphere`／`ambient`／`point`）只寫進 manifest，不放進 GLB，因為 Blender 和 Three.js 的燈光單位不同。方向與位置使用 Three.js 座標（Y 朝上），強度也是 Three.js 的數值。
+
+## lowpoly MCP server（背景 Blender）
+
+把建模流程包成正式的 MCP 工具，每個工具都在背景 Blender 子行程中執行，**不碰你正在使用的 Blender**。
+
+| 工具 | 需要 Blender | 用途 |
+|---|---|---|
+| `lowpoly_list_plans` | 否 | 列出 `plans/` 裡的 plan |
+| `lowpoly_validate_plan(path)` | 否 | 驗證 plan（可以只寫檔名） |
+| `lowpoly_build_asset(plan, export, preset, render_dir, out_root)` | 是 | 建模 + QA（有 render_dir 時加上 Visual QA 與預覽）+ 匯出 |
+| `lowpoly_build_scene(scene, export, render_dir, out_root)` | 是 | 組裝場景 + Scene QA + 匯出 |
+| `lowpoly_run_tests(keyword)` | 是 | headless 測試套件 |
+
+- 設定：`.mcp.json`（Claude Code）、`.cursor/mcp.json`（Cursor）都已進版控。第一次使用時，Claude Code 會詢問是否信任這個專案的 MCP server。
+- 執行方式：`uv run --no-project --with "mcp>=2,<3" python tools/blender/mcp_server/server.py`，不需要全域安裝 mcp 套件。
+- Blender 路徑：環境變數 `LPK_BLENDER`，預設 `~/Applications/Blender.app/Contents/MacOS/Blender`。
+- 輸出只允許寫到專案或系統暫存目錄。
+- 煙霧測試：`uv run --no-project --with "mcp>=2,<3" python tools/blender/tests/mcp_smoke.py`
+- 和 mcp-for-blender 的分工：
+  - 要在你的 Blender 裡即時檢視或手動調整 → mcp-for-blender
+  - 批次建模、匯出、測試 → lowpoly
+
+## 端到端驗收（Test A／Test B）
+
+```bash
+python3 tools/blender/tests/e2e.py              # 全部（約 1 分鐘）
+python3 tools/blender/tests/e2e.py --skip-units # 只跑 Test A／B
+```
+
+1. 純 Python 測試
+2. headless 測試套件
+3. Test A（test01_shop + Visual QA）
+4. Test B（sample_town）
+5. Three.js 檢查
+6. 原始需求的 19 條驗收條件逐條判定
+
+- 輸出（GLB、manifest、預覽、`e2e_report.json`）都在暫存目錄，不會改到 `public/models`。
+- 任一條不通過就以 1 結束，並列出是哪一條。
+- 對照表見 `openspec/changes/add-e2e-acceptance/proposal.md`。
+
 ## 建模流程
 
 完整步驟見 [`WORKFLOW.md`](WORKFLOW.md)。摘要：
@@ -231,7 +288,7 @@ node tools/blender/tests/threejs_scene_check.mjs
 | `build_scene_from_plan(scene_path, export=)` | 依 ScenePlan 組裝場景並執行 Scene QA | 只新建／重建該場景與它用到的資產 |
 | `optimize_lowpoly_mesh(obj, planar_angle_deg=1.0)` | 溶掉共平面的多餘邊、Flat Shading | 是 |
 | `remesh_organic_mesh(obj, voxel_size=)` | Voxel Remesh，只允許 `organic` | 是 |
-| `prepare_for_gltf(root, filepath)` | 驗證 root 底下所有 Mesh，全部通過才匯出 GLB | 否 |
+| `prepare_for_gltf(root, filepath, compress=)` | 驗證 root 底下所有 Mesh，全部通過才匯出 GLB（compress = meshopt） | 否 |
 | `clear_backups(obj)` | 確認結果後刪除備份 mesh | — |
 | `validate_plan(plan_or_path)` | 驗證 reference／asset／scene plan JSON | 否 |
 | `build_asset_from_plan(plan, export=, preset=)` | 依 AssetPlan 建出整個資產（零件庫 → 編輯 → Union → wobble → bevel → 驗證 → 預算），可重複執行 | 只新建／重建該 plan 的 Object |
@@ -324,15 +381,16 @@ tools/blender/
 │  ├─ lowpoly.py          dissolve_limit + Flat Shading
 │  ├─ remesh_engine.py    Voxel Remesh
 │  ├─ validation/         checks（9 項）／profiles／report
-│  ├─ export/             gltf_export／glb_stats
+│  ├─ export/             gltf_export（meshopt、gpu instancing）／glb_stats／manifest
 │  ├─ pipeline/           schema（三種 plan 驗證）／detail_config／vocab，不依賴 bpy
 │  ├─ shapes.py           幾何產生器（grid_slab／prism／loft／lathe／sweep／blob），不依賴 bpy
 │  ├─ components/         零件庫（25 個 kind）與 layout，不依賴 bpy
 │  ├─ appearance/         palette atlas 色格配置（不依賴 bpy）
 │  ├─ build/              orchestrator／materials／appearance／wobble／bevel（Blender 端建模流程）
-│  ├─ qa/                 geometry、visual、scene（Scene QA）、metrics（不依賴 bpy）
+│  ├─ qa/                 geometry、visual、scene（Scene QA）、preview（預覽渲染）、metrics（不依賴 bpy）
 │  ├─ scene/              terrain（高度場、道路、外框幾何，不依賴 bpy）、assembly（場景組裝）
 │  └─ presets/building.py Low Poly 小屋
-├─ scripts/              build_from_plan.py（資產）、build_scene.py（場景）、overlay_reference.py、build_house.py
+├─ mcp_server/           server.py（lowpoly MCP server）
+├─ scripts/              build_from_plan.py（資產）、build_scene.py（場景）、mcp_runner.py（MCP／e2e 共用）、overlay_reference.py、build_house.py
 └─ tests/                 run.py、fixtures、test_*.py（test_plan_schema、test_shapes 不需要 Blender）、threejs_check.mjs、threejs_plan_check.mjs
 ```

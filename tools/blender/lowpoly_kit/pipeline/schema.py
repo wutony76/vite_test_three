@@ -423,6 +423,7 @@ def _validate_asset(doc, c):
 
     export = c.get(doc, "export", "", "dict")
     export_path = c.get(export, "path", "export", "str")
+    c.get(export, "compress", "export", "bool", required=False)
     if export_path is not None and not export_path.endswith(".glb"):
         c.error("PLAN_FIELD_TYPE", "export.path", f"需要 .glb 檔名，拿到 {export_path!r}")
     for index, name in enumerate(c.get(export, "clickable", "export", "list", required=False, default=[])):
@@ -519,6 +520,25 @@ def _validate_scene(doc, c):
 
     export = c.get(doc, "export", "", "dict", required=False)
     export_path = c.get(export, "path", "export", "str", required=False)
+    c.get(export, "compress", "export", "bool", required=False)
+
+    # 燈光只寫進 manifest，由 Three.js 建立（Blender 的 W 和 Three.js 的強度單位不同，直接匯出會過亮或過暗）
+    lights = c.items(doc, "lights", "", required=False)
+    c.unique_ids(lights)
+    for path, light in lights:
+        kind = c.get(light, "type", path, "str")
+        c.enum(kind, ("sun", "hemisphere", "ambient", "point"), f"{path}.type")
+        for key in ("color", "ground_color"):
+            value = c.get(light, key, path, "str", required=(key == "color"))
+            if value is not None and not HEX_COLOR.match(value):
+                c.error("PLAN_FIELD_TYPE", f"{path}.{key}", f"需要 #RRGGBB 格式，拿到 {value!r}")
+        c.in_range(c.get(light, "intensity", path, "number"), 0, None, f"{path}.intensity", low_open=True)
+        if kind == "sun":
+            c.get(light, "direction", path, "vec3")
+        if kind == "point":
+            c.get(light, "position", path, "vec3")
+        if kind == "hemisphere":
+            c.get(light, "ground_color", path, "str")
     if export_path is not None and not export_path.endswith(".glb"):
         c.error("PLAN_FIELD_TYPE", "export.path", f"需要 .glb 檔名，拿到 {export_path!r}")
 

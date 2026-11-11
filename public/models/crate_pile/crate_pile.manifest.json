@@ -1,0 +1,23 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "crate_pile",
+  "glb": "crate_pile.glb",
+  "requires": [
+    "EXT_meshopt_compression"
+  ],
+  "root": "crate_pile_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 524,
+    "primitives": 4,
+    "meshes": 4,
+    "materials": 1,
+    "file_bytes": 28492
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass"
+  }
+}

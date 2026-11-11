@@ -114,6 +114,7 @@
       "porch_wall"
     ],
     "anim_groups": {},
-    "instance_groups": {}
+    "instance_groups": {},
+    "compress": true
   }
 }

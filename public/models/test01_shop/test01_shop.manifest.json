@@ -1,0 +1,34 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "test01_shop",
+  "glb": "test01_shop.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "KHR_materials_emissive_strength"
+  ],
+  "root": "test01_shop_Root",
+  "clickable": [
+    "test01_shop_awning",
+    "test01_shop_door",
+    "test01_shop_shop_window"
+  ],
+  "anim_groups": {
+    "lamp_glow": [
+      "test01_shop_street_lamp",
+      "test01_shop_top_light",
+      "test01_shop_wall_lamp"
+    ]
+  },
+  "stats": {
+    "triangles": 4656,
+    "primitives": 29,
+    "meshes": 25,
+    "materials": 3,
+    "file_bytes": 235600
+  },
+  "qa": {
+    "topology": "warn",
+    "geometry": "pass"
+  }
+}

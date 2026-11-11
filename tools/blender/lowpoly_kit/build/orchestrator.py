@@ -21,6 +21,8 @@ from .. import backup as _backup
 from .. import mesh_builder
 from ..components import EDIT_KINDS, BuildError, get_builder
 from ..components.layout import layout_plan, to_local
+from ..export.glb_stats import read_glb_json
+from ..export.manifest import asset_manifest, write_manifest
 from ..pipeline import load_plan, resolve_detail, validate_plan
 from ..qa.geometry import check_asset_geometry
 from ..result import KitError, add_error, make_result
@@ -339,12 +341,18 @@ def build_asset(plan_or_path, location=(0.0, 0.0, 0.0), export=False, preset=Non
     if export and result["ok"]:
         target = export_spec["path"]
         target = target if os.path.isabs(target) else os.path.join(repo_root or REPO_ROOT, target)
-        exported = api.prepare_for_gltf(root, target)
+        exported = api.prepare_for_gltf(root, target, compress=export_spec.get("compress", True))
         result["changes"]["export"] = exported["changes"].get("export")
         result["changes"]["filepath"] = target
         if not exported["ok"]:
             for error in exported["errors"]:
                 add_error(result, error["code"], error["message"])
+        else:
+            statuses = {info["status"] for info in report_objects.values()}
+            qa = {"topology": "fail" if "fail" in statuses else "warn" if "warn" in statuses else "pass",
+                  "geometry": geometry["status"]}
+            manifest = asset_manifest(doc, root, target, exported["changes"]["export"], read_glb_json(target), qa)
+            result["changes"]["manifest"] = write_manifest(target, manifest)
     return result
 
 

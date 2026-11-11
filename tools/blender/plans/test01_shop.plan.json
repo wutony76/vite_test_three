@@ -146,6 +146,7 @@
         "pot_door",
         "pot_right"
       ]
-    }
+    },
+    "compress": true
   }
 }

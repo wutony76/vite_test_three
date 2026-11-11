@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "lowpoly": {
+      "command": "uv",
+      "args": ["run", "--no-project", "--with", "mcp>=2,<3", "python", "tools/blender/mcp_server/server.py"]
+    }
+  }
+}

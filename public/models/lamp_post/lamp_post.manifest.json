@@ -1,0 +1,28 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "lamp_post",
+  "glb": "lamp_post.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "KHR_materials_emissive_strength"
+  ],
+  "root": "lamp_post_Root",
+  "clickable": [],
+  "anim_groups": {
+    "lamp_glow": [
+      "lamp_post_lamp"
+    ]
+  },
+  "stats": {
+    "triangles": 132,
+    "primitives": 2,
+    "meshes": 1,
+    "materials": 2,
+    "file_bytes": 10804
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass"
+  }
+}

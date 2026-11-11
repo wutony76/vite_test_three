@@ -1,0 +1,19 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "lamp_post",
+  "notes": "小鎮的街燈（Props）：沿用 test01 路燈的造型，單獨成一個資產，在場景中以 instance 擺放。燈罩屬於 lamp_glow 動畫群組。",
+  "dimensions": {"w": 0.6, "d": 0.6, "h": 4.3},
+  "detail": {"preset": "game_default", "overrides": {}},
+  "style": {"edge_wobble": 0.0},
+  "materials": [
+    {"name": "iron", "hex": "#2E2C2A", "roughness": 0.5, "metallic": 0.6},
+    {"name": "lamp_glow", "hex": "#F0DC24", "roughness": 0.4, "emissive": true}
+  ],
+  "budget": {"max_tris": 400, "max_primitives": 4},
+  "components": [
+    {"id": "lamp", "kind": "street_lamp", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "iron",
+     "params": {"glow_material": "lamp_glow"}, "bounds": [[-0.25, -0.25, 0.0], [0.25, 0.25, 4.2]],
+     "source": "inferred", "confidence": 0.8, "assumption": "沿用 test01 參考圖的路燈造型，高度略低（4.2 m）"}
+  ],
+  "export": {"path": "public/models/lamp_post/lamp_post.glb", "compress": true, "clickable": [], "anim_groups": {"lamp_glow": ["lamp"]}}
+}

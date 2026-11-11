@@ -10,19 +10,17 @@
 """
 
 import json
-import math
 import os
 import sys
 
 import bpy
-from mathutils import Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 from lowpoly_kit import api  # noqa: E402
 from lowpoly_kit.build.orchestrator import summary_table  # noqa: E402
-from lowpoly_kit.qa.visual import SceneState, _setup, _uses_atlas  # noqa: E402
+from lowpoly_kit.qa.preview import render_asset  # noqa: E402
 
 
 def parse_args():
@@ -34,36 +32,6 @@ def parse_args():
         if flag in argv:
             args[flag[2:]] = argv[argv.index(flag) + 1]
     return args
-
-
-def render_three_quarter(plan, root, path):
-    scene = bpy.context.scene
-    state = SceneState(scene)
-    try:
-        _setup(scene, state, (0.93, 0.92, 0.88))
-        shading = scene.display.shading
-        shading.light = "STUDIO"
-        shading.color_type = "TEXTURE" if _uses_atlas(root) else "MATERIAL"
-        shading.show_shadows = True
-        shading.show_cavity = True
-        dims = plan["dimensions"]
-        size = max(dims["w"], dims["d"], dims["h"])
-        origin = Vector(root.matrix_world.translation)
-        location = origin + Vector((size * 1.1, -size * 1.5, size * 0.75))
-        target = origin + Vector((0.0, 0.0, dims["h"] * 0.42))
-        data = bpy.data.cameras.new("LPK_Preview")
-        data.lens = 40
-        camera = bpy.data.objects.new("LPK_Preview", data)
-        scene.collection.objects.link(camera)
-        state.temp_objects.append(camera)
-        camera.location = location
-        camera.rotation_euler = (target - location).to_track_quat("-Z", "Y").to_euler()
-        scene.camera = camera
-        scene.render.resolution_x, scene.render.resolution_y = 900, 1100
-        scene.render.filepath = path
-        bpy.ops.render.render(write_still=True)
-    finally:
-        state.restore()
 
 
 def main():
@@ -99,7 +67,7 @@ def main():
                 print("VISUAL", issue["level"], issue["message"])
         for error in visual["errors"]:
             print("ERROR", error["code"], error["message"])
-        render_three_quarter(plan, root, os.path.join(out, "three_quarter.png"))
+        render_asset(plan, root, out)
         print("預覽：", out)
 
     if not result["ok"]:

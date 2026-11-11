@@ -1,0 +1,26 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "test02_cottage",
+  "glb": "test02_cottage.glb",
+  "requires": [
+    "EXT_meshopt_compression"
+  ],
+  "root": "test02_cottage_Root",
+  "clickable": [
+    "test02_cottage_door",
+    "test02_cottage_porch_wall"
+  ],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 3644,
+    "primitives": 20,
+    "meshes": 20,
+    "materials": 2,
+    "file_bytes": 183540
+  },
+  "qa": {
+    "topology": "warn",
+    "geometry": "pass"
+  }
+}

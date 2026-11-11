@@ -1,0 +1,23 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "tree_round",
+  "glb": "tree_round.glb",
+  "requires": [
+    "EXT_meshopt_compression"
+  ],
+  "root": "tree_round_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 360,
+    "primitives": 2,
+    "meshes": 2,
+    "materials": 1,
+    "file_bytes": 19592
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass"
+  }
+}

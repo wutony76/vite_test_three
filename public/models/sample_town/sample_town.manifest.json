@@ -1,0 +1,172 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "scene",
+  "id": "sample_town",
+  "glb": "sample_town.glb",
+  "requires": [
+    "EXT_mesh_gpu_instancing",
+    "EXT_meshopt_compression",
+    "KHR_materials_emissive_strength"
+  ],
+  "root": "sample_town_Root",
+  "groups": [
+    "sample_town_Terrain",
+    "sample_town_Roads",
+    "sample_town_Buildings",
+    "sample_town_Vegetation",
+    "sample_town_Props"
+  ],
+  "placements": [
+    {
+      "id": "cottage_a",
+      "asset": "test02_cottage",
+      "root": "cottage_a_Root",
+      "clickable": [
+        "cottage_a_door",
+        "cottage_a_porch_wall"
+      ]
+    },
+    {
+      "id": "cottage_b",
+      "asset": "test02_cottage",
+      "root": "cottage_b_Root",
+      "clickable": [
+        "cottage_b_door",
+        "cottage_b_porch_wall"
+      ]
+    },
+    {
+      "id": "crates_a",
+      "asset": "crate_pile",
+      "root": "crates_a_Root",
+      "clickable": []
+    },
+    {
+      "id": "crates_b",
+      "asset": "crate_pile",
+      "root": "crates_b_Root",
+      "clickable": []
+    },
+    {
+      "id": "shop_a",
+      "asset": "test01_shop",
+      "root": "shop_a_Root",
+      "clickable": [
+        "shop_a_awning",
+        "shop_a_door",
+        "shop_a_shop_window"
+      ]
+    },
+    {
+      "id": "shop_b",
+      "asset": "test01_shop",
+      "root": "shop_b_Root",
+      "clickable": [
+        "shop_b_awning",
+        "shop_b_door",
+        "shop_b_shop_window"
+      ]
+    }
+  ],
+  "instanced": [
+    {
+      "id": "lamp_01",
+      "asset": "lamp_post",
+      "anim_group": "lamp_glow"
+    },
+    {
+      "id": "lamp_02",
+      "asset": "lamp_post",
+      "anim_group": "lamp_glow"
+    },
+    {
+      "id": "lamp_03",
+      "asset": "lamp_post",
+      "anim_group": "lamp_glow"
+    },
+    {
+      "id": "lamp_04",
+      "asset": "lamp_post",
+      "anim_group": "lamp_glow"
+    },
+    {
+      "id": "tree_01",
+      "asset": "tree_round"
+    },
+    {
+      "id": "tree_02",
+      "asset": "tree_round"
+    },
+    {
+      "id": "tree_03",
+      "asset": "tree_round"
+    },
+    {
+      "id": "tree_04",
+      "asset": "tree_round"
+    },
+    {
+      "id": "tree_05",
+      "asset": "tree_round"
+    },
+    {
+      "id": "tree_06",
+      "asset": "tree_round"
+    },
+    {
+      "id": "tree_07",
+      "asset": "tree_round"
+    },
+    {
+      "id": "tree_08",
+      "asset": "tree_round"
+    }
+  ],
+  "anim_groups": {
+    "lamp_glow": [
+      "shop_a_street_lamp",
+      "shop_a_top_light",
+      "shop_a_wall_lamp",
+      "shop_b_street_lamp",
+      "shop_b_top_light",
+      "shop_b_wall_lamp"
+    ]
+  },
+  "lights": [
+    {
+      "id": "sun",
+      "type": "sun",
+      "color": "#FFF1D6",
+      "intensity": 3.0,
+      "direction": [
+        -0.5,
+        -1.0,
+        -0.35
+      ]
+    },
+    {
+      "id": "sky",
+      "type": "hemisphere",
+      "color": "#CFE8FF",
+      "ground_color": "#6B8A3A",
+      "intensity": 0.9
+    }
+  ],
+  "stats": {
+    "triangles": 14100,
+    "primitives": 60,
+    "meshes": 55,
+    "materials": 11,
+    "file_bytes": 572672
+  },
+  "qa": {
+    "scene": "pass",
+    "assets": {
+      "test01_shop": "pass",
+      "test02_cottage": "pass",
+      "tree_round": "pass",
+      "lamp_post": "pass",
+      "crate_pile": "pass"
+    }
+  }
+}

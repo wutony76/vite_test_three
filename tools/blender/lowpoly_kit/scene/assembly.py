@@ -18,6 +18,8 @@ from .. import mesh_builder
 from ..build import materials
 from ..build.orchestrator import REPO_ROOT, build_asset, mesh_from_data
 from ..export import export_glb, glb_stats
+from ..export.glb_stats import read_glb_json
+from ..export.manifest import scene_manifest, write_manifest
 from ..pipeline import load_plan, validate_plan
 from ..qa.scene import check_scene
 from ..result import add_error, make_result
@@ -195,9 +197,13 @@ def build_scene(scene_path, export=False, repo_root=None, overrides=None):
     target = doc.get("export", {}).get("path")
     if export and result["ok"] and target:
         target = target if os.path.isabs(target) else os.path.join(repo_root or REPO_ROOT, target)
-        export_glb(root, target, apply_modifiers=True, gpu_instances=True)
+        export_glb(root, target, apply_modifiers=True, gpu_instances=True,
+                   compress=doc.get("export", {}).get("compress", True))
         result["changes"]["filepath"] = target
         result["changes"]["export"] = glb_stats(target)
+        qa = {"scene": report["status"], "assets": report["assets"]}
+        manifest = scene_manifest(doc, root, target, result["changes"]["export"], read_glb_json(target), qa)
+        result["changes"]["manifest"] = write_manifest(target, manifest)
     return result
 
 
