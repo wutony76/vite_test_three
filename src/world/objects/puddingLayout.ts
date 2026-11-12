@@ -30,7 +30,7 @@ export const PUDDING_LAYOUT_DEFAULT: PuddingLayout = {
 export type PuddingPlacement = PuddingLayout & { id: string };
 
 /** 場景啟動時要種幾顆、各在哪裡 */
-export const PUDDING_PLACEMENTS: PuddingPlacement[] = [
+export const PUDDING_PLACEMENTS = [
   {
     id: 'pudding_1',
     angleFromTopDegrees: 42,
@@ -38,9 +38,9 @@ export const PUDDING_PLACEMENTS: PuddingPlacement[] = [
     spinDegrees: 42,
     sink: 0.003,
     placementScale: 0.85,
-    modelSize: 0.13,
-    jiggleStrength: 1,
-    jiggleSpeed: 1,
+    modelSize: 0.130,
+    jiggleStrength: 1.00,
+    jiggleSpeed: 1.00,
   },
   {
     id: 'pudding_2',
@@ -49,9 +49,9 @@ export const PUDDING_PLACEMENTS: PuddingPlacement[] = [
     spinDegrees: 42,
     sink: 0.003,
     placementScale: 0.53,
-    modelSize: 0.13,
-    jiggleStrength: 1,
-    jiggleSpeed: 1,
+    modelSize: 0.130,
+    jiggleStrength: 1.00,
+    jiggleSpeed: 1.00,
   },
   {
     id: 'pudding_3',
@@ -60,30 +60,30 @@ export const PUDDING_PLACEMENTS: PuddingPlacement[] = [
     spinDegrees: 42,
     sink: 0.001,
     placementScale: 0.29,
-    modelSize: 0.13,
-    jiggleStrength: 1,
-    jiggleSpeed: 1,
+    modelSize: 0.130,
+    jiggleStrength: 1.00,
+    jiggleSpeed: 1.00,
   },
   {
     id: 'pudding_4',
     angleFromTopDegrees: 34,
     azimuthDegrees: 146,
     spinDegrees: 42,
-    sink: 0.01,
+    sink: 0.010,
     placementScale: 1.35,
-    modelSize: 0.13,
-    jiggleStrength: 1,
-    jiggleSpeed: 1,
+    modelSize: 0.130,
+    jiggleStrength: 1.00,
+    jiggleSpeed: 1.00,
   },
   {
     id: 'pudding_5',
     angleFromTopDegrees: 45,
     azimuthDegrees: 175,
     spinDegrees: 42,
-    sink: -0.001,
+    sink: 0.003,
     placementScale: 0.35,
-    modelSize: 0.13,
-    jiggleStrength: 1,
-    jiggleSpeed: 1,
+    modelSize: 0.130,
+    jiggleStrength: 1.00,
+    jiggleSpeed: 1.00,
   },
-];
+] satisfies PuddingPlacement[];
