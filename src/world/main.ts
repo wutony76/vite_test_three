@@ -171,6 +171,7 @@ const {
   houses,
   ground,
   groundSurface,
+  groundFlowers,
   groundRadius,
   isHouseGrown,
   isIntroComplete,
@@ -482,6 +483,62 @@ for (let i = 0; i < 7; i++) {
     .onFinishChange(logRainbow);
 }
 
+const flowerFolder = groundFlowers ? gui.addFolder('地表小花') : null;
+if (flowerFolder && groundFlowers) {
+  const flowerSettings = groundFlowers.settings;
+  const applyFlowerLayout = () => groundFlowers.applyLayout();
+  const applyFlowerVisual = () => groundFlowers.applyVisuals();
+  flowerFolder.add(flowerSettings, 'count', 0, 512, 1).name('數量').onFinishChange(applyFlowerLayout);
+  flowerFolder.add(flowerSettings, 'seed', 1, 999_999, 1).name('種子 seed').onFinishChange(applyFlowerLayout);
+  flowerFolder
+    .add(flowerSettings, 'sizeVariation', 0, 1, 0.02)
+    .name('大小變化')
+    .onFinishChange(applyFlowerLayout);
+  flowerFolder.add(flowerSettings, 'lift', 0, 0.01, 0.0001).name('浮起 lift').onFinishChange(applyFlowerLayout);
+  flowerFolder
+    .add(flowerSettings, 'frontShare', 0, 1, 0.02)
+    .name('鏡頭前比例')
+    .onFinishChange(applyFlowerLayout);
+  flowerFolder
+    .add(flowerSettings, 'viewFocus', 0, 1, 0.02)
+    .name('視線集中')
+    .onFinishChange(applyFlowerLayout);
+  flowerFolder
+    .add(flowerSettings, 'viewConeDegrees', 10, 120, 1)
+    .name('視錐角度 °')
+    .onFinishChange(applyFlowerLayout);
+  flowerFolder
+    .add(flowerSettings, 'styleBRatio', 0, 1, 0.02)
+    .name('B 款比例')
+    .onFinishChange(applyFlowerLayout);
+  const styleAFolder = flowerFolder.addFolder('款式 A');
+  styleAFolder.add(flowerSettings.styleA, 'size', 0.1, 1.2, 0.01).name('大小').onChange(applyFlowerVisual);
+  styleAFolder.addColor(flowerSettings.styleA, 'petalColor').name('花瓣色').onChange(applyFlowerVisual);
+  styleAFolder.addColor(flowerSettings.styleA, 'centerColor').name('花心色').onChange(applyFlowerVisual);
+  const styleBFolder = flowerFolder.addFolder('款式 B');
+  styleBFolder.add(flowerSettings.styleB, 'size', 0.1, 1.2, 0.01).name('大小').onChange(applyFlowerVisual);
+  styleBFolder.addColor(flowerSettings.styleB, 'petalColor').name('花瓣色').onChange(applyFlowerVisual);
+  styleBFolder.addColor(flowerSettings.styleB, 'centerColor').name('花心色').onChange(applyFlowerVisual);
+  const flowerActions = {
+    layoutFromView() {
+      groundFlowers.layoutFromView();
+    },
+    reroll() {
+      groundFlowers.rerollDistribution();
+    },
+    exportBaked() {
+      groundFlowers.exportBakedJsonToConsole();
+    },
+    clearSaved() {
+      groundFlowers.clearPersistedLayout();
+    },
+  };
+  flowerFolder.add(flowerActions, 'layoutFromView').name('依目前鏡頭重排');
+  flowerFolder.add(flowerActions, 'reroll').name('重骰分佈');
+  flowerFolder.add(flowerActions, 'exportBaked').name('印出烘焙 JSON');
+  flowerFolder.add(flowerActions, 'clearSaved').name('還原 repo 烘焙');
+}
+
 function logRainbow() {
   const r = rainbowSettings;
   const hex = (color: string) => `0x${color.replace('#', '')}`;
@@ -611,8 +668,6 @@ function bindHousePanel(entry: WorldHouse) {
   if (alreadyShowing) return;
 
   houseFolder.title(`房子 · ${entry.label}`);
-  // 打開分組，點完房子就看得到下方這排滑桿
-  houseFolder.open();
   for (const controller of [...houseFolder.controllers]) controller.destroy();
 
   const settings = entry.settings;
@@ -643,7 +698,6 @@ function bindHousePanel(entry: WorldHouse) {
     lightFolder.controllers.forEach((c) => {
       if (c.property !== 'speed') c.onFinishChange(logGameHallLights);
     });
-    lightFolder.open();
   }
 }
 
@@ -723,7 +777,6 @@ function bindPuddingPanel(entry: WorldPudding) {
   if (alreadyShowing) return;
 
   puddingFolder.title(`布丁 · ${entry.label}`);
-  puddingFolder.open();
   clearPuddingPanelSliders();
 
   const settings = entry.settings;
@@ -801,6 +854,24 @@ if (puddingFolder) {
   puddingFolder.add(puddingControls, 'log').name('印出全部佈局 (console)');
   highlightPudding(null);
 }
+
+// 進場時各分組與根面板都收合，需要時再手動展開
+[
+  lightFolder,
+  introFolder,
+  rainbowFolder,
+  rainbowColorFolder,
+  flowerFolder,
+  ringFolder,
+  sharkFolder,
+  waveFolder,
+  transitionFolder,
+  houseFolder,
+  puddingFolder,
+]
+  .filter((folder): folder is GUI => folder != null)
+  .forEach((folder) => folder.close());
+gui.close();
 
 // 選中那棟的名字：用 HTML 畫在畫面上，而不是貼在 3D 房子上
 // 房子會跟著地球傾斜，3D 文字也會跟著歪、變小；HTML 永遠正對螢幕、大小固定，才是「2D 的名字」

@@ -389,7 +389,6 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         );
       }
       rainbow.setIntroReveal(rainbowReveal);
-
       if (introElapsed >= ketchupEnd + introSettings.rainbowSeconds) {
         if (ground !== all) {
           ground.visible = true;
