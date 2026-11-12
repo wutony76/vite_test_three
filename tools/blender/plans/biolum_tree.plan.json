@@ -1,0 +1,95 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "biolum_tree",
+  "reference": "biolum_tree",
+  "notes": "參考 tools/img/biolum_tree.png：紫樹幹、多球融合藍樹冠、頂端小孢子叢。正面朝 -Y，原點在 footprint 中心地面。發光斑點不做獨立 mesh，樹冠材質帶輕量 emissive。",
+  "dimensions": {
+    "w": 2.0,
+    "d": 1.8,
+    "h": 4.8
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {
+      "tertiary_density": 1.0
+    }
+  },
+  "style": {
+    "edge_wobble": 0.035
+  },
+  "materials": [
+    {
+      "name": "trunk_purple",
+      "hex": "#5A2D78",
+      "roughness": 0.88,
+      "surface": {"class": "wood", "pattern": "wood_grain", "scale_m": 0.2, "tier": "prop", "wear": 0.3}
+    },
+    {
+      "name": "canopy_blue",
+      "hex": "#172881",
+      "roughness": 0.72,
+      "emissive": true,
+      "emission_strength": 0.45,
+      "surface": {"class": "vegetation", "scale_m": 0.25, "tier": "prop", "palette": ["#0C1450", "#172881", "#4A70E0"]}
+    }
+  ],
+  "budget": {
+    "max_tris": 1200,
+    "max_primitives": 3,
+    "max_texture_kb": 400,
+    "max_gpu_texture_mb": 8
+  },
+  "components": [
+    {
+      "id": "trunk",
+      "kind": "tree_trunk",
+      "tier": "primary",
+      "method": "custom_mesh",
+      "profile": "vegetation",
+      "material": "trunk_purple",
+      "params": {
+        "segments_from": "geometry_complexity",
+        "taper": 0.82
+      },
+      "bounds": [[-0.16, -0.14, 0.0], [0.16, 0.14, 1.35]],
+      "source": "observed",
+      "confidence": 0.88
+    },
+    {
+      "id": "canopy_main",
+      "kind": "tree_canopy",
+      "tier": "primary",
+      "method": "remesh",
+      "profile": "organic",
+      "material": "canopy_blue",
+      "params": {
+        "blobs": 5,
+        "voxel_size": 0.18
+      },
+      "bounds": [[-0.95, -0.85, 1.0], [0.95, 0.85, 2.6]],
+      "source": "observed",
+      "confidence": 0.9,
+      "assumption": "下段樹冠：寬扁球叢，與樹幹頂端重疊"
+    },
+    {
+      "id": "canopy_upper",
+      "kind": "tree_canopy",
+      "tier": "primary",
+      "method": "remesh",
+      "profile": "organic",
+      "material": "canopy_blue",
+      "params": {
+        "blobs": 4,
+        "voxel_size": 0.16
+      },
+      "bounds": [[-0.72, -0.62, 2.0], [0.72, 0.62, 4.35]],
+      "source": "observed",
+      "confidence": 0.85,
+      "assumption": "上段樹冠含頂端小孢子球；與下段 bounds 在 z≈2.0–2.6 重疊，避免 Remesh 後懸空"
+    }
+  ],
+  "export": {
+    "path": "public/models/biolum_tree/biolum_tree.glb",
+    "compress": true
+  }
+}

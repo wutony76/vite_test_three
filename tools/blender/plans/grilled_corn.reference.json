@@ -1,0 +1,33 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "grilled_corn",
+  "image": {"path": "tools/img/grilled_corn.png", "width": 1024, "height": 1024},
+  "medium": "3D stylized grilled corn on bamboo skewer render",
+  "view": {"type": "three_quarter", "source": "observed", "confidence": 0.92},
+  "scale_anchor": {"component": "kernels", "axis": "height", "meters": 0.18},
+  "silhouette": {
+    "outline": [
+      [0.28, 0.18], [0.72, 0.22], [0.76, 0.78], [0.24, 0.82], [0.28, 0.18]
+    ],
+    "source": "observed",
+    "confidence": 0.88
+  },
+  "palette": [
+    {"name": "kernel", "hex": "#F0C42E", "usage": "飽和金黃玉米粒", "sample": [0.35, 0.42, 0.58, 0.68]},
+    {"name": "char", "hex": "#3A2418", "usage": "中央偏左烤焦斑", "sample": [0.38, 0.48, 0.48, 0.58]},
+    {"name": "cob_pith", "hex": "#E6D2A8", "usage": "底部玉米芯", "sample": [0.42, 0.46, 0.52, 0.56]},
+    {"name": "skewer_wood", "hex": "#C9A87A", "usage": "竹籤木色", "sample": [0.48, 0.52, 0.54, 0.58]}
+  ],
+  "components": [
+    {"id": "kernels", "kind": "grilled_corn_kernels", "tier": "primary", "bbox": [0.30, 0.32, 0.74, 0.80], "material_hint": "kernel", "source": "observed", "confidence": 0.94},
+    {"id": "cob_end", "kind": "grilled_corn_end", "tier": "secondary", "bbox": [0.38, 0.52, 0.62, 0.58], "material_hint": "cob_pith", "parent": "kernels", "source": "observed", "confidence": 0.9},
+    {"id": "skewer", "kind": "bamboo_skewer", "tier": "secondary", "bbox": [0.47, 0.12, 0.53, 0.88], "material_hint": "skewer_wood", "source": "observed", "confidence": 0.91}
+  ],
+  "hidden": [
+    {"id": "depth", "assumption": "截面近圓形，直徑約高度的 0.38", "source": "inferred", "confidence": 0.6}
+  ],
+  "excluded": [
+    {"what": "藍色漸層背景", "reason": "場景環境，不做幾何"},
+    {"what": "玉米粒表面高光貼圖", "reason": "以 palette_vc atlas 與材質粗糙度表現"}
+  ]
+}

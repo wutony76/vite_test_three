@@ -4,20 +4,94 @@
   "id": "crate_pile",
   "glb": "crate_pile.glb",
   "requires": [
-    "EXT_meshopt_compression"
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
   ],
   "root": "crate_pile_Root",
   "clickable": [],
   "anim_groups": {},
   "stats": {
     "triangles": 524,
-    "primitives": 4,
+    "primitives": 5,
     "meshes": 4,
-    "materials": 1,
-    "file_bytes": 28492
+    "materials": 4,
+    "file_bytes": 145160
   },
   "qa": {
     "topology": "pass",
-    "geometry": "pass"
+    "geometry": "pass",
+    "texture": "pass",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "wood": {
+        "class": "wood",
+        "pattern": "planks",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.48,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "planks",
+          "seed": 376209775,
+          "hash": "166c816f17aa"
+        }
+      },
+      "wood_dark": {
+        "class": "wood",
+        "pattern": "planks",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.4,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "planks",
+          "seed": 1801964381,
+          "hash": "6b67cb5ddcfe"
+        }
+      },
+      "terracotta": {
+        "class": "painted",
+        "pattern": "painted",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 1.0,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "painted",
+          "seed": 1368053420,
+          "hash": "518ad6ac02e4"
+        }
+      },
+      "leaf_green": {
+        "class": "vegetation",
+        "pattern": "foliage",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.3,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "foliage",
+          "seed": 2616141017,
+          "hash": "9bef24d94a55"
+        }
+      }
+    },
+    "bake": {
+      "mode": "ao",
+      "size": 128,
+      "seconds": 0.08
+    },
+    "decals": 0,
+    "gpu_texture_mb": 3.75,
+    "flat_ratio": 0.0,
+    "texture_count": 12,
+    "texture_kb": 97.2,
+    "images": 12,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 141.8
   }
 }

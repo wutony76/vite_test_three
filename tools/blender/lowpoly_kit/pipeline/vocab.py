@@ -44,6 +44,7 @@ KINDS = (
     "wall_lamp", "wall_light", "street_lamp", "lantern", "cat_silhouette", "crate", "fence", "bucket",
     "arcade_cabinet", "arcade_kitbash", "arcade_controls",
     "roast_chicken_meat", "chicken_bone", "caramel_pudding",
+    "grilled_corn_body", "grilled_corn_kernels", "grilled_corn_end", "bamboo_skewer",
     # 植物、自然物
     "tree_trunk", "tree_canopy", "bush", "rock", "rock_pile",
     # 暫時找不到合適種類時使用，驗證會給 warning

@@ -1,4 +1,4 @@
-"""DetailConfig：細節程度的 7 個參數，每個都能單獨調整。
+"""DetailConfig：細節程度的 10 個參數，每個都能單獨調整。
 
 為什麼不是一個「品質 1～10」的數字就好？
 一個數字只能整體變多或變少。實際上常需要「輪廓精細，但裝飾少」（遠景建築），
@@ -18,7 +18,11 @@ PARAMS = {
     "geometry_complexity": ("int", (4, 16)),     # 圓形物件的分段數
     "bevel_quality": ("int", (0, 2)),            # 0 不倒角、1 一段 chamfer、2 兩段
     "material_quality": ("enum", ("flat", "palette", "palette_vc")),
-    "texture_quality": ("enum", ("none", "atlas64", "atlas256")),
+    "texture_quality": ("enum", ("none", "atlas64", "atlas256")),  # 純色材質的 palette atlas 尺寸
+    # ── Surface Engine（有 surface 的材質）──
+    "surface_quality": ("enum", ("off", "standard", "hero")),  # off：不產生貼圖；standard：hero tier 降一級
+    "surface_detail": ("float", (0.0, 1.0)),  # 磨損、髒污的整體強度（乘上材質自己的 wear／dirt）
+    "bake": ("enum", ("none", "ao", "full")),  # ao：烘焙 AO；full：貼圖 × AO × 邊緣高光全部烘進一張圖
 }
 
 PRESETS = {
@@ -27,18 +31,21 @@ PRESETS = {
         "primary_quality": 2, "secondary_density": 0.8, "tertiary_density": 0.6,
         "geometry_complexity": 8, "bevel_quality": 1,
         "material_quality": "palette_vc", "texture_quality": "atlas64",
+        "surface_quality": "standard", "surface_detail": 0.6, "bake": "ao",
     },
     # 快速預覽：只看比例和輪廓，不做裝飾、不倒角
     "preview": {
         "primary_quality": 1, "secondary_density": 0.4, "tertiary_density": 0.0,
         "geometry_complexity": 6, "bevel_quality": 0,
         "material_quality": "flat", "texture_quality": "none",
+        "surface_quality": "off", "surface_detail": 0.0, "bake": "none",
     },
     # 主角級資產：鏡頭會拉近看的建築
     "hero": {
         "primary_quality": 3, "secondary_density": 1.0, "tertiary_density": 1.0,
         "geometry_complexity": 12, "bevel_quality": 2,
         "material_quality": "palette_vc", "texture_quality": "atlas256",
+        "surface_quality": "hero", "surface_detail": 0.8, "bake": "ao",
     },
 }
 
@@ -54,6 +61,9 @@ class DetailConfig:
     bevel_quality: int
     material_quality: str
     texture_quality: str
+    surface_quality: str
+    surface_detail: float
+    bake: str
     seed: int
 
     def to_dict(self):

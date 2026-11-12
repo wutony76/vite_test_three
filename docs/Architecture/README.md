@@ -12,6 +12,7 @@
 | 樣式 | `sass-embedded` | SCSS |
 | 物理 | `cannon-es` | ^0.20.0（drive 頁） |
 | Runtime | Node.js | 22.22.2 |
+| GLB 貼圖後處理（devDependencies） | `@gltf-transform/core`／`extensions`／`functions`、`sharp`、`meshoptimizer` | ^4.5（Blender 匯出後轉 WebP） |
 
 ## 2. 目錄結構
 
@@ -49,9 +50,11 @@ vite_test_three/
 │     │  ├─ components/       零件庫：kind → builder（不依賴 bpy）
 │     │  ├─ build/            依 plan 建模的 orchestrator、材質、wobble、bevel（Blender）
 │     │  ├─ appearance/       palette atlas 色格配置（不依賴 bpy）
+│     │  ├─ surface/          Surface Engine：程序手繪貼圖、provider（含本機 ComfyUI）、UV、材質、Bake、Decal
 │     │  ├─ scene/            場景組裝：terrain（不依賴 bpy）、assembly（Blender）
-│     │  └─ qa/               Geometry、Visual、Scene QA（Blender）；metrics（不依賴 bpy）
-│     ├─ mcp_server/          lowpoly MCP server（背景 Blender 執行建模、匯出、測試）
+│     │  └─ qa/               Geometry、Visual、Scene、Texture QA（Blender）；metrics、surface_metrics（不依賴 bpy）
+│     ├─ mcp_server/          lowpoly MCP server（背景 Blender 執行建模、匯出、測試；host 端生成外部貼圖）
+│     ├─ textures/            貼圖快取（provider 產出，進版控）、圖庫、ComfyUI workflow 樣板；baked/ 不進版控
 │     ├─ plans/               ReferenceSpec／AssetPlan／ScenePlan JSON
 │     ├─ scripts/             背景模式產生模型、參考圖疊圖校正的腳本
 │     └─ tests/               headless Blender 測試 + Three.js 載入檢查
@@ -200,6 +203,8 @@ vite_test_three/
 | `python3 -m unittest discover -s tools/blender/tests -p "test_plan_schema.py"` | plan 驗證測試（不需要 Blender） |
 | `python3 -m unittest discover -s tools/blender/tests -p "test_shapes.py"` | 幾何產生器與零件庫拓撲測試（不需要 Blender） |
 | `python3 -m unittest discover -s tools/blender/tests -p "test_visual_metrics.py"` | Visual QA 計算與 atlas 配置測試（不需要 Blender） |
+| `python3 -m unittest discover -s tools/blender/tests -p "test_surface_pure.py"` | Surface Engine 純 Python 測試：貼圖、PNG、provider（含 ComfyUI mock） |
+| `python3 tools/blender/scripts/prepare_textures.py <plan>` | 建模前生成外部 provider（本機 ComfyUI）的貼圖快取 |
 | `node tools/blender/tests/threejs_plan_check.mjs <plan.json>` | 依 plan 檢查 GLB 在 Three.js 的結構、射線、draw call |
 | `node tools/blender/tests/threejs_scene_check.mjs` | 檢查場景 GLB：群組、每棟建築的門、InstancedMesh、draw call |
 | `python3 tools/blender/tests/e2e.py` | Test A／B 端到端驗收（19 條條件，輸出在暫存目錄） |
@@ -209,14 +214,15 @@ vite_test_three/
 
 AI 透過 MCP for Blender 建模時，一律使用 `tools/blender/lowpoly_kit`：Custom Mesh／Extrude／Inset／Boolean Union 建出連續拓撲，依 12 種 profile（`building_shell`、`roof`、`trim`、`opening`、`glass`、`decoration`、`vegetation`、`tile_array`、`organic`、`terrain`、`road`、`water_surface`）以程式驗證拓撲指標（含 Connected Components、自我交叉、島數／三角面上限、縮放），並以 Geometry QA 對照 plan 檢查位置與懸空，全部通過才匯出 GLB。每棟建築一個根 Empty，需要點擊或動畫的零件保留為獨立 Object。
 
-建模前先規劃：AI 分析參考圖後輸出 `ReferenceSpec`，再輸出 `AssetPlan`／`ScenePlan` JSON（`tools/blender/plans/`）。每個欄位都標示 observed／inferred；用 `api.validate_plan` 驗證，使用者確認後才建模。細節程度由 `DetailConfig` 的 7 個參數分別控制。流程寫在 `tools/blender/WORKFLOW.md`，`.cursor/rules/blender-modeling.mdc` 與 `.claude/skills/blender-modeling/SKILL.md` 都指向它。Phase 路線見 `openspec/changes/add-asset-plan-schema/design.md` §0。
+建模前先規劃：AI 分析參考圖後輸出 `ReferenceSpec`，再輸出 `AssetPlan`／`ScenePlan` JSON（`tools/blender/plans/`）。每個欄位都標示 observed／inferred；用 `api.validate_plan` 驗證，使用者確認後才建模。細節程度由 `DetailConfig` 的 10 個參數分別控制（含 Surface Engine 的 `surface_quality`、`surface_detail`、`bake`）。流程寫在 `tools/blender/WORKFLOW.md`，`.cursor/rules/blender-modeling.mdc` 與 `.claude/skills/blender-modeling/SKILL.md` 都指向它。Phase 路線見 `openspec/changes/add-asset-plan-schema/design.md` §0。
 
 建模由 `api.build_asset_from_plan` 依 plan 確定性產生：
 
 - 零件庫（`components/`）的每個 kind 都用 `shapes.py` 的產生器建出封閉流形，不用 primitive 堆疊。
-- orchestrator 依序：建立 Object → 編輯 parent（屋頂、磚面）→ Boolean Union（煙囪）→ wobble（手繪感）→ bevel（稜角高光）→ 外觀（palette atlas + vertex color）→ profile 驗證 → Geometry QA → 預算檢查 → 匯出 GLB。
-- Visual QA（`api.validate_visual`）和正面參考圖比較輪廓 IoU、元件位置 IoU、色差，並輸出疊圖給 AI 寫評語；判定只看數字。
-- 匯出：meshopt 壓縮（頁面要設定 MeshoptDecoder），每個 GLB 旁有 manifest（可點擊節點、動畫群組、場景燈光）。
+- orchestrator 依序：建立 Object → 編輯 parent（屋頂、磚面）→ Boolean Union（煙囪）→ wobble（手繪感）→ bevel（稜角高光）→ Surface Engine（palette atlas + vertex color、貼圖、UV、AO bake、decal）→ profile 驗證 → Geometry QA → Texture QA → 預算檢查 → 匯出 GLB → 貼圖轉 WebP → GLB 貼圖檢查。
+- Surface Engine（`lowpoly_kit/surface/`，OpenSpec `add-texture-surface-engine`）：plan 材質的 `surface` 決定材質類別、圖樣、色票、圖樣尺寸、UV 策略、解析度等級與來源。貼圖由 numpy 程序手繪產生（色票鎖定、無縫平鋪；可換成圖庫、手繪或本機 ComfyUI 的快取），UV 以公尺為單位投影；AO 用 Cycles 烘到 TEXCOORD_1；Material Builder 只產生 glTF 匯得出的節點並設定 color space。沒有 surface 的材質維持 palette atlas。
+- Visual QA（`api.validate_visual`）和正面參考圖比較輪廓 IoU、元件位置 IoU、色差，以及 reference `surfaces[]` 的材質區域（色彩分布、細節密度、紋理比例、風格；只 warn），並輸出疊圖給 AI 寫評語；判定只看數字。
+- 匯出：meshopt 壓縮（頁面要設定 MeshoptDecoder）、貼圖轉 WebP（GLTFLoader 原生支援），每個 GLB 旁有 manifest（可點擊節點、動畫群組、場景燈光、貼圖統計）。
 - `lowpoly` MCP server（`.mcp.json`、`.cursor/mcp.json`）把建模流程包成正式工具，在背景 Blender 執行。
 - 場景由 `api.build_scene_from_plan` 依 ScenePlan 組裝：資產只建一次，擺放是共用 mesh 的複本；地形在建築與道路周圍自動整平；樹用 GPU instancing。Scene QA 檢查重疊、壓道路、地面不平、階層與預算。
 

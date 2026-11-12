@@ -21,8 +21,12 @@ from ..export import export_glb, glb_stats
 from ..export.glb_stats import read_glb_json
 from ..export.manifest import scene_manifest, write_manifest
 from ..pipeline import load_plan, validate_plan
+from ..export.texture_optimize import optimize_glb
 from ..qa.scene import check_scene
+from ..qa.texture import glb_image_bytes
 from ..result import add_error, make_result
+from ..surface.engine import apply_scene_surfaces
+from ..surface.spec import gpu_bytes
 from .terrain import TerrainField, footprint_of, road_mesh, terrain_mesh
 
 # 複本要另外帶的 custom property；不複製 lpk_asset：
@@ -127,12 +131,16 @@ def build_scene(scene_path, export=False, repo_root=None, overrides=None):
 
     # 4. 地形、道路
     terrain_mat = doc["terrain"].get("material", "ground")
-    add_mesh(f"{scene_id}_terrain", terrain_mesh(field, terrain_mat), "Terrain", "terrain", {terrain_mat: default_mat, **mats})
+    ground_objects = [add_mesh(f"{scene_id}_terrain", terrain_mesh(field, terrain_mat), "Terrain", "terrain",
+                               {terrain_mat: default_mat, **mats})]
     for index, road in enumerate(doc.get("roads", [])):
         road_mat = road.get("material", terrain_mat)
         # 每條道路高 5 mm：交會處兩條道路重疊時才不會互相閃爍（z-fighting）
-        add_mesh(f"{scene_id}_{road['id']}", road_mesh(road["polyline"], road["width"], road_mat, z=0.03 + 0.005 * index),
-                 "Roads", "road", {road_mat: mats.get(road_mat, default_mat), **mats})
+        ground_objects.append(add_mesh(f"{scene_id}_{road['id']}",
+                                       road_mesh(road["polyline"], road["width"], road_mat, z=0.03 + 0.005 * index),
+                                       "Roads", "road", {road_mat: mats.get(road_mat, default_mat), **mats}))
+    # 4b. 地形、道路的貼圖：和資產同一套 Surface Engine（UV 用 planar 世界座標，草地、石板路才會連續）
+    surface_report = apply_scene_surfaces(scene_id, doc.get("materials", []), ground_objects)
 
     # 5. 擺放
     placed = {}
@@ -186,6 +194,9 @@ def build_scene(scene_path, export=False, repo_root=None, overrides=None):
     for issue in report["issues"]:
         if issue["level"] == "fail":
             add_error(result, issue["code"], issue["message"])
+    report["textures"] = _scene_textures(root, surface_report)
+    for warning in report["textures"]["warnings"]:
+        report["issues"].append({"level": "warn", "code": warning.split("：", 1)[0], "message": warning})
     result["report"] = report
     result["changes"].update({
         "root": root.name, "collection": collection.name,
@@ -199,8 +210,16 @@ def build_scene(scene_path, export=False, repo_root=None, overrides=None):
         target = target if os.path.isabs(target) else os.path.join(repo_root or REPO_ROOT, target)
         export_glb(root, target, apply_modifiers=True, gpu_instances=True,
                    compress=doc.get("export", {}).get("compress", True))
+        if doc.get("export", {}).get("texture_format", "webp") == "webp" and read_glb_json(target).get("images"):
+            optimized = optimize_glb(target)
+            if optimized["ok"]:
+                result["changes"]["texture_optimize"] = {
+                    k: optimized["report"][k] for k in ("image_bytes_before", "image_bytes_after", "file_bytes")}
+            else:
+                result.setdefault("warnings", []).append(optimized["warning"])
         result["changes"]["filepath"] = target
         result["changes"]["export"] = glb_stats(target)
+        result["changes"]["export"]["texture_bytes"] = glb_image_bytes(read_glb_json(target))
         qa = {"scene": report["status"], "assets": report["assets"]}
         manifest = scene_manifest(doc, root, target, result["changes"]["export"], read_glb_json(target), qa)
         result["changes"]["manifest"] = write_manifest(target, manifest)
@@ -213,3 +232,24 @@ def _depth(obj, stop):
         depth += 1
         node = node.parent
     return depth
+
+
+def _scene_textures(root, surface_report, hint_mb=150.0):
+    """整個場景用到的貼圖：張數、GPU 記憶體（同一張圖只算一次——相同 hash 的貼圖在資產間共用）。"""
+    images = {}
+    for obj in root.children_recursive:
+        if obj.type != "MESH":
+            continue
+        for material in obj.data.materials:
+            if material is None or material.node_tree is None:
+                continue
+            for node in material.node_tree.nodes:
+                if node.type == "TEX_IMAGE" and node.image is not None:
+                    images[node.image.name] = node.image
+    mb = sum(gpu_bytes(*image.size) for image in images.values()) / (1024 * 1024)
+    warnings = list(surface_report.get("warnings", []))
+    if mb > hint_mb:
+        warnings.append(f"GPU_TEXTURE_HIGH：場景貼圖 GPU 記憶體 {mb:.0f} MB，超過 {hint_mb:.0f} MB，建議升級 KTX2")
+    shared = sum(1 for name in images if name.startswith("LPK_tex_"))
+    return {"images": len(images), "shared_library_images": shared, "gpu_texture_mb": round(mb, 2),
+            "ground": surface_report.get("materials", {}), "warnings": warnings}

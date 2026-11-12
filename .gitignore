@@ -26,3 +26,6 @@ dist-ssr
 # Python
 __pycache__/
 *.pyc
+
+# Blender Surface Engine：bake 的中間輸出（可重新產生；GLB 內已打包）
+tools/blender/textures/baked/

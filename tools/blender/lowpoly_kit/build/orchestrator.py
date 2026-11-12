@@ -7,7 +7,9 @@
    否則煙囪的頂面也會被選進「屋頂」一起往下壓
 6. Boolean Union（煙囪融進牆體）
 7. Wobble（手繪感）→ 8. Bevel —— 先偏移再倒角，斜面才會跟著新的稜線走
-9. 每個 Object 修復 + 依 profile 驗證 → 10. 統計三角面、primitive，和預算比較 → 11. 匯出（選擇性）
+8b. Surface Engine：palette atlas、貼圖、UV、Bake、Decal（幾何定案後才做，UV 才不會被後續步驟打亂）
+9. 每個 Object 修復 + 依 profile 驗證 → 9b. Geometry QA → 9c. Texture QA
+10. 統計三角面、primitive，和預算比較 → 11. 匯出（選擇性）→ 貼圖轉 WebP → GLB 貼圖檢查 → manifest
 """
 
 import json
@@ -21,13 +23,16 @@ from .. import backup as _backup
 from .. import mesh_builder
 from ..components import EDIT_KINDS, BuildError, get_builder
 from ..components.layout import layout_plan, to_local
-from ..export.glb_stats import read_glb_json
+from ..export.glb_stats import glb_stats, read_glb_json
+from ..export.texture_optimize import optimize_glb
 from ..export.manifest import asset_manifest, write_manifest
 from ..pipeline import load_plan, resolve_detail, validate_plan
 from ..qa.geometry import check_asset_geometry
+from ..qa.texture import check_asset_textures, check_glb_textures, glb_image_bytes
 from ..result import KitError, add_error, make_result
+from ..surface.engine import apply_surface
 from ..validation.profiles import PROFILES
-from . import appearance, bevel, materials, wobble
+from . import bevel, materials, wobble
 
 KIT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO_ROOT = os.path.abspath(os.path.join(KIT_DIR, "..", "..", ".."))
@@ -281,12 +286,14 @@ def build_asset(plan_or_path, location=(0.0, 0.0, 0.0), export=False, preset=Non
             bevel_used[obj.name] = bevel.bevel_mesh_safe(obj.data, width, detail["bevel_quality"])
             done_bevel.add(obj.data.name)
 
-    # 8b. 外觀：palette atlas／vertex color（bevel 之後做，新產生的斜面才會拿到 UV 和顏色）
+    # 8b. 外觀：palette atlas、貼圖、UV、Bake、Decal（bevel 之後做，新產生的斜面才會拿到 UV 和顏色）
     bpy.context.view_layer.update()
-    appearance_info = appearance.apply_appearance(
-        plan_id, doc["materials"], list(objects.items()), detail, doc["dimensions"]["h"], config.seed,
-        ground_z=root.matrix_world.translation.z,
+    base_dir = os.path.dirname(os.path.abspath(plan_or_path)) if isinstance(plan_or_path, (str, os.PathLike)) else REPO_ROOT
+    surface_report, decal_objects = apply_surface(
+        plan_id, doc, objects, detail, config.seed, root.matrix_world.translation.z, root, collection, base_dir,
     )
+    for warning in surface_report["warnings"]:
+        result.setdefault("warnings", []).append(warning)
 
     # 9. 修復與驗證
     report_objects = {}
@@ -314,6 +321,19 @@ def build_asset(plan_or_path, location=(0.0, 0.0, 0.0), export=False, preset=Non
         }
         if not checked_obj["ok"]:
             fail("VALIDATION_FAILED", cid, checked_obj["errors"][0]["message"])
+    for obj in decal_objects:
+        checked_obj = api.validate_mesh_topology(obj)
+        obj.data.calc_loop_triangles()
+        tris = len(obj.data.loop_triangles)
+        triangles += tris
+        primitives += 1
+        report_objects[obj.name] = {"component": obj["lpk_component"], "kind": "decal", "tier": "tertiary",
+                                    "profile": "decoration", "status": checked_obj["report"]["status"],
+                                    "components": 1, "non_manifold": 0, "boundary": 4, "ngons": 0,
+                                    "triangles": tris, "primitives": 1, "self_intersections": 0,
+                                    "bevel_width": 0.0, "wobble": None}
+        if not checked_obj["ok"]:
+            fail("VALIDATION_FAILED", obj["lpk_component"], checked_obj["errors"][0]["message"])
 
     # 9b. Geometry QA：位置、大小、懸空（拓撲檢查看不出零件跑錯位置）
     bpy.context.view_layer.update()  # matrix_world 要更新後才是最新的位置
@@ -321,6 +341,12 @@ def build_asset(plan_or_path, location=(0.0, 0.0, 0.0), export=False, preset=Non
     for item in geometry["issues"]:
         if item["level"] == "fail":
             add_error(result, f"GEOMETRY_{item['code']}", item["message"])
+
+    # 9c. Texture QA：貼圖、UV、節點、color space、預算、純色比例
+    texture = check_asset_textures(doc, root, detail, surface_report)
+    for item in texture["issues"]:
+        if item["level"] == "fail":
+            add_error(result, item["code"], item["message"])
 
     # 10. 預算
     budget = doc["budget"]
@@ -335,7 +361,7 @@ def build_asset(plan_or_path, location=(0.0, 0.0, 0.0), export=False, preset=Non
         "skipped": lay["skipped"], "triangles": triangles, "primitives": primitives,
     })
     result["report"] = {"objects": report_objects, "detail": detail, "budget": budget, "geometry": geometry,
-                        "appearance": appearance_info}
+                        "appearance": surface_report, "texture": texture}
 
     # 11. 匯出
     if export and result["ok"]:
@@ -348,10 +374,33 @@ def build_asset(plan_or_path, location=(0.0, 0.0, 0.0), export=False, preset=Non
             for error in exported["errors"]:
                 add_error(result, error["code"], error["message"])
         else:
+            # 貼圖轉 WebP（只影響下載大小）；失敗時保留 PNG，只記 warning
+            if export_spec.get("texture_format", "webp") == "webp" and read_glb_json(target).get("images"):
+                optimized = optimize_glb(target, quality=export_spec.get("texture_quality", 88))
+                if optimized["ok"]:
+                    result["changes"]["texture_optimize"] = {
+                        k: optimized["report"][k] for k in ("image_bytes_before", "image_bytes_after", "file_bytes")}
+                    result["changes"]["export"] = glb_stats(target)
+                else:
+                    result.setdefault("warnings", []).append(optimized["warning"])
+            gltf = read_glb_json(target)
+            glb_texture = check_glb_textures(gltf, root, doc, os.path.getsize(target), glb_image_bytes(gltf))
+            result["report"]["glb_texture"] = glb_texture
+            for item in glb_texture["issues"]:
+                if item["level"] == "fail":
+                    add_error(result, item["code"], item["message"])
             statuses = {info["status"] for info in report_objects.values()}
             qa = {"topology": "fail" if "fail" in statuses else "warn" if "warn" in statuses else "pass",
-                  "geometry": geometry["status"]}
-            manifest = asset_manifest(doc, root, target, exported["changes"]["export"], read_glb_json(target), qa)
+                  "geometry": geometry["status"], "texture": texture["status"], "glb_texture": glb_texture["status"]}
+            manifest = asset_manifest(doc, root, target, result["changes"]["export"], gltf, qa)
+            manifest["textures"] = {
+                "materials": {name: {k: info[k] for k in ("class", "pattern", "tier", "size", "tile_m", "provenance")}
+                              for name, info in surface_report["materials"].items()},
+                "bake": {k: v for k, v in (surface_report.get("bake") or {}).items() if k in ("mode", "size", "seconds")},
+                "decals": surface_report["decals"].get("count", 0),
+                **{k: texture["metrics"].get(k) for k in ("gpu_texture_mb", "flat_ratio", "texture_count")},
+                **glb_texture["metrics"],
+            }
             result["changes"]["manifest"] = write_manifest(target, manifest)
     return result
 

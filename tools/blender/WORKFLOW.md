@@ -40,6 +40,10 @@ api = lowpoly_kit.api
 - 每個元件、輪廓、視角都要標 `source`：`observed`（看得到）或 `inferred`（推測）。推測的必須寫 `assumption`。
 - 一定要有 `scale_anchor`，例如門高 2.1 m，用來把整張圖換算成公尺。
 - `excluded` 列出故意不做的東西，例如背景、電線、文字。
+- **材質區域 `surfaces[]`（Texture Analysis）**：圖上每一種可辨識的表面都要標出來——
+  `{id, region: [[x, y]…], class, pattern, base_hex, scale_m, components: [...], source, confidence}`。
+  class 用 wood／stone／brick／roof_tile／plaster／metal／fabric／vegetation／ground／food／painted；
+  scale_m 用比例錨點換算（例如磚高 8 cm）。不要再把「表面紋理」放進 `excluded`。
 - 用疊圖校正元件框，並從原圖取樣色票：
 
 ```bash
@@ -71,6 +75,13 @@ Blender --background --factory-startup --python-exit-code 1 \
   - 地形、道路：`terrain`、`road`
   - 每種 profile 都有島數與三角面上限（見 `tools/blender/README.md`）
 - 細節程度用 `detail.preset`（`game_default`／`preview`／`hero`）加上 `overrides` 逐項調整。
+- **貼圖（Surface Engine）是預設，不是選配**：
+  - primary／secondary 元件用到的材質都要有 `surface`（格式見 `tools/blender/README.md` 的 Surface Engine）。純色只留給小裝飾、發光、玻璃
+  - 依 reference 的 `surfaces[]` 決定 class、pattern、palette（陰影／基底／高光）、scale_m
+  - tier 依重要性：主體 standard、小物 prop；hero 只給鏡頭會拉近的主角。不要全部用大貼圖
+  - 寫上 `budget.max_gpu_texture_mb`、`max_texture_kb`；貼圖材質各佔 1 個 primitive，`max_primitives` 要算進去
+  - 招牌字、海報、符號用 `decals`，不要做成幾何
+  - 貼圖不能用來掩蓋錯誤的比例或輪廓：先讓 Visual QA 的輪廓 IoU 通過，再談貼圖
 - 驗證 plan，`ok` 必須是 True。`report.warnings` 也要逐條看過：
 
 ```python
@@ -92,6 +103,9 @@ print(r["ok"], r["errors"], r["changes"]["triangles"], r["changes"]["primitives"
 from lowpoly_kit.build.orchestrator import summary_table; print(summary_table(r))
 ```
 
+- 材質的 `surface.source` 是 `provider:comfyui` 時，建模前先生成貼圖（host 端，需要本機 ComfyUI 在跑）：
+  `python3 tools/blender/scripts/prepare_textures.py tools/blender/plans/<id>.plan.json` 或 MCP 工具 `lowpoly_prepare_textures`。
+  產出在 `tools/blender/textures/cache/`，要 commit；沒有快取時建模會退回 procedural 並給 warning。
 - 同一份 plan 可以重複執行：會先清掉上一次的結果，結果完全相同。
 - 想先快速看比例：加上 `preset="preview"`（不做 bevel、不建 tertiary 裝飾）。
 - `errors` 會附上 `component`（元件 id）。修正方式是改 **plan**，不是改模型：
@@ -127,7 +141,12 @@ Blender --background --factory-startup --python-exit-code 1 --python tools/blend
    - 讀 `overlay.png`（綠 = 重疊、紅 = 模型缺少、藍 = 模型多出來）和 `compare.png`，寫出 AI 評語：差異、可能原因、要改 plan 的哪個欄位
    - 評語附在回報中，不影響判定；不可以用評語推翻數字
    - 位置 IoU 偏低時，先檢查 plan 的 bounds 和 builder 是否填滿 bounds，再看 instance 是否形狀不合
-3. `look` 只用來確認外觀，不能當作拓撲或視覺通過的依據。
+3. Texture QA 的結果在 `r["report"]["texture"]`（匯出後另有 `glb_texture`）。fail 會擋下匯出：
+   - `COLOR_SPACE`、`NODE_COMPAT`、`UV_MISSING`、`TEXTURE_MISSING`：多半是手動改了材質節點，重建即可
+   - `TEXTURE_BUDGET`：降低 tier 或減少貼圖材質，不要直接把預算調大
+   - warn 也要看：`FLAT_RATIO`（主要元件還是純色）、`TEXEL_DENSITY`（會糊）、`UV_STRETCH`、`TEXTURE_SEAM`
+   - Visual QA 的 `SURFACE_*` warn（顏色分布、細節密度、紋理比例、風格）→ 改 plan 的 surface，不是改貼圖檔
+4. `look` 只用來確認外觀，不能當作拓撲或視覺通過的依據。
 
 ## 5. 匯出給 Three.js
 
@@ -147,5 +166,6 @@ Blender --background --factory-startup --python-exit-code 1 --python tools/blend
 - Visual QA：輪廓 IoU、元件位置 IoU 平均、偏低的元件、色差警告、AI 評語
 - 每個 Object 的 profile、components、non-manifold、面數、ngon、是否通過
 - GLB 路徑、primitive 數、三角面數，並和 plan 的 `budget` 比較
+- Texture QA：每個貼圖材質的 pattern／tier／texel density、純色面積比、GPU 貼圖 MB、GLB 貼圖 KB（WebP 前後）、bake 結果
 
 沒通過的項目要明講，不可以把「有建出來」說成「驗證通過」。

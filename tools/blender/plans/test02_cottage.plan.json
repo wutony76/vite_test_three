@@ -20,32 +20,38 @@
     {
       "name": "plaster",
       "hex": "#F9F4E8",
-      "roughness": 0.9
+      "roughness": 0.9,
+      "surface": {"class": "plaster", "wear": 0.5, "dirt": 0.5}
     },
     {
       "name": "plaster_shade",
       "hex": "#64484E",
-      "roughness": 0.9
+      "roughness": 0.9,
+      "surface": {"class": "plaster", "tier": "prop", "dirt": 0.5}
     },
     {
       "name": "roof_tile",
       "hex": "#9D5B2A",
-      "roughness": 0.8
+      "roughness": 0.8,
+      "surface": {"class": "roof_tile", "pattern": "brick", "scale_m": 0.14, "palette": ["#7A3A16", "#C8662A", "#F0A050"], "wear": 0.5, "dirt": 0.3}
     },
     {
       "name": "stone",
       "hex": "#7D7572",
-      "roughness": 0.95
+      "roughness": 0.95,
+      "surface": {"class": "stone", "pattern": "rock", "palette": ["#5E5550", "#958A82", "#D0C4B6"], "tier": "prop", "dirt": 0.4}
     },
     {
       "name": "wood_door",
       "hex": "#966D4D",
-      "roughness": 0.8
+      "roughness": 0.8,
+      "surface": {"class": "wood", "pattern": "planks", "scale_m": 0.11, "uv": "along", "tier": "prop", "wear": 0.5}
     },
     {
       "name": "wood_dark",
       "hex": "#785447",
-      "roughness": 0.85
+      "roughness": 0.85,
+      "surface": {"class": "wood", "pattern": "wood_grain", "tier": "prop", "wear": 0.4}
     },
     {
       "name": "glass",
@@ -62,27 +68,33 @@
       "name": "metal",
       "hex": "#A29B98",
       "roughness": 0.45,
-      "metallic": 0.6
+      "metallic": 0.6,
+      "surface": {"class": "metal", "tier": "prop", "wear": 0.3}
     },
     {
       "name": "step_stone",
       "hex": "#767E79",
-      "roughness": 0.95
+      "roughness": 0.95,
+      "surface": {"class": "stone", "pattern": "brick", "scale_m": 0.17, "tier": "prop", "dirt": 0.4}
     },
     {
       "name": "bush_orange",
       "hex": "#B97121",
-      "roughness": 0.85
+      "roughness": 0.85,
+      "surface": {"class": "vegetation", "scale_m": 0.3, "tier": "prop"}
     },
     {
       "name": "bush_green",
       "hex": "#504122",
-      "roughness": 0.85
+      "roughness": 0.85,
+      "surface": {"class": "vegetation", "scale_m": 0.3, "tier": "prop"}
     }
   ],
   "budget": {
     "max_tris": 6000,
-    "max_primitives": 32
+    "max_primitives": 32,
+    "max_texture_kb": 1500,
+    "max_gpu_texture_mb": 28
   },
   "components": [
     {"id": "tower", "kind": "wall_block", "tier": "primary", "method": "component", "profile": "building_shell", "material": "plaster", "params": {"openings": ["upper_window", "vent_window"], "reveal": 0.2, "niche_material": "niche_dark"}, "bounds": [[-2.4, -1.708, 0.0], [1.015, 1.708, 7.408]], "source": "observed", "confidence": 0.85},

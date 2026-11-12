@@ -14,6 +14,7 @@
 import os
 import re
 
+from ..surface import spec as surface_spec
 from ..validation.profiles import PROFILES
 from . import vocab
 from .detail_config import resolve_detail
@@ -252,6 +253,28 @@ def _validate_reference(doc, c):
             parents[item["id"]] = parent
             paths[item["id"]] = path
 
+    # surfaces：材質區域（Texture Analysis）。region 是正規化座標的多邊形，Visual QA 用它逐區比對
+    surfaces = c.items(doc, "surfaces", "", required=False)
+    c.unique_ids(surfaces)
+    for path, item in surfaces:
+        region = item.get("region")
+        if not (isinstance(region, list) and len(region) >= 3 and all(_type_ok(p, "vec2") for p in region)):
+            c.error("PLAN_FIELD_TYPE", f"{path}.region", "需要至少 3 個 [x, y]（0～1）")
+        elif any(not (0 <= v <= 1) for p in region for v in p):
+            c.error("PLAN_RANGE", f"{path}.region", "座標必須在 0～1 之間")
+        c.enum(c.get(item, "class", path, "str"), tuple(surface_spec.SURFACE_CLASSES), f"{path}.class")
+        pattern = c.get(item, "pattern", path, "str", required=False)
+        if pattern is not None:
+            c.enum(pattern, tuple(surface_spec.PATTERNS), f"{path}.pattern")
+        base_hex = c.get(item, "base_hex", path, "str", required=False)
+        if base_hex is not None and not HEX_COLOR.match(base_hex):
+            c.error("PLAN_FIELD_TYPE", f"{path}.base_hex", f"需要 #RRGGBB，拿到 {base_hex!r}")
+        c.in_range(c.get(item, "scale_m", path, "number", required=False), 0, None, f"{path}.scale_m", low_open=True)
+        for index, comp in enumerate(c.get(item, "components", path, "list", required=False, default=[])):
+            c.ref(comp, component_ids, f"{path}.components[{index}]", "元件")
+        c.get(item, "material", path, "str", required=False)
+        c.fact(item, path)
+
     for path, item in hidden:
         source = c.fact(item, path)
         sources.append(source)
@@ -335,6 +358,10 @@ def _validate_asset(doc, c):
         for key in ("roughness", "metallic", "alpha"):
             c.in_range(c.get(material, key, path, "number", required=False), 0.0, 1.0, f"{path}.{key}")
         c.get(material, "emissive", path, "bool", required=False)
+        if "surface" in material:
+            surface_spec.validate_surface(c, material["surface"], f"{path}.surface", HEX_COLOR)
+            if material.get("alpha", 1.0) < 1.0:
+                c.error("PLAN_METHOD_NOT_ALLOWED", f"{path}.surface", "半透明材質（玻璃）不支援 surface 貼圖")
 
     budget = c.get(doc, "budget", "", "dict")
     max_tris = c.get(budget, "max_tris", "budget", "int")
@@ -343,6 +370,9 @@ def _validate_asset(doc, c):
     max_primitives = c.get(budget, "max_primitives", "budget", "int")
     if max_primitives is not None and max_primitives <= 0:
         c.error("PLAN_BUDGET_INVALID", "budget.max_primitives", "必須大於 0")
+    # 貼圖預算（選填）：GLB 裡貼圖的 KB、GPU 記憶體 MB（未壓縮 RGBA + mipmap 的估算值）
+    for key in ("max_texture_kb", "max_gpu_texture_mb"):
+        c.in_range(c.get(budget, key, "budget", "number", required=False), 0, None, f"budget.{key}", low_open=True)
 
     components = c.items(doc, "components", "")
     if doc.get("components") == []:
@@ -451,6 +481,8 @@ def _validate_asset(doc, c):
     ratio = _inferred_ratio(sources)
     if ratio > vocab.HIGH_INFERRED_RATIO:
         c.warn("HIGH_INFERRED_RATIO", "components", f"{ratio:.0%} 的元件是推測的，建議和使用者確認")
+    _validate_decals(doc, c, ids)
+
     return {
         "counts": {"components": len(components), **_tier_counts(components)},
         "inferred_ratio": ratio,
@@ -476,6 +508,44 @@ def _check_inside(c, box, size, path):
                     f"{axis} 軸 {low[k]}～{high[k]} 超出 dimensions 外框 {lo:.3f}～{hi:.3f}（含 {tol:.0%} 容差）")
 
 
+DECAL_FACES = ("front", "back", "left", "right", "top")
+DECAL_TYPES = ("text", "symbol", "image")
+DECAL_SYMBOLS = ("circle", "star", "heart", "arrow", "cup", "bolt", "drop")
+
+
+def _validate_decals(doc, c, component_ids):
+    """decals：貼在元件表面的獨立小片（招牌字、海報、符號）。rect 是目標面上的公尺座標。"""
+    decals = c.items(doc, "decals", "", required=False)
+    c.unique_ids(decals)
+    for path, decal in decals:
+        if decal.get("id") in component_ids:
+            # decal 會建成名為 <plan>_<id> 的 Object，和元件同名會互相覆蓋
+            c.error("PLAN_ID_DUPLICATE", f"{path}.id", f"{decal.get('id')!r} 和元件 id 重複")
+        c.ref(c.get(decal, "target", path, "str"), component_ids, f"{path}.target", "元件")
+        c.enum(c.get(decal, "face", path, "str"), DECAL_FACES, f"{path}.face")
+        rect = decal.get("rect")
+        if not (isinstance(rect, list) and len(rect) == 2 and all(_type_ok(p, "vec2") for p in rect)):
+            c.error("PLAN_FIELD_TYPE", f"{path}.rect", "需要 [[水平0, 垂直0], [水平1, 垂直1]]（公尺）")
+        elif rect[0][0] >= rect[1][0] or rect[0][1] >= rect[1][1]:
+            c.error("PLAN_RANGE", f"{path}.rect", f"左下角必須小於右上角，拿到 {rect}")
+        c.in_range(c.get(decal, "offset", path, "number", required=False), 0.0005, 0.05, f"{path}.offset")
+        content = c.get(decal, "content", path, "dict")
+        if content is None:
+            continue
+        kind = c.get(content, "type", f"{path}.content", "str")
+        c.enum(kind, DECAL_TYPES, f"{path}.content.type")
+        if kind == "text":
+            c.get(content, "text", f"{path}.content", "str")
+        elif kind == "symbol":
+            c.enum(c.get(content, "symbol", f"{path}.content", "str"), DECAL_SYMBOLS, f"{path}.content.symbol")
+        elif kind == "image":
+            c.file_exists(c.get(content, "path", f"{path}.content", "str"), f"{path}.content.path", " 圖片 ")
+        for key in ("color", "background"):
+            value = c.get(content, key, f"{path}.content", "str", required=False)
+            if value is not None and not HEX_COLOR.match(value):
+                c.error("PLAN_FIELD_TYPE", f"{path}.content.{key}", f"需要 #RRGGBB，拿到 {value!r}")
+
+
 # ---------------------------------------------------------------------------
 # ScenePlan
 # ---------------------------------------------------------------------------
@@ -490,6 +560,8 @@ def _validate_materials(doc, c):
             c.error("PLAN_FIELD_TYPE", f"{path}.hex", f"需要 #RRGGBB 格式，拿到 {hex_value!r}")
         for key in ("roughness", "metallic", "alpha"):
             c.in_range(c.get(material, key, path, "number", required=False), 0.0, 1.0, f"{path}.{key}")
+        if "surface" in material:
+            surface_spec.validate_surface(c, material["surface"], f"{path}.surface", HEX_COLOR)
     return names
 
 

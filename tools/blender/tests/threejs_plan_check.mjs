@@ -3,7 +3,8 @@
 //   node tools/blender/tests/threejs_plan_check.mjs <plan.json> [GLB 路徑]
 //
 // 檢查：單一根節點、clickable 元件是獨立節點、userData 帶有 profile 與元件資訊、
-// 正面射線打得到門、移動門不影響牆、draw call 不超過 plan 的 primitive 預算。
+// 正面射線打得到門、移動門不影響牆、draw call 不超過 plan 的 primitive 預算、
+// 貼圖（atlas NEAREST、surface 的 sRGB／ORM／法線、AO 用 uv1）、decal 用 alphaTest。
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as THREE from 'three';
@@ -33,8 +34,12 @@ const stubTextures = (parser) => ({
     return Promise.resolve(texture);
   },
 });
+// WebP／AVIF 貼圖由 GLTFLoader 內建的 EXT_texture_webp／EXT_texture_avif 外掛載入，它們會先 new Image() 偵測支援度，
+// 在 Node 裡會崩潰。外掛以名稱為鍵，註冊同名的 stub 就能覆蓋內建的版本
+const stubNamed = (name) => (parser) => ({ ...stubTextures(parser), name });
 // meshopt 壓縮的 GLB（EXT_meshopt_compression）要先設定 decoder，否則讀不到頂點
-const loader = new GLTFLoader().register(stubTextures).setMeshoptDecoder(MeshoptDecoder);
+const loader = new GLTFLoader().register(stubTextures).register(stubNamed('EXT_texture_webp'))
+  .register(stubNamed('EXT_texture_avif')).setMeshoptDecoder(MeshoptDecoder);
 const gltf = await new Promise((done, fail) => loader.parse(arrayBuffer, '', done, fail));
 
 const failures = [];
@@ -83,32 +88,67 @@ if (door) {
 
 let drawCalls = 0;
 let transparent = 0;
+let opaque = 0;
 let textured = 0;
-let nearest = 0;
+let decals = 0;
 let vertexColored = 0;
+const atlas = { total: 0, nearest: 0 };
+const surface = { total: 0, srgb: 0, orm: 0, normalOk: 0, normalTotal: 0 };
+const ao = { total: 0, channel1: 0 };
+const surfaceNames = new Set((plan.materials ?? []).filter((m) => m.surface).map((m) => `LPK_${plan.id}_${m.name}`));
 gltf.scene.traverse((o) => {
   if (!o.isMesh) return;
   drawCalls += 1;
-  if (o.material.transparent) transparent += 1;
-  if (o.material.map) {
-    textured += 1;
-    // palette atlas 的色格很小，放大時要用 NEAREST，否則格子邊緣會和相鄰顏色混在一起
-    if (o.material.map.magFilter === THREE.NearestFilter) nearest += 1;
+  const material = o.material;
+  if (material.transparent) transparent += 1;
+  else opaque += 1;
+  if (material.map) textured += 1;
+  if (material.name.endsWith('_decals')) {
+    decals += 1;
+    // decal：alphaMode MASK → Three.js 用 alphaTest 直接丟掉透明像素，不需要排序
+    check(material.alphaTest > 0 && !material.transparent, `${o.name} decal 使用 alphaTest（MASK），不是半透明`);
+    return;
   }
-  if (o.material.vertexColors && o.geometry.attributes.color) vertexColored += 1;
+  if (material.name.includes('_atlas')) {
+    // palette atlas 的色格很小，放大時要用 NEAREST，否則格子邊緣會和相鄰顏色混在一起
+    atlas.total += 1;
+    if (material.map?.magFilter === THREE.NearestFilter) atlas.nearest += 1;
+  }
+  if (surfaceNames.has(material.name)) {
+    surface.total += 1;
+    if (material.map?.colorSpace === THREE.SRGBColorSpace) surface.srgb += 1;
+    if (material.roughnessMap && material.metalnessMap) surface.orm += 1;
+    if (material.normalMap) {
+      surface.normalTotal += 1;
+      // 法線是資料，不能被當成 sRGB 做 gamma 轉換
+      if (material.normalMap.colorSpace !== THREE.SRGBColorSpace) surface.normalOk += 1;
+    }
+  }
+  if (material.aoMap) {
+    ao.total += 1;
+    // AO 用第二組 UV（UVBake → TEXCOORD_1 → Three.js 的 uv1）
+    if (material.aoMap.channel === 1 && o.geometry.attributes.uv1) ao.channel1 += 1;
+  }
+  if (material.vertexColors && o.geometry.attributes.color) vertexColored += 1;
 });
 check(drawCalls <= plan.budget.max_primitives, `draw call ${drawCalls} ≤ 預算 ${plan.budget.max_primitives}`);
 const glassCount = plan.components.filter((c) => c.profile === 'glass').length;
 // 必須剛好相等：多出來的半透明 mesh 代表有不該透明的面（例如牆上的凹槽底面），會看穿牆體內部
 check(transparent === glassCount, `只有玻璃是半透明（transparent mesh ${transparent} 個，玻璃元件 ${glassCount} 個）`);
+check(decals === (plan.decals ?? []).length, `每個 decal 都是獨立 mesh（${decals}/${(plan.decals ?? []).length}）`);
 
-const usesAtlas = (plan.detail?.preset ?? 'game_default') !== 'preview';
-if (usesAtlas) {
-  const opaque = drawCalls - transparent;
-  check(textured === opaque && nearest === textured, `不透明 mesh 都使用 atlas 貼圖且為 NEAREST（${textured}/${opaque}）`);
-  check(vertexColored === drawCalls, `所有 mesh 都帶 vertex color（${vertexColored}/${drawCalls}）`);
+const preview = (plan.detail?.preset ?? 'game_default') === 'preview';
+if (!preview) {
+  check(textured === opaque, `不透明 mesh 都有貼圖（${textured}/${opaque}）`);
+  check(atlas.nearest === atlas.total, `palette atlas 使用 NEAREST（${atlas.nearest}/${atlas.total}）`);
+  check(vertexColored === drawCalls - decals, `除了 decal 之外都帶 vertex color（${vertexColored}/${drawCalls - decals}）`);
+  if (surface.total > 0) {
+    check(surface.srgb === surface.total, `貼圖材質的 base color 是 sRGB（${surface.srgb}/${surface.total}）`);
+    check(surface.orm === surface.total, `貼圖材質有粗糙度／金屬度貼圖（${surface.orm}/${surface.total}）`);
+    check(surface.normalOk === surface.normalTotal, `法線貼圖不是 sRGB（${surface.normalOk}/${surface.normalTotal}）`);
+    check(ao.total > 0 && ao.channel1 === ao.total, `AO 貼圖使用第二組 UV（${ao.channel1}/${ao.total}）`);
+  }
 }
-
 
 // manifest：列出的節點名稱都必須真的存在於 GLB（頁面靠這份清單找可點擊的物件、燈光）
 const manifestPath = file.replace(/\.glb$/, '.manifest.json');

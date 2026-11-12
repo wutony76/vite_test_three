@@ -6,6 +6,7 @@
   "requires": [
     "EXT_mesh_gpu_instancing",
     "EXT_meshopt_compression",
+    "EXT_texture_webp",
     "KHR_materials_emissive_strength"
   ],
   "root": "sample_town_Root",
@@ -153,11 +154,11 @@
     }
   ],
   "stats": {
-    "triangles": 14100,
-    "primitives": 60,
-    "meshes": 55,
-    "materials": 11,
-    "file_bytes": 572672
+    "triangles": 14106,
+    "primitives": 79,
+    "meshes": 58,
+    "materials": 34,
+    "file_bytes": 2021976
   },
   "qa": {
     "scene": "pass",

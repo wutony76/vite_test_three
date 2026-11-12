@@ -203,6 +203,56 @@ node tools/blender/tests/threejs_plan_check.mjs tools/blender/plans/test01_shop.
 - `texture_quality`：`atlas64`（每格 8 px）或 `atlas256`（每格 32 px）；`none` 會退回 flat。
 - 效果：test01_shop 的 primitive 從 40 降到 30，材質從 14 個變成 3 個。
 
+## Surface Engine（貼圖、UV、Bake、Decal）
+
+主要資產不再只用純色。plan 的材質加上 `surface` 就會改用手繪風貼圖；沒有 `surface` 的材質維持上面的 palette atlas（適合小裝飾）。
+
+```jsonc
+{"name": "wall", "hex": "#B8A58C", "roughness": 0.85,
+ "surface": {"class": "stone", "pattern": "rock", "palette": ["#5E5550", "#958A82", "#D0C4B6"],
+             "scale_m": 0.3, "wear": 0.4, "dirt": 0.3, "uv": "planar", "tier": "standard", "source": "procedural"}}
+```
+
+| 欄位 | 說明 |
+|---|---|
+| `class` | wood／stone／brick／roof_tile／plaster／metal／fabric／vegetation／ground／food／painted（決定預設圖樣、粗糙度、金屬度） |
+| `pattern` | planks、wood_grain、brick、cobble、rock、roof_tiles、plaster、brushed、weave、foliage、ground、crust、painted、stripes、corn_kernels |
+| `palette` | [陰影, 基底, 高光]；省略時由 hex 推出（HSV：陰影偏冷、高光偏暖）。所有顏色只在這三色之間變化，不同材質的風格才一致 |
+| `scale_m` | 一個圖樣單元的大小（磚高、板寬）。一張平鋪貼圖覆蓋 `units × scale_m` 公尺 |
+| `uv` | planar（依面自己的平面，斜屋頂不拉伸）、along（u 沿最長軸，木紋方向）、cylinder（一圈整數張）、fit（不平鋪的 unique 貼圖）。省略時依 profile；磚、瓦、石有重力方向，不會用 along |
+| `tier` | prop（256／512）、standard（512／1024）、hero（1024／2048）：平鋪／unique 貼圖邊長。DetailConfig `surface_quality = standard` 時 hero 降一級 |
+| `source` | procedural（預設，numpy 手繪，可重現）、`library:<id>`、`manual:<路徑>`、`provider:comfyui`（本機 ComfyUI，見下方） |
+
+- **貼圖**：base color（sRGB）、ORM（R = 小尺度 AO、G = 粗糙度、B = 金屬度，Non-Color）、normal（Non-Color；平坦的圖樣如灰泥不產生，省 1/3 GPU 記憶體）。以內容 hash 命名（`LPK_tex_<hash>_<role>`），相同設定在不同資產間共用。
+- **DetailConfig**：`surface_quality`（off／standard／hero）、`surface_detail`（磨損、髒污強度）、`bake`（none／ao／full）。preview 全部關閉。
+- **Bake**（Cycles，CPU，固定取樣數）：
+  - `ao`：AO 烘到第二組 UV（`UVBake` → TEXCOORD_1），接到 `glTF Material Output` 的 Occlusion。尺寸刻意避開 ORM 的尺寸，否則匯出器會把兩者合成一張（UV 空間不同，結果錯誤）
+  - `full`：貼圖 × vertex color × AO × 邊緣高光烘成一張 unique 貼圖（加 ORM、normal），整個資產的不透明面合併成 1 個材質
+  - 結果存到 `textures/baked/<plan>/`、重新載入比對，再打包進 GLB
+- **Decal**：plan 的 `decals`（text／symbol／image），每個是獨立的四邊形 Object，parent 到目標元件、`alphaMode = MASK`；同一資產共用一張 decal atlas。文字用 Blender 渲染成貼圖（不轉 mesh）；內建字型只支援拉丁字母。
+- **外部貼圖（本機 ComfyUI）**：建模不連網、只讀快取。先在 host 端生成：`python3 tools/blender/scripts/prepare_textures.py <plan>` 或 MCP 工具 `lowpoly_prepare_textures`，結果寫進 `textures/cache/<key>/`（含 provenance，請 commit）。環境變數 `LPK_COMFYUI_URL`、`LPK_COMFYUI_CKPT`、`LPK_COMFYUI_WORKFLOW`；workflow 樣板在 `textures/comfyui/workflow_sdxl.json`。快取沒有時自動退回 procedural 並給 warning。
+
+## Texture QA
+
+建模後（匯出前）自動執行，fail 會擋下匯出；匯出後再讀 GLB JSON 檢查一次。
+
+| code | level | 判定 |
+|---|---|---|
+| TEXTURE_MISSING | fail | 貼圖材質缺 base color 圖、圖片沒有像素 |
+| UV_MISSING | fail | 材質需要的 UV（UVMap／UVBake）不存在，或第一組不是 UVMap |
+| UV_STRETCH | fail／warn | 各向異性拉伸 > 2×（或 1.5×）的面積超過 10% |
+| UV_OVERLAP | fail | UVBake 重疊 > 0.5% |
+| UV_PADDING | warn | UVBake 區塊間距太小 |
+| TEXEL_DENSITY | warn | 低於 tier 目標（128／256／512 px/m）的一半 |
+| TEXTURE_SEAM | warn | 平鋪貼圖的邊界差 > 圖內最大相鄰差的 2 倍 |
+| COLOR_SPACE | fail | base／emissive 不是 sRGB，或資料貼圖不是 Non-Color |
+| NODE_COMPAT | fail | 材質有 glTF 匯不出的節點（程序貼圖、Bump、ColorRamp…） |
+| EXTERNAL_FILE_MISSING | fail | 圖片沒有打包、檔案也不存在 |
+| TEXTURE_BUDGET | fail | GPU 記憶體或 GLB 貼圖 KB 超過 plan 的 `budget.max_gpu_texture_mb`／`max_texture_kb` |
+| GPU_TEXTURE_HIGH | warn | 超過 150 MB：建議升級 KTX2 |
+| FLAT_RATIO | warn | primary／secondary 元件的純色面積比 > 30% |
+| GLB_TEXTURE_EXPORT | fail | GLB 少了預期的貼圖槽、occlusion 不是 TEXCOORD_1、被合併進 metallicRoughness、decal 不是 MASK |
+
 ## Visual QA
 
 `api.validate_visual(plan_path, out_dir)`：和正面參考圖比較。判定只看數字；疊圖給 AI 或人工寫評語，評語不影響判定。
@@ -217,6 +267,7 @@ node tools/blender/tests/threejs_plan_check.mjs tools/blender/plans/test01_shop.
 - 會暫時改動渲染引擎、相機、隱藏狀態，結束時全部還原，所以也可以在正在使用的 Blender 裡執行。
 - 參考圖不是正面正交視角時回報 `skipped`。
 - 計算模組 `qa/metrics.py` 是純 Python + numpy：掃描線填色、IoU、Lab ΔE、外框投影。
+- **材質區域**（reference.json 的 `surfaces[]`，只產生 warn）：每個區域比較 Lab 色彩直方圖交集（< 0.35 warn）、Sobel 細節密度比（0.6～1.5）、圖樣週期 ÷ `scale_m`（0.75～1.25）、飽和度差（> 0.2 warn）。計算在 `qa/surface_metrics.py`（純 numpy）。
 
 ## 場景組裝（Scene Assembly）
 
@@ -263,6 +314,7 @@ node tools/blender/tests/threejs_scene_check.mjs
   - 場景另有 `placements`（每棟建築的根節點與可點擊元件）、`instanced`（instance 擺放與動畫群組）、`lights`
   - `stats`、`qa`
   - 頁面可以先讀 manifest，再決定要綁定哪些互動。
+- **貼圖**：匯出後由 `scripts/optimize_textures.mjs`（gltf-transform + sharp）轉 WebP（`EXT_texture_webp`）：一般貼圖有損 quality 88，法線與 palette atlas 無損。Three.js 的 GLTFLoader 原生支援，不需要額外設定。plan 的 `export.texture_format: "png"` 可關閉。WebP 只減少下載大小，GPU 記憶體不變；場景超過約 150 MB 時再改 KTX2。
 - **場景燈光**：ScenePlan 的 `lights`（`sun`／`hemisphere`／`ambient`／`point`）只寫進 manifest，不放進 GLB，因為 Blender 和 Three.js 的燈光單位不同。方向與位置使用 Three.js 座標（Y 朝上），強度也是 Three.js 的數值。
 
 ## lowpoly MCP server（背景 Blender）
@@ -275,6 +327,7 @@ node tools/blender/tests/threejs_scene_check.mjs
 | `lowpoly_validate_plan(path)` | 否 | 驗證 plan（可以只寫檔名） |
 | `lowpoly_build_asset(plan, export, preset, render_dir, out_root)` | 是 | 建模 + QA（有 render_dir 時加上 Visual QA 與預覽）+ 匯出 |
 | `lowpoly_build_scene(scene, export, render_dir, out_root)` | 是 | 組裝場景 + Scene QA + 匯出 |
+| `lowpoly_prepare_textures(plan, force)` | 否 | 生成 `provider:*`（本機 ComfyUI）的貼圖並寫入快取 |
 | `lowpoly_run_tests(keyword)` | 是 | headless 測試套件 |
 
 - 設定：`.mcp.json`（Claude Code）、`.cursor/mcp.json`（Cursor）都已進版控。第一次使用時，Claude Code 會詢問是否信任這個專案的 MCP server。
@@ -286,19 +339,20 @@ node tools/blender/tests/threejs_scene_check.mjs
   - 要在你的 Blender 裡即時檢視或手動調整 → mcp-for-blender
   - 批次建模、匯出、測試 → lowpoly
 
-## 端到端驗收（Test A／Test B）
+## 端到端驗收（Test A／B／C）
 
 ```bash
-python3 tools/blender/tests/e2e.py              # 全部（約 1 分鐘）
-python3 tools/blender/tests/e2e.py --skip-units # 只跑 Test A／B
+python3 tools/blender/tests/e2e.py              # 全部（約 6 分鐘）
+python3 tools/blender/tests/e2e.py --skip-units # 只跑 Test A／B／C
 ```
 
 1. 純 Python 測試
 2. headless 測試套件
 3. Test A（test01_shop + Visual QA）
 4. Test B（sample_town）
-5. Three.js 檢查
-6. 原始需求的 19 條驗收條件逐條判定
+5. Test C（貼圖資產：crate_pile、grilled_corn、test02_cottage）
+6. Three.js 檢查
+7. 驗收條件逐條判定（Test A／B 的原始需求 + Test C 的貼圖驗收）
 
 - 輸出（GLB、manifest、預覽、`e2e_report.json`）都在暫存目錄，不會改到 `public/models`。
 - 任一條不通過就以 1 結束，並列出是哪一條。
@@ -387,7 +441,7 @@ profile 存在 Object 的 custom property `lowpoly_profile`，匯出後是 Three
 ## 測試
 
 ```bash
-# 147 個 headless 測試（不會碰到正在使用的 Blender）
+# 200 多個 headless 測試（不會碰到正在使用的 Blender）
 ~/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup \
   --python-exit-code 1 --python tools/blender/tests/run.py [-- 關鍵字]
 
@@ -396,6 +450,7 @@ python3 -m unittest discover -s tools/blender/tests -p "test_plan_schema.py"
 python3 -m unittest discover -s tools/blender/tests -p "test_shapes.py"
 python3 -m unittest discover -s tools/blender/tests -p "test_visual_metrics.py"
 python3 -m unittest discover -s tools/blender/tests -p "test_scene_terrain.py"
+python3 -m unittest discover -s tools/blender/tests -p "test_surface_pure.py"   # 貼圖、PNG、provider（含 ComfyUI mock）
 
 # 重新產生小屋 GLB → public/models/lowpoly_house/lowpoly_house.glb
 ~/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup \
@@ -428,11 +483,16 @@ tools/blender/
 │  ├─ shapes.py           幾何產生器（grid_slab／prism／loft／lathe／sweep／blob），不依賴 bpy
 │  ├─ components/         零件庫（25 個 kind）與 layout，不依賴 bpy
 │  ├─ appearance/         palette atlas 色格配置（不依賴 bpy）
+│  ├─ surface/            Surface Engine：spec、pngio、packing、painter/（程序手繪貼圖）、sources/（provider、快取、ComfyUI）
+│  │                      不依賴 bpy；images、uv、material_builder、gltf_compat、bake、decals、engine 是 Blender 端
 │  ├─ build/              orchestrator／materials／appearance／wobble／bevel（Blender 端建模流程）
-│  ├─ qa/                 geometry、visual、scene（Scene QA）、preview（預覽渲染）、metrics（不依賴 bpy）
+│  ├─ qa/                 geometry、visual、scene（Scene QA）、texture（Texture QA）、preview（預覽渲染）、
+│  │                      metrics、surface_metrics（不依賴 bpy）
 │  ├─ scene/              terrain（高度場、道路、外框幾何，不依賴 bpy）、assembly（場景組裝）
 │  └─ presets/building.py Low Poly 小屋
 ├─ mcp_server/           server.py（lowpoly MCP server）
-├─ scripts/              build_from_plan.py（資產）、build_scene.py（場景）、mcp_runner.py（MCP／e2e 共用）、overlay_reference.py、build_house.py
+├─ scripts/              build_from_plan.py（資產）、build_scene.py（場景）、mcp_runner.py（MCP／e2e 共用）、overlay_reference.py、build_house.py、
+│                         optimize_textures.mjs（WebP）、prepare_textures.py（外部貼圖快取）
+├─ textures/             cache/（provider 產出，進版控）、library/（圖庫素材）、comfyui/（workflow 樣板）、baked/（bake 中間檔，不進版控）
 └─ tests/                 run.py、fixtures、test_*.py（test_plan_schema、test_shapes 不需要 Blender）、threejs_check.mjs、threejs_plan_check.mjs
 ```

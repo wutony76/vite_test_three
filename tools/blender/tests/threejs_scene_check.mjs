@@ -28,8 +28,12 @@ const stubTextures = (parser) => ({
     return Promise.resolve(texture);
   },
 });
+// WebP／AVIF 由內建外掛載入，它們會 new Image() 偵測支援度而在 Node 崩潰：註冊同名的 stub 覆蓋
+const stubNamed = (name) => (parser) => ({ ...stubTextures(parser), name });
 // meshopt 壓縮的 GLB（EXT_meshopt_compression）要先設定 decoder，否則讀不到頂點
-const gltf = await new Promise((done, fail) => new GLTFLoader().register(stubTextures).setMeshoptDecoder(MeshoptDecoder).parse(arrayBuffer, '', done, fail));
+const loader = new GLTFLoader().register(stubTextures).register(stubNamed('EXT_texture_webp'))
+  .register(stubNamed('EXT_texture_avif')).setMeshoptDecoder(MeshoptDecoder);
+const gltf = await new Promise((done, fail) => loader.parse(arrayBuffer, '', done, fail));
 
 const failures = [];
 const check = (ok, message) => {

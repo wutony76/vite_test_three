@@ -94,3 +94,91 @@ def build_caramel_pudding(ctx):
         cap_fraction=float(ctx.param("cap_fraction", 0.16)),
         phase=phase,
     )
+
+
+@register("grilled_corn_body")
+def build_grilled_corn_body(ctx):
+    """實心玉米棒：單一旋轉體，底部芯帶 + 錐台棒身（細節交給貼圖）。"""
+    seg = ctx.segments(1.15, minimum=28)
+    r_bot = ctx.hw * 0.96
+    r_top = ctx.hw * 0.64
+    h = ctx.h
+    pith = ctx.mat(ctx.param("pith_material", "cob_pith"))
+    kernel = ctx.material
+    pith_h = max(h * 0.075, 0.008)
+    profile = [
+        (0.0, 0.0),
+        (r_bot, 0.0),
+        (r_bot, pith_h),
+        (r_bot * 0.99, h * 0.88),
+        (r_top * 0.78, h * 0.96),
+        (0.0, h),
+    ]
+    bands = [pith, pith, kernel, kernel, kernel]
+    return shapes.lathe(profile, seg, bands, axis="z")
+
+
+@register("grilled_corn_kernels")
+def build_grilled_corn_kernels(ctx):
+    """烤玉米：錐台表面排列的圓角粒，部分區域烤焦（雙材質）。"""
+    rows = int(ctx.param("rows", 10))
+    cols = int(ctx.param("cols", 12))
+    char_mat = ctx.mat(ctx.param("char_material", "char"))
+    body_mat = ctx.material
+    char_prob = float(ctx.param("char_probability", 0.16))
+    char_y0 = float(ctx.param("char_y_min", -0.014))
+    char_y1 = float(ctx.param("char_y_max", 0.016))
+
+    data = shapes.MeshData()
+    z0 = ctx.h * 0.06
+    z1 = ctx.h * 0.94
+    r_bot = ctx.hw * 0.90
+    r_top = ctx.hw * 0.58
+
+    for row in range(rows):
+        t = row / max(rows - 1, 1)
+        z = z0 + (z1 - z0) * t
+        r = r_bot + (r_top - r_bot) * t
+        stagger = (math.pi / cols) if row % 2 else 0.0
+        for col in range(cols):
+            angle = stagger + math.tau * col / cols
+            shell = r * 0.90
+            cx = math.cos(angle) * shell
+            cy = math.sin(angle) * shell
+            jitter = 1.0 + ctx.rng.uniform(-0.10, 0.10)
+            kr = min(0.0078, ctx.hw * 0.24) * jitter
+            kz = kr * (1.05 + ctx.rng.uniform(-0.05, 0.12))
+            mat = char_mat if (char_y0 <= cy <= char_y1 and ctx.rng.random() < char_prob) else body_mat
+            kcx, kcy, kcz = cx, cy, z + kz * 0.15
+            seg = max(4, min(5, ctx.segments(0.35, minimum=4)))
+            data.extend(
+                shapes.blob(
+                    (kcx, kcy, kcz),
+                    (kr, kr * 0.86, kz * 0.52),
+                    mat,
+                    segments=seg,
+                    rings=3,
+                    jitter=0.035,
+                    rng=ctx.rng,
+                )
+            )
+    return data
+
+
+@register("grilled_corn_end")
+def build_grilled_corn_end(ctx):
+    """玉米棒底部露出的芯。"""
+    r = ctx.hw * 0.72
+    h = max(ctx.h * 0.55, 0.004)
+    profile = [(0.0, 0.0), (r, 0.0), (r * 0.97, h), (0.0, h)]
+    return shapes.lathe(profile, ctx.segments(0.65, minimum=8), ctx.material, axis="z")
+
+
+@register("bamboo_skewer")
+def build_bamboo_skewer(ctx):
+    """竹籤：細軸 + 頂端尖頭。"""
+    h = ctx.h
+    r = min(ctx.hw, ctx.hd) * 0.88
+    tip_z = h * 0.94
+    profile = [(0.0, 0.0), (r, 0.0), (r, tip_z), (0.0, h)]
+    return shapes.lathe(profile, ctx.segments(0.45, minimum=6), ctx.material, axis="z")

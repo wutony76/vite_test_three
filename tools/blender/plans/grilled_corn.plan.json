@@ -1,0 +1,48 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "grilled_corn",
+  "reference": "grilled_corn",
+  "notes": "實心烤玉米棒 + Surface Engine 的 corn_kernels 貼圖（fit UV）；竹籤用實木紋。正面朝 -Y。",
+  "dimensions": {"w": 0.075, "d": 0.075, "h": 0.26},
+  "detail": {"preset": "hero", "overrides": {"tertiary_density": 0}},
+  "style": {"edge_wobble": 0.003},
+  "materials": [
+    {"name": "kernel", "hex": "#F0C42E", "roughness": 0.28,
+     "surface": {"class": "food", "pattern": "corn_kernels", "palette": ["#B07A14", "#F0C42E", "#FFE68A"],
+                 "accents": {"char": "#3A2418"}, "tier": "prop", "wear": 0.0, "dirt": 0.0, "normal_strength": 1.4}},
+    {"name": "char", "hex": "#3A2418", "roughness": 0.42},
+    {"name": "cob_pith", "hex": "#E6D2A8", "roughness": 0.52},
+    {"name": "skewer_wood", "hex": "#C9A87A", "roughness": 0.58,
+     "surface": {"class": "wood", "pattern": "wood_grain", "scale_m": 0.04, "tier": "prop", "wear": 0.2, "dirt": 0.1}}
+  ],
+  "budget": {"max_tris": 1800, "max_primitives": 3, "max_texture_kb": 400, "max_gpu_texture_mb": 8},
+  "components": [
+    {
+      "id": "body",
+      "kind": "grilled_corn_body",
+      "tier": "primary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "kernel",
+      "params": {"pith_material": "cob_pith"},
+      "bounds": [[-0.036, -0.036, 0.0], [0.036, 0.036, 0.20]],
+      "source": "observed",
+      "confidence": 0.94
+    },
+    {
+      "id": "skewer",
+      "kind": "bamboo_skewer",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "trim",
+      "material": "skewer_wood",
+      "bounds": [[-0.004, -0.004, 0.0], [0.004, 0.004, 0.26]],
+      "source": "observed",
+      "confidence": 0.91
+    }
+  ],
+  "export": {
+    "path": "public/models/grilled_corn/grilled_corn.glb",
+    "compress": true
+  }
+}

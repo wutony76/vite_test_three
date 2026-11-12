@@ -15,13 +15,23 @@ SHOP = os.path.join(PLANS, "test01_shop.plan.json")
 TREE = os.path.join(PLANS, "tree_round.plan.json")
 
 
+def _atlas_shop():
+    """Phase 5 的測試對象是 palette atlas 本身：關掉 Surface Engine、拿掉 decal，只剩純色 atlas。"""
+    import json
+    with open(SHOP, encoding="utf-8") as handle:
+        plan = json.load(handle)
+    plan["detail"] = {"preset": "game_default", "overrides": {"surface_quality": "off"}}
+    plan.pop("decals", None)
+    return plan
+
+
 def _shop_meshes():
     # 只看根節點底下的物件：已融合的煙囪原件被移到備份 collection，不屬於資產
     return [o for o in bpy.data.objects["test01_shop_Root"].children_recursive if o.type == "MESH"]
 
 
 def test_atlas_reduces_primitives_and_materials():
-    result = api.build_asset_from_plan(SHOP)
+    result = api.build_asset_from_plan(_atlas_shop())
     assert result["ok"], result["errors"]
     assert result["changes"]["primitives"] <= 32
     assert result["report"]["appearance"]["mode"] == "palette_vc"
@@ -32,7 +42,7 @@ def test_atlas_reduces_primitives_and_materials():
 
 def test_uvs_point_at_plan_colors():
     """每個 atlas 面的 UV 取到的貼圖顏色，必須剛好是 plan 裡的某個顏色。"""
-    api.build_asset_from_plan(SHOP)
+    api.build_asset_from_plan(_atlas_shop())
     image = bpy.data.images["LPK_test01_shop_atlas_color"]
     size = image.size[0]
     pixels = np.empty(size * size * 4, dtype=np.float32)
@@ -75,8 +85,12 @@ def test_glb_has_textures_and_vertex_colors():
     pbr = [m.get("pbrMetallicRoughness", {}) for m in gltf["materials"]]
     assert any("baseColorTexture" in p and "metallicRoughnessTexture" in p for p in pbr)
     assert any(m.get("emissiveTexture") for m in gltf["materials"])
-    assert all("COLOR_0" in p["attributes"] for m in gltf["meshes"] for p in m["primitives"])
-    assert gltf["samplers"][0]["magFilter"] == 9728  # NEAREST：放大時不混色
+    # decal 是貼在表面上的小片，沒有 vertex color；其他 mesh 都要有
+    decals = {f"test01_shop_{d}" for d in ("sign_text", "door_open", "wall_cup")}
+    assert all("COLOR_0" in p["attributes"] for m in gltf["meshes"] if m["name"] not in decals for p in m["primitives"])
+    # palette atlas 用 NEAREST（放大時不混色）；Surface Engine 的手繪貼圖用 LINEAR + mipmap
+    assert any(s.get("magFilter") == 9728 for s in gltf["samplers"])
+    assert any(s.get("magFilter") == 9729 for s in gltf["samplers"])
 
 
 def test_visual_qa_passes_and_restores_scene():

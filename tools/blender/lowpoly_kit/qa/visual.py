@@ -12,7 +12,7 @@ import os
 import bpy
 import numpy as np
 
-from . import metrics
+from . import metrics, surface_metrics
 
 KIT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO_ROOT = os.path.abspath(os.path.join(KIT_DIR, "..", "..", ".."))
@@ -20,6 +20,11 @@ REPO_ROOT = os.path.abspath(os.path.join(KIT_DIR, "..", "..", ".."))
 SILHOUETTE_PASS, SILHOUETTE_WARN = 0.85, 0.75
 COMPONENT_PASS, COMPONENT_WARN, COMPONENT_LOW = 0.7, 0.55, 0.5
 COLOR_PASS, COLOR_WARN = 15.0, 30.0
+# 材質區域（reference.surfaces）：只產生 warn。參考圖是插畫、渲染是 Workbench，本來就不會完全一樣
+SURFACE_SIMILARITY = 0.35        # Lab 直方圖交集
+SURFACE_DETAIL = (0.6, 1.5)      # 細節密度比（渲染 ÷ 參考）
+SURFACE_SCALE = (0.75, 1.25)     # 圖樣週期 ÷ scale_m
+SURFACE_STYLE = 0.2              # 飽和度差
 
 
 # ---------------------------------------------------------------------------
@@ -172,8 +177,12 @@ def save_pixels(pixels, path):
 
 
 def _uses_atlas(root):
-    return any(m and m.name.endswith("_atlas") for o in root.children_recursive if o.type == "MESH"
-               for m in o.data.materials)
+    """有任何 Image Texture（palette atlas 或 Surface Engine 的貼圖）就要用 Workbench 的 TEXTURE 顯示模式。
+
+    MATERIAL 模式只顯示材質的 viewport 顏色；貼圖材質的 viewport 顏色是白色，整個模型會變成灰的。
+    """
+    return any(m and m.node_tree and any(n.type == "TEX_IMAGE" and n.image for n in m.node_tree.nodes)
+               for o in root.children_recursive if o.type == "MESH" for m in o.data.materials)
 
 
 # ---------------------------------------------------------------------------
@@ -256,6 +265,17 @@ def run_visual_qa(plan, plan_path, root, out_dir):
                        "render": metrics.rgb_to_hex(out_rgb), "delta_e": round(metrics.delta_e(ref_rgb, out_rgb), 1)})
     report["colors"] = colors
 
+    # 4b. 材質區域（reference.surfaces）：顏色分布、細節密度、紋理比例、風格。只產生 warn
+    meters_per_px = frame["height_m"] / height
+    surfaces = []
+    for spec in reference.get("surfaces", []):
+        mask = metrics.polygon_mask(spec["region"], width, height)
+        if mask.sum() < 64:
+            continue
+        values = surface_metrics.compare_region(ref_pixels, front, mask, spec.get("scale_m"), meters_per_px)
+        surfaces.append({"id": spec["id"], "class": spec["class"], **values})
+    report["surfaces"] = surfaces
+
     # 5. 並排比較圖
     pad = np.ones((height, 12, 4), dtype=np.float32)
     save_pixels(np.concatenate([ref_pixels, pad, front], axis=1), os.path.join(out_dir, "compare.png"))
@@ -285,6 +305,20 @@ def _grade(report):
         for cid, value in report["component_iou"].items():
             if value < COMPONENT_LOW:
                 add("warn", "COMPONENT_LOW", f"{cid} 的位置 IoU 只有 {value}")
+    for item in report.get("surfaces", []):
+        if item["similarity"] < SURFACE_SIMILARITY:
+            add("warn", "SURFACE_COLOR", f"{item['id']}（{item['class']}）顏色分布相似度 {item['similarity']}"
+                                         f"（< {SURFACE_SIMILARITY}）：檢查 surface.palette")
+        ratio = item.get("detail_ratio")
+        if ratio is not None and not SURFACE_DETAIL[0] <= ratio <= SURFACE_DETAIL[1]:
+            hint = "太平（加 surface 或提高 wear／dirt）" if ratio < 1 else "太花（降低 tier 細節或 normal_strength）"
+            add("warn", "SURFACE_DETAIL", f"{item['id']} 細節密度是參考圖的 {ratio} 倍：{hint}")
+        scale = item.get("scale_ratio")
+        if scale is not None and not SURFACE_SCALE[0] <= scale <= SURFACE_SCALE[1]:
+            add("warn", "SURFACE_SCALE", f"{item['id']} 圖樣週期 {item.get('period_render_m')} m，是 scale_m 的 {scale} 倍")
+        gap = abs(item["style_render"]["saturation"] - item["style_reference"]["saturation"])
+        if gap > SURFACE_STYLE:
+            add("warn", "SURFACE_STYLE", f"{item['id']} 飽和度差 {gap:.2f}：和參考圖的手繪風格不一致")
     for color in report["colors"]:
         if color["delta_e"] > COLOR_PASS:
             note = "偏差大" if color["delta_e"] > COLOR_WARN else "略有偏差"

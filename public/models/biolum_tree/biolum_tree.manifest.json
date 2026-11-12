@@ -1,0 +1,72 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "biolum_tree",
+  "glb": "biolum_tree.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_materials_emissive_strength"
+  ],
+  "root": "biolum_tree_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 868,
+    "primitives": 3,
+    "meshes": 3,
+    "materials": 2,
+    "file_bytes": 150252
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "warn",
+    "texture": "pass",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "trunk_purple": {
+        "class": "wood",
+        "pattern": "wood_grain",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.4,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "wood_grain",
+          "seed": 1369817917,
+          "hash": "51a5c33dccaa"
+        }
+      },
+      "canopy_blue": {
+        "class": "vegetation",
+        "pattern": "foliage",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 1.25,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "foliage",
+          "seed": 3568952522,
+          "hash": "d4b9e4cad982"
+        }
+      }
+    },
+    "bake": {
+      "mode": "ao",
+      "size": 128,
+      "seconds": 0.04
+    },
+    "decals": 0,
+    "gpu_texture_mb": 1.75,
+    "flat_ratio": 0.0,
+    "texture_count": 6,
+    "texture_kb": 86.8,
+    "images": 6,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 146.7
+  }
+}

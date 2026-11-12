@@ -3,8 +3,10 @@
   "id": "sample_town",
   "notes": "Test B：2 棟店面（test01_shop）+ 2 棟童話石屋（test02_cottage）+ 8 棵 instanced 樹 + Props（4 盞 instance 街燈沿主街、2 組木箱堆）。資產正面朝 -Y：道路北側的建築轉 0°、南側轉 180°，正面都朝向道路。lights 只寫進 manifest（不放進 GLB），由 Three.js 建立，方向使用 Three.js 座標（Y 朝上）。",
   "materials": [
-    {"name": "grass", "hex": "#8DB04A", "roughness": 0.95},
-    {"name": "road", "hex": "#C9B38A", "roughness": 0.9}
+    {"name": "grass", "hex": "#8DB04A", "roughness": 0.95,
+     "surface": {"class": "ground", "tier": "standard", "palette": ["#5E8030", "#8DB04A", "#B8D070"]}},
+    {"name": "road", "hex": "#C9B38A", "roughness": 0.9,
+     "surface": {"class": "stone", "pattern": "cobble", "scale_m": 0.45, "tier": "standard", "dirt": 0.3}}
   ],
   "terrain": {"kind": "grid_hills", "size": [60, 60], "material": "grass",
               "params": {"amplitude": 1.6, "seed": 7, "resolution": 48, "flatten_margin": 4.0, "frequency": 0.12}},
@@ -44,6 +46,6 @@
     {"id": "sun", "type": "sun", "color": "#FFF1D6", "intensity": 3.0, "direction": [-0.5, -1.0, -0.35]},
     {"id": "sky", "type": "hemisphere", "color": "#CFE8FF", "ground_color": "#6B8A3A", "intensity": 0.9}
   ],
-  "budget": {"max_tris": 150000, "max_draw_calls": 150},
+  "budget": {"max_tris": 150000, "max_draw_calls": 200},
   "export": {"path": "public/models/sample_town/sample_town.glb", "compress": true}
 }

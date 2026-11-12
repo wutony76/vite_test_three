@@ -502,6 +502,12 @@
       "confidence": 0.6
     }
   ],
+  "surfaces": [
+    {"id": "roof_tiles", "region": [[0.25, 0.32], [0.52, 0.32], [0.55, 0.41], [0.22, 0.41]], "class": "roof_tile", "pattern": "brick", "base_hex": "#C8662A", "scale_m": 0.14, "components": ["roof_main"], "material": "roof_tile", "source": "observed", "confidence": 0.8},
+    {"id": "tower_plaster", "region": [[0.44, 0.53], [0.55, 0.53], [0.55, 0.64], [0.44, 0.64]], "class": "plaster", "base_hex": "#F2EEE4", "components": ["tower"], "material": "plaster", "source": "observed", "confidence": 0.75},
+    {"id": "stone_pile", "region": [[0.32, 0.8], [0.5, 0.8], [0.5, 0.94], [0.32, 0.94]], "class": "stone", "pattern": "rock", "base_hex": "#958A82", "components": ["stones_front"], "material": "stone", "source": "observed", "confidence": 0.7},
+    {"id": "stone_steps", "region": [[0.6, 0.85], [0.75, 0.85], [0.75, 0.95], [0.6, 0.95]], "class": "stone", "pattern": "brick", "base_hex": "#767E79", "scale_m": 0.17, "components": ["steps"], "material": "step_stone", "source": "observed", "confidence": 0.7}
+  ],
   "hidden": [
     {
       "id": "view_projection",

@@ -126,6 +126,17 @@ def lowpoly_build_scene(scene: str, export: bool = False, render_dir: str | None
 
 
 @server.tool()
+def lowpoly_prepare_textures(plan: str, force: bool = False) -> dict:
+    """建模前生成外部 provider（本機 ComfyUI）的貼圖並寫入快取（不需要 Blender）。
+
+    只處理 surface.source 為 provider:<名稱> 的材質；已有快取時略過，force=True 重新生成。
+    ComfyUI 位址用環境變數 LPK_COMFYUI_URL（預設 http://127.0.0.1:8188）。
+    """
+    from lowpoly_kit.surface.prepare import prepare_plan
+    return prepare_plan(_plan_path(plan), force=force)
+
+
+@server.tool()
 def lowpoly_run_tests(keyword: str = "") -> dict:
     """執行 headless Blender 測試套件（可用 keyword 只跑名稱含該字串的測試）。回傳通過與失敗的數量與失敗清單。"""
     command = [_blender(), "--background", "--factory-startup", "--python-exit-code", "1", "--python", TESTS]

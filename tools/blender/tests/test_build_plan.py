@@ -91,8 +91,9 @@ def test_export_glb():
     assert result["ok"], result["errors"]
     stats = glb_stats(result["changes"]["filepath"])
     assert stats["root_nodes"] == ["test01_shop_Root"]
-    # 26 個 Object：pot_right 共用 pot_left 的 mesh；門口盆栽形狀差太多，獨立建模
-    assert stats["meshes"] == 25
+    # 26 個元件 Object：pot_right 共用 pot_left 的 mesh；門口盆栽形狀差太多，獨立建模 → 25 個 mesh
+    # 再加 3 個 decal（招牌字、門上 OPEN、牆上咖啡杯）各自一個 mesh → 28
+    assert stats["meshes"] == 28
 
 
 def test_unknown_kind_is_reported():

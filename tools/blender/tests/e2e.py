@@ -1,4 +1,4 @@
-"""Test A／Test B 端到端驗收：一條指令跑完所有測試，並逐條判定原始需求的驗收條件。
+"""Test A／B／C 端到端驗收：一條指令跑完所有測試，並逐條判定原始需求的驗收條件。
 
     python3 tools/blender/tests/e2e.py [--skip-units] [--silhouette 0.85]
 
@@ -6,6 +6,7 @@
 1. 純 Python 測試  2. headless Blender 測試套件
 3. Test A：建 test01_shop（含 Visual QA），匯出到暫存目錄
 4. Test B：組裝 sample_town，匯出到暫存目錄
+4b. Test C：貼圖資產（crate_pile、grilled_corn、test02_cottage）
 5. Three.js 檢查  6. 驗收條件逐條判定 → e2e_report.json；任一條不通過就以 1 結束
 
 所有輸出（GLB、manifest、預覽圖、e2e_report.json）都在暫存目錄並保留下來，不會改到 public/models。
@@ -30,7 +31,9 @@ sys.path.insert(0, BLENDER_DIR)
 
 from lowpoly_kit.export.glb_stats import read_glb_json  # noqa: E402
 
-UNIT_FILES = ("test_plan_schema.py", "test_shapes.py", "test_visual_metrics.py", "test_scene_terrain.py")
+UNIT_FILES = ("test_plan_schema.py", "test_shapes.py", "test_visual_metrics.py", "test_scene_terrain.py",
+              "test_surface_pure.py")
+OLD_CORN_GLB_BYTES = 626992  # Surface Engine 之前（Bump 特例、PNG）的 grilled_corn.glb
 BLENDER = os.environ.get("LPK_BLENDER") or os.path.expanduser("~/Applications/Blender.app/Contents/MacOS/Blender")
 
 
@@ -124,6 +127,35 @@ def judge_test_a(c, plan, built, three_ok, silhouette_min):
           f"threejs_plan_check {'通過' if three_ok else '失敗'}")
 
 
+def judge_test_c(c, results, three):
+    """Test C：Texture & Surface Detail Engine 的驗收。"""
+    for name, built in results.items():
+        texture = built.get("texture") or {}
+        glb = built.get("glb_texture") or {}
+        c.add("C", f"{name}：Texture QA 與 GLB 貼圖檢查通過",
+              built["ok"] and texture.get("status") in ("pass", "warn") and glb.get("status") == "pass",
+              f"Texture QA {texture.get('status')}、GLB {glb.get('status')}、錯誤 {[e['code'] for e in built.get('errors', [])]}")
+        c.add("C", f"{name}：貼圖轉成 WebP", glb.get("metrics", {}).get("mime_types") == ["image/webp"],
+              f"{glb.get('metrics', {}).get('mime_types')}，貼圖 {glb.get('metrics', {}).get('texture_kb')} KB")
+        c.add("C", f"{name}：Three.js 載入與貼圖設定", three.get(name, False), "threejs_plan_check " + ("通過" if three.get(name) else "失敗"))
+    corn = results.get("grilled_corn", {})
+    size = (corn.get("export") or {}).get("file_bytes") or 0
+    c.add("C", "grilled_corn：GLB 比舊版小 50% 以上", 0 < size <= OLD_CORN_GLB_BYTES * 0.5,
+          f"{size / 1024:.0f} KB（舊版 {OLD_CORN_GLB_BYTES / 1024:.0f} KB）")
+    kernel = (corn.get("appearance") or {}).get("materials", {}).get("kernel", {})
+    c.add("C", "grilled_corn：沒有 orchestrator 特例，改由 surface 設定", kernel.get("pattern") == "corn_kernels",
+          f"kernel pattern = {kernel.get('pattern')}")
+    cottage = results.get("test02_cottage", {})
+    flat = (cottage.get("texture") or {}).get("metrics", {}).get("flat_ratio")
+    visual = cottage.get("visual") or {}
+    c.add("C", "test02_cottage：主要元件不再是純色（FLAT_RATIO ≤ 30%）", flat is not None and flat <= 0.3, f"純色面積比 {flat}")
+    c.add("C", "test02_cottage：貼圖沒有拉低外型比例", (visual.get("silhouette_iou") or 0) >= 0.85 and (visual.get("component_mean") or 0) >= 0.7,
+          f"輪廓 IoU {visual.get('silhouette_iou')}、元件位置 IoU {visual.get('component_mean')}")
+    bake = (cottage.get("appearance") or {}).get("bake") or {}
+    c.add("C", "test02_cottage：AO 烘焙存檔、重新載入一致", (bake.get("saved") or {}).get("max_error", 1) < 0.01,
+          f"AO {bake.get('size')} px、重新載入誤差 {(bake.get('saved') or {}).get('max_error')}、{bake.get('seconds')} s")
+
+
 def judge_test_b(c, scene, built, three_ok):
     assets = {a["asset_id"]: load(a["plan"]) for a in scene["assets"]}
 
@@ -156,8 +188,16 @@ def judge_test_b(c, scene, built, three_ok):
     c.add("B", "資產可以獨立管理", independent and three_ok, f"{len(buildings)} 棟建築都有根節點與可點擊的門" if independent else "有建築缺少根節點或可點擊元件")
     materials = [m["name"] for m in gltf.get("materials", [])]
     building_mats = [m for m in materials if any(m.startswith(f"LPK_{aid}_") for aid in kinds)]
-    consistent = building_mats and all(m.endswith(("_atlas", "_atlas_emissive", "_glass")) for m in building_mats)
-    c.add("B", "視覺一致性", consistent, f"建築材質：{', '.join(sorted(set(building_mats)))}")
+    # 一致性：建築只用「同一套」材質系統——palette atlas、玻璃、decal，或 Surface Engine 的手繪貼圖材質
+    surfaced = {f"LPK_{aid}_{m['name']}" for aid in kinds for m in assets[aid]["materials"] if m.get("surface")}
+    consistent = building_mats and all(m.endswith(("_atlas", "_atlas_emissive", "_glass", "_decals")) or m in surfaced
+                                       for m in building_mats)
+    odd = sorted({m for m in building_mats if not (m.endswith(("_atlas", "_atlas_emissive", "_glass", "_decals")) or m in surfaced)})
+    c.add("B", "視覺一致性", consistent, f"{len(set(building_mats))} 個建築材質，系統外的材質：{', '.join(odd) or '無'}")
+    textures = qa.get("textures") or {}
+    c.add("B", "場景共用同一套貼圖", textures.get("shared_library_images", 0) > 0 and bool(textures.get("ground")),
+          f"共用貼圖 {textures.get('shared_library_images')} 張、地面材質 {sorted(textures.get('ground') or {})}、"
+          f"GPU {textures.get('gpu_texture_mb')} MB")
     triangles = mesh_triangles(gltf)
     total = sum(triangles.values()) or 1
     largest = max(triangles.items(), key=lambda kv: kv[1]) if triangles else ("", 0)
@@ -213,12 +253,24 @@ def main():
     report["steps"]["test_b_build"] = {"ok": built_b["ok"], "seconds": seconds, "errors": built_b.get("errors")}
     log(f"  {'PASS' if built_b['ok'] else 'FAIL'}  組裝、Scene QA、匯出（{seconds}s）")
 
+    log("4b. Test C：貼圖資產")
+    built_c = {}
+    for name in ("crate_pile", "grilled_corn", "test02_cottage"):
+        render = os.path.join(out, f"test_c_{name}") if name == "test02_cottage" else None
+        built_c[name], seconds = runner({"action": "build_asset", "plan": os.path.join(PLANS, f"{name}.plan.json"),
+                                         "export": True, "out_root": out, "render_dir": render})
+        report["steps"][f"test_c_{name}"] = {"ok": built_c[name]["ok"], "seconds": seconds,
+                                             "errors": built_c[name].get("errors")}
+        log(f"  {'PASS' if built_c[name]['ok'] else 'FAIL'}  {name}（{seconds}s）")
+
     log("5. Three.js 檢查")
     three = {}
-    for key, script, plan_path, glb in (
+    checks = [
         ("a", "threejs_plan_check.mjs", os.path.join(PLANS, "test01_shop.plan.json"), built_a.get("filepath")),
         ("b", "threejs_scene_check.mjs", os.path.join(PLANS, "sample_town.scene.json"), built_b.get("filepath")),
-    ):
+    ] + [(name, "threejs_plan_check.mjs", os.path.join(PLANS, f"{name}.plan.json"), built.get("filepath"))
+         for name, built in built_c.items()]
+    for key, script, plan_path, glb in checks:
         if not glb:
             three[key] = False
             log(f"  FAIL  {script}：沒有 GLB")
@@ -226,7 +278,7 @@ def main():
         proc, seconds = run(["node", os.path.join(HERE, script), plan_path, glb])
         three[key] = proc.returncode == 0
         fails = [line for line in proc.stdout.splitlines() if line.startswith("FAIL")]
-        report["steps"][script] = {"ok": three[key], "fails": fails, "seconds": seconds}
+        report["steps"][f"{script}:{key}"] = {"ok": three[key], "fails": fails, "seconds": seconds}
         log(f"  {'PASS' if three[key] else 'FAIL'}  {script}（{seconds}s）" + ("".join(f"\n        {f}" for f in fails)))
 
     log("6. 驗收條件")
@@ -236,6 +288,7 @@ def main():
         judge_test_b(criteria, scene, built_b, three["b"])
     else:
         criteria.add("B", "能夠匯出完整場景", False, "場景沒有匯出")
+    judge_test_c(criteria, built_c, three)
     report["criteria"] = criteria.items
     report["visual_a"] = {k: (built_a.get("visual") or {}).get(k) for k in ("silhouette_iou", "component_mean")}
     report["scene_b"] = (built_b.get("scene_qa") or {}).get("budget")

@@ -49,6 +49,11 @@ def build_asset(args):
         "geometry": {"status": (report.get("geometry") or {}).get("status"),
                      "issues": (report.get("geometry") or {}).get("issues", [])},
         "appearance": report.get("appearance"),
+        # Texture QA（匯出前）與 GLB 貼圖檢查（匯出後）；texture_optimize 是 WebP 轉換前後的大小
+        "texture": report.get("texture"),
+        "glb_texture": report.get("glb_texture"),
+        "texture_optimize": result["changes"].get("texture_optimize"),
+        "warnings": result.get("warnings", []),
         "detail": report.get("detail"),
         "export": result["changes"].get("export"),
         "filepath": result["changes"].get("filepath"),
@@ -61,7 +66,7 @@ def build_asset(args):
         visual = api.validate_visual(plan_path, render_dir, root=root)
         rep = visual.get("report") or {}
         out["visual"] = {k: rep.get(k) for k in ("status", "reason", "silhouette_iou", "component_mean", "component_iou",
-                                                  "colors", "issues", "images")}
+                                                  "colors", "surfaces", "issues", "images")}
         out["preview"] = render_asset(plan, root, render_dir)
         if not visual["ok"]:
             out["ok"] = False
@@ -78,7 +83,8 @@ def build_scene(args):
     report = result.get("report") or {}
     out.update({
         "id": scene["id"],
-        "scene_qa": {k: report.get(k) for k in ("status", "issues", "budget", "sharing", "assets")},
+        "scene_qa": {k: report.get(k) for k in ("status", "issues", "budget", "sharing", "assets", "textures")},
+        "texture_optimize": result["changes"].get("texture_optimize"),
         "placements": result["changes"].get("placements"),
         "export": result["changes"].get("export"),
         "filepath": result["changes"].get("filepath"),

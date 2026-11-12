@@ -20,27 +20,32 @@
     {
       "name": "lime_paint",
       "hex": "#D6DE24",
-      "roughness": 0.85
+      "roughness": 0.85,
+      "surface": {"class": "plaster", "palette": ["#8FA012", "#D6DE24", "#F2F27A"], "wear": 0.5, "dirt": 0.45}
     },
     {
       "name": "door_lime",
       "hex": "#E1E201",
-      "roughness": 0.7
+      "roughness": 0.7,
+      "surface": {"class": "wood", "pattern": "planks", "scale_m": 0.12, "uv": "along", "palette": ["#9AA000", "#E1E201", "#F6F37A"], "tier": "prop", "wear": 0.5}
     },
     {
       "name": "awning_yellow",
       "hex": "#FCDB05",
-      "roughness": 0.75
+      "roughness": 0.75,
+      "surface": {"class": "fabric", "pattern": "painted", "tier": "prop", "wear": 0.3, "dirt": 0.3}
     },
     {
       "name": "brick",
       "hex": "#94471C",
-      "roughness": 0.9
+      "roughness": 0.9,
+      "surface": {"class": "brick", "scale_m": 0.065, "wear": 0.5, "dirt": 0.4}
     },
     {
       "name": "coping",
       "hex": "#935843",
-      "roughness": 0.8
+      "roughness": 0.8,
+      "surface": {"class": "painted", "tier": "prop", "wear": 0.4}
     },
     {
       "name": "sign_brown",
@@ -68,7 +73,8 @@
       "name": "iron",
       "hex": "#2E2C2A",
       "roughness": 0.5,
-      "metallic": 0.6
+      "metallic": 0.6,
+      "surface": {"class": "metal", "tier": "prop", "wear": 0.3}
     },
     {
       "name": "chalk_dark",
@@ -78,22 +84,27 @@
     {
       "name": "step_gray",
       "hex": "#B5B196",
-      "roughness": 0.9
+      "roughness": 0.9,
+      "surface": {"class": "stone", "pattern": "cobble", "scale_m": 0.3, "tier": "prop", "dirt": 0.4}
     },
     {
       "name": "leaf_green",
       "hex": "#7D991E",
-      "roughness": 0.85
+      "roughness": 0.85,
+      "surface": {"class": "vegetation", "scale_m": 0.06, "tier": "prop"}
     },
     {
       "name": "terracotta",
       "hex": "#C9683A",
-      "roughness": 0.85
+      "roughness": 0.85,
+      "surface": {"class": "painted", "tier": "prop", "wear": 0.4, "dirt": 0.3}
     }
   ],
   "budget": {
     "max_tris": 5000,
-    "max_primitives": 32
+    "max_primitives": 44,
+    "max_texture_kb": 1500,
+    "max_gpu_texture_mb": 24
   },
   "components": [
     {"id": "facade", "kind": "wall_block", "tier": "primary", "method": "component", "profile": "building_shell", "material": "lime_paint", "params": {"openings": ["upper_window", "door", "shop_window"], "reveal": 0.18, "niche_material": "niche_dark"}, "bounds": [[-1.329, -2.125, 0.0], [1.329, 2.125, 6.45]], "source": "observed", "confidence": 0.9},
@@ -125,6 +136,11 @@
     {"id": "pot_left", "kind": "pot_plant", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "terracotta", "bounds": [[-1.836, -2.95, 0.0], [-1.034, -2.45, 1.05]], "source": "observed", "confidence": 0.8, "params": {"plant_material": "leaf_green"}},
     {"id": "pot_door", "kind": "pot_plant", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "terracotta", "bounds": [[-0.443, -2.6, 0.0], [-0.021, -2.2, 0.825]], "source": "observed", "confidence": 0.7, "params": {"plant_material": "leaf_green"}},
     {"id": "pot_right", "kind": "pot_plant", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "terracotta", "bounds": [[1.245, -2.95, 0.0], [1.878, -2.45, 0.9]], "source": "observed", "confidence": 0.75, "params": {"plant_material": "leaf_green"}}
+  ],
+  "decals": [
+    {"id": "sign_text", "target": "sign_disc", "face": "front", "rect": [[0.06, 2.93], [0.49, 3.07]], "content": {"type": "text", "text": "LIME", "color": "#F2E6C8"}},
+    {"id": "door_open", "target": "door", "face": "front", "rect": [[0.4, 1.5], [0.74, 1.66]], "content": {"type": "text", "text": "OPEN", "color": "#F7F3E3", "background": "#2E2C2A"}},
+    {"id": "wall_cup", "target": "facade", "face": "front", "rect": [[0.22, 4.0], [0.52, 4.3]], "content": {"type": "symbol", "symbol": "cup", "color": "#5A3A22"}}
   ],
   "export": {
     "path": "public/models/test01_shop/test01_shop.glb",

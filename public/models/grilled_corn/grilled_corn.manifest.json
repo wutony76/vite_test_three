@@ -1,0 +1,71 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "grilled_corn",
+  "glb": "grilled_corn.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
+  ],
+  "root": "grilled_corn_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 348,
+    "primitives": 3,
+    "meshes": 2,
+    "materials": 3,
+    "file_bytes": 174212
+  },
+  "qa": {
+    "topology": "warn",
+    "geometry": "pass",
+    "texture": "pass",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "kernel": {
+        "class": "food",
+        "pattern": "corn_kernels",
+        "tier": "prop",
+        "size": 512,
+        "tile_m": null,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "corn_kernels",
+          "seed": 2352921048,
+          "hash": "8c3eb9d88cde"
+        }
+      },
+      "skewer_wood": {
+        "class": "wood",
+        "pattern": "wood_grain",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.08,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "wood_grain",
+          "seed": 3988031515,
+          "hash": "edb4881b19ed"
+        }
+      }
+    },
+    "bake": {
+      "mode": "ao",
+      "size": 128,
+      "seconds": 0.03
+    },
+    "decals": 0,
+    "gpu_texture_mb": 5.42,
+    "flat_ratio": 0.136,
+    "texture_count": 8,
+    "texture_kb": 142.5,
+    "images": 8,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 170.1
+  }
+}
