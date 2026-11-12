@@ -1,0 +1,71 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "fried_egg",
+  "glb": "fried_egg.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
+  ],
+  "root": "fried_egg_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 104,
+    "primitives": 2,
+    "meshes": 2,
+    "materials": 2,
+    "file_bytes": 383524
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "pass",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "egg_white": {
+        "class": "food",
+        "pattern": "fried_egg_white",
+        "tier": "standard",
+        "size": 1024,
+        "tile_m": null,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "fried_egg_white",
+          "seed": 3344063063,
+          "hash": "c7525a57f746"
+        }
+      },
+      "egg_yolk": {
+        "class": "food",
+        "pattern": "fried_egg_yolk",
+        "tier": "standard",
+        "size": 1024,
+        "tile_m": null,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "fried_egg_yolk",
+          "seed": 3845354587,
+          "hash": "e533745bdf8a"
+        }
+      }
+    },
+    "bake": {
+      "mode": "ao",
+      "size": 512,
+      "seconds": 0.22
+    },
+    "decals": 0,
+    "gpu_texture_mb": 33.33,
+    "flat_ratio": 0.0,
+    "texture_count": 7,
+    "texture_kb": 360.6,
+    "images": 7,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 374.5
+  }
+}

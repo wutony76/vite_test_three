@@ -11,11 +11,11 @@
   "clickable": [],
   "anim_groups": {},
   "stats": {
-    "triangles": 348,
+    "triangles": 118,
     "primitives": 3,
     "meshes": 2,
-    "materials": 3,
-    "file_bytes": 174212
+    "materials": 2,
+    "file_bytes": 158424
   },
   "qa": {
     "topology": "warn",
@@ -34,38 +34,25 @@
         "provenance": {
           "source": "procedural",
           "pattern": "corn_kernels",
-          "seed": 2352921048,
-          "hash": "8c3eb9d88cde"
-        }
-      },
-      "skewer_wood": {
-        "class": "wood",
-        "pattern": "wood_grain",
-        "tier": "prop",
-        "size": 256,
-        "tile_m": 0.08,
-        "provenance": {
-          "source": "procedural",
-          "pattern": "wood_grain",
-          "seed": 3988031515,
-          "hash": "edb4881b19ed"
+          "seed": 1337134757,
+          "hash": "4fb30ea51e61"
         }
       }
     },
     "bake": {
       "mode": "ao",
-      "size": 128,
-      "seconds": 0.03
+      "size": 256,
+      "seconds": 0.17
     },
     "decals": 0,
-    "gpu_texture_mb": 5.42,
-    "flat_ratio": 0.136,
-    "texture_count": 8,
-    "texture_kb": 142.5,
-    "images": 8,
+    "gpu_texture_mb": 4.37,
+    "flat_ratio": 0.249,
+    "texture_count": 6,
+    "texture_kb": 139.5,
+    "images": 6,
     "mime_types": [
       "image/webp"
     ],
-    "file_kb": 170.1
+    "file_kb": 154.7
   }
 }

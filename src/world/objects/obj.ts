@@ -6,8 +6,22 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { createKetchup } from './ketchup';
 import { createHouse, type HouseSettings } from './house';
 import { createCartoonRainbow } from './rainbow';
-import { createGameHallLights, type GameHallLights } from './gameHallLights';
+import { createGameHallLights } from './gameHallLights';
 import { createGroundFlowers, type GroundFlowers } from './groundFlowers';
+import {
+  createGrilledCorn,
+  type GrilledCornSettings,
+  type GrilledCornVisualSettings,
+} from './grilledCorn';
+import { createFriedEgg, type FriedEggSettings } from './friedEgg';
+import { FRIED_EGG_PLACEMENTS, type FriedEggLayout } from './friedEggLayout';
+import {
+  GRILLED_CORN_LAYOUT_DEFAULT,
+  GRILLED_CORN_PLACEMENTS,
+  GRILLED_CORN_VISUAL_DEFAULT,
+  splitGrilledCornPlacement,
+  type GrilledCornPlacement,
+} from './grilledCornLayout';
 import { createPudding, type PuddingSettings } from './pudding';
 import { PUDDING_LAYOUT_DEFAULT, PUDDING_PLACEMENTS, type PuddingLayout } from './puddingLayout';
 
@@ -138,6 +152,92 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     }
   }
 
+  type GrilledCornRuntime = ReturnType<typeof createGrilledCorn>;
+  const grilledCornEntries: Array<{ world: WorldGrilledCorn; runtime: GrilledCornRuntime }> = [];
+  const grilledCorns: WorldGrilledCorn[] = [];
+
+  function spawnGrilledCorn(
+    id: string,
+    placement: Omit<GrilledCornPlacement, 'id'>,
+    grown = false,
+  ) {
+    if (!puddingAxes) return null;
+    const { layout, visual } = splitGrilledCornPlacement({ id, ...placement });
+    const runtime = createGrilledCorn({ ...puddingAxes, layout: { ...layout }, visual: { ...visual } });
+    ground.add(runtime.object);
+    const world = exposeGrilledCorn(id, runtime);
+    grilledCornEntries.push({ world, runtime });
+    grilledCorns.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  if (puddingAxes) {
+    for (const placement of GRILLED_CORN_PLACEMENTS) {
+      const { id, ...rest } = placement;
+      spawnGrilledCorn(id, rest);
+    }
+  }
+
+  type FriedEggRuntime = ReturnType<typeof createFriedEgg>;
+  const friedEggEntries: Array<{ world: WorldFriedEgg; runtime: FriedEggRuntime }> = [];
+  const friedEggs: WorldFriedEgg[] = [];
+
+  function spawnFriedEgg(
+    id: string,
+    layout: FriedEggLayout,
+    options?: { attachParent?: THREE.Object3D; sceneParent?: THREE.Object3D; grown?: boolean },
+  ) {
+    if (!puddingAxes) return null;
+    const runtime = createFriedEgg({
+      ...puddingAxes,
+      camera,
+      layout: { ...layout },
+      attachParent: options?.attachParent ?? null,
+      sceneParent: options?.sceneParent ?? null,
+    });
+    const world = exposeFriedEgg(id, runtime);
+    friedEggEntries.push({ world, runtime });
+    friedEggs.push(world);
+    runtime.setIntroGrow(options?.grown ? 1 : 0);
+    return world;
+  }
+
+  function nextGrilledCornId() {
+    let n = grilledCornEntries.length + 1;
+    let id = `grilled_corn_${n}`;
+    while (grilledCorns.some((item) => item.id === id)) {
+      n += 1;
+      id = `grilled_corn_${n}`;
+    }
+    return id;
+  }
+
+  function addGrilledCorn(seed?: Partial<GrilledCornPlacement>): WorldGrilledCorn | null {
+    if (!puddingAxes) return null;
+    const base: Omit<GrilledCornPlacement, 'id'> = {
+      ...GRILLED_CORN_LAYOUT_DEFAULT,
+      ...GRILLED_CORN_VISUAL_DEFAULT,
+      ...seed,
+    };
+    const n = grilledCornEntries.length + 1;
+    if (seed?.azimuthDegrees === undefined) {
+      base.azimuthDegrees = GRILLED_CORN_LAYOUT_DEFAULT.azimuthDegrees + n * 14;
+    }
+    return spawnGrilledCorn(nextGrilledCornId(), base, introDone);
+  }
+
+  function removeGrilledCorn(entry: WorldGrilledCorn) {
+    const index = grilledCornEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    const { runtime, world } = grilledCornEntries[index];
+    runtime.dispose();
+    grilledCornEntries.splice(index, 1);
+    const cornIndex = grilledCorns.indexOf(world);
+    if (cornIndex >= 0) grilledCorns.splice(cornIndex, 1);
+    return true;
+  }
+
   function addPudding(layout?: Partial<PuddingLayout>): WorldPudding | null {
     if (!puddingAxes) return null;
     const base = { ...PUDDING_LAYOUT_DEFAULT, ...layout };
@@ -237,8 +337,20 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     gameHallLights.bind(model);
   });
 
+  if (puddingAxes) {
+    for (const placement of FRIED_EGG_PLACEMENTS) {
+      const { id, ...layout } = placement;
+      spawnFriedEgg(id, layout, {
+        attachParent:
+          layout.mode === 'attach' && layout.hostLabel === 'Gamehall' ? Gamehall.object : undefined,
+        sceneParent: layout.mode === 'sun' ? all : layout.mode === 'sphere' ? ground : undefined,
+        grown: false,
+      });
+    }
+  }
 
   const introHouses = [mainHall, projectRoom, bgRoom, twRoom, Gamehall];
+  const gameHallIntroIndex = introHouses.length - 1;
   // 鏡頭看的方向。小球的起點會落在這個方向和畫面上方之間
   const approachDir = new THREE.Vector3();
   if (camera.position.lengthSq() > 1e-8) approachDir.copy(camera.position).normalize();
@@ -351,6 +463,8 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   // 房子先收成 0。開場先不要綠球，等空景一段再從遠處跑進來
   placeHouses(0);
   for (const { runtime } of puddingEntries) runtime.setIntroGrow(0);
+  for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(0);
+  for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
   groundFlowers?.resetIntro(introHouses.length);
   placeFlowers(0);
   if (ground !== all) ground.visible = false;
@@ -400,6 +514,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         ketchup.setWrap(1);
         rainbow.finishIntro();
         introDone = true;
+        for (const { runtime } of friedEggEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of puddingEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(1);
       }
     }
 
@@ -412,6 +529,35 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       runtime.setIntroGrow(easeOutBack(puddingT, 2.4));
       runtime.update(deltaTime, introDone);
     });
+    grilledCornEntries.forEach(({ runtime }, index) => {
+      const cornStart = introSettings.emptyHold + introSettings.ballSeconds * 0.78 + index * 0.1;
+      const cornT = THREE.MathUtils.clamp((introElapsed - cornStart) / 0.9, 0, 1);
+      runtime.setIntroGrow(easeOutBack(cornT, 2.2));
+      runtime.update(deltaTime, introDone);
+    });
+    friedEggEntries.forEach(({ runtime }, index) => {
+      if (introDone) {
+        runtime.setIntroGrow(1);
+      } else if (runtime.settings.mode === 'attach') {
+        const houseStart = introSettings.emptyHold + introSettings.ballSeconds;
+        const t = THREE.MathUtils.clamp(
+          (introElapsed - houseStart - gameHallIntroIndex * introSettings.houseStagger) /
+            introSettings.houseSeconds,
+          0,
+          1,
+        );
+        runtime.setIntroGrow(Math.max(0, easeOutBack(t, introSettings.houseOvershoot)));
+      } else if (runtime.settings.mode === 'sun') {
+        const sunStart = introSettings.emptyHold + introSettings.ballSeconds * 0.55;
+        const t = THREE.MathUtils.clamp((introElapsed - sunStart) / 1.05, 0, 1);
+        runtime.setIntroGrow(Math.max(0, easeOutBack(t, 1.85)));
+      } else {
+        const eggStart = introSettings.emptyHold + introSettings.ballSeconds * 0.8 + index * 0.08;
+        const eggT = THREE.MathUtils.clamp((introElapsed - eggStart) / 0.85, 0, 1);
+        runtime.setIntroGrow(Math.max(0, easeOutBack(eggT, 1.9)));
+      }
+      runtime.update(deltaTime, introDone);
+    });
   }
 
   function isHouseGrown(object: THREE.Object3D) {
@@ -421,6 +567,16 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     return (
       introElapsed >=
       introSettings.emptyHold + introSettings.ballSeconds + index * introSettings.houseStagger + introSettings.houseSeconds
+    );
+  }
+
+  /** 入場時最後一棟房子的長出動畫已結束（不等番茄醬／彩虹收尾） */
+  function isIntroHousesComplete() {
+    if (introDone) return true;
+    const houseStart = introSettings.emptyHold + introSettings.ballSeconds;
+    const last = Math.max(0, introHouses.length - 1);
+    return (
+      introElapsed >= houseStart + last * introSettings.houseStagger + introSettings.houseSeconds
     );
   }
 
@@ -441,6 +597,8 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     ketchup.resetIntro();
     rainbow.resetIntro();
     for (const { runtime } of puddingEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
   }
 
   // 緞帶擺放參數也往外交出去，讓 main.ts 的控制面板可以調整
@@ -467,6 +625,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     groundFlowers,
     groundRadius: GROUND_RADIUS,
     isHouseGrown,
+    isIntroHousesComplete,
     isIntroComplete: () => introDone,
     introSettings,
     replayIntro,
@@ -474,6 +633,10 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     puddings,
     addPudding,
     removePudding,
+    grilledCorns,
+    addGrilledCorn,
+    removeGrilledCorn,
+    friedEggs,
     houses: [
       exposeHouse('mainHall', mainHall),
       exposeHouse('projectRoom', projectRoom),
@@ -502,6 +665,56 @@ export type WorldPudding = {
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;
 };
+
+export type WorldGrilledCorn = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: GrilledCornSettings;
+  visualSettings: GrilledCornVisualSettings;
+  apply: () => void;
+  applyVisuals: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldFriedEgg = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: FriedEggSettings;
+  apply: () => void;
+  applyVisuals: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+function exposeFriedEgg(id: string, egg: ReturnType<typeof createFriedEgg>): WorldFriedEgg {
+  return {
+    id,
+    label: id,
+    object: egg.object,
+    settings: egg.settings,
+    apply: egg.applySettings,
+    applyVisuals: egg.applyVisuals,
+    getNormal: egg.getNormal,
+    setNormal: egg.setNormal,
+  };
+}
+
+function exposeGrilledCorn(id: string, corn: ReturnType<typeof createGrilledCorn>): WorldGrilledCorn {
+  return {
+    id,
+    label: id,
+    object: corn.object,
+    settings: corn.settings,
+    visualSettings: corn.visualSettings,
+    apply: corn.applySettings,
+    applyVisuals: corn.applyVisuals,
+    getNormal: corn.getNormal,
+    setNormal: corn.setNormal,
+  };
+}
 
 function exposePudding(id: string, pudding: ReturnType<typeof createPudding>): WorldPudding {
   return {

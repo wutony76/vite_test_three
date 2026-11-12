@@ -7,8 +7,18 @@ import gradientFragmentShader from './shader/gradient.frag.glsl?raw';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // RoomEnvironment：three.js 內建的「虛擬攝影棚」，拿來當反射用的環境，不用另外下載 HDR 圖
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { createObjs, INTRO_BALL_EASE_OPTIONS, type WorldHouse, type WorldPudding } from './objects/obj';
+import {
+  createObjs,
+  INTRO_BALL_EASE_OPTIONS,
+  type WorldFriedEgg,
+  type WorldGrilledCorn,
+  type WorldHouse,
+  type WorldPudding,
+} from './objects/obj';
+import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatPuddingPlacementsForPaste } from './objects/pudding';
+import { formatFriedEggPlacementsForPaste } from './objects/friedEgg';
+import type { FriedEggSunLayout } from './objects/friedEggLayout';
 // lil-gui：three.js 內建的小型控制面板，拖拉滑桿就能即時調整數值，不用改程式碼重新整理
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { enableViewPlaneDrag } from './debug/viewPlaneDrag';
@@ -174,6 +184,7 @@ const {
   groundFlowers,
   groundRadius,
   isHouseGrown,
+  isIntroHousesComplete,
   isIntroComplete,
   introSettings,
   replayIntro,
@@ -181,6 +192,10 @@ const {
   puddings,
   addPudding,
   removePudding,
+  grilledCorns,
+  addGrilledCorn,
+  removeGrilledCorn,
+  friedEggs,
 } = createObjs({ envMap, camera });
 
 scene.add(all);
@@ -252,14 +267,30 @@ const viewIntroButton = document.getElementById('view-intro') as HTMLButtonEleme
 const houseEnterSlot = document.getElementById('house-enter-slot');
 const houseEnterButton = document.getElementById('house-enter') as HTMLButtonElement | null;
 
-/** 點過房子才算選好，「進入」才出現 */
+/** 已選房子（或開場預設 mainHall） */
 let houseEnterReady = false;
+/** 入場動畫：最後一棟房子長完後才允許顯示「進入」 */
+let introEnterUnlocked = false;
 
 function syncWorldActionButtons() {
   const busy = isCameraFlying() || isHouseTransitionPlaying();
+  const showEnter = houseEnterReady && introEnterUnlocked;
   if (viewIntroButton) viewIntroButton.disabled = busy;
-  if (houseEnterSlot) houseEnterSlot.hidden = !houseEnterReady;
-  if (houseEnterButton) houseEnterButton.disabled = busy || !houseEnterReady;
+  if (houseEnterSlot) houseEnterSlot.hidden = !showEnter;
+  if (houseEnterButton) houseEnterButton.disabled = busy || !showEnter;
+}
+
+function resetIntroEnterButton() {
+  introEnterUnlocked = false;
+  houseEnterReady = false;
+  syncWorldActionButtons();
+}
+
+function tryUnlockEnterAfterHouses() {
+  if (introEnterUnlocked || !isIntroHousesComplete()) return;
+  introEnterUnlocked = true;
+  if (!houseEnterReady) markHouseSelected();
+  else syncWorldActionButtons();
 }
 
 function markHouseSelected() {
@@ -423,6 +454,7 @@ introFolder.add(introSettings, 'ketchupAfterHouse', 0, 1, 0.05).name('醬在末�
 introFolder.add(introSettings, 'rainbowSeconds', 0.2, 3, 0.05).name('彩虹入場 (秒)').onFinishChange(logIntro);
 const introControls = {
   replayIntro() {
+    resetIntroEnterButton();
     replayIntro();
   },
 };
@@ -828,6 +860,85 @@ function logPuddingPlacements() {
   );
 }
 
+// 蛋形太陽（位置／大小／發光）
+const eggSunEntry = friedEggs.find((e) => e.settings.mode === 'sun') ?? null;
+const eggSunFolder = eggSunEntry ? gui.addFolder('蛋形太陽') : null;
+
+function logEggSun() {
+  if (!eggSunEntry || eggSunEntry.settings.mode !== 'sun') return;
+  console.log(formatFriedEggPlacementsForPaste([{ id: eggSunEntry.id, settings: eggSunEntry.settings }]));
+}
+
+if (eggSunFolder && eggSunEntry && eggSunEntry.settings.mode === 'sun') {
+  const sun = eggSunEntry.settings as FriedEggSunLayout;
+  const apply = () => eggSunEntry.apply();
+  const applyVisuals = () => eggSunEntry.applyVisuals();
+  eggSunFolder
+    .add(sun, 'camX', -8, 8, 0.02)
+    .name('鏡頭 X（右＋）')
+    .onChange(apply)
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'camY', -2, 6, 0.02)
+    .name('鏡頭 Y（上＋）')
+    .onChange(apply)
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'camZ', -40, -2, 0.05)
+    .name('鏡頭 Z（愈負愈遠）')
+    .onChange(apply)
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'modelSize', 0.02, 0.45, 0.005)
+    .name('大小 (m)')
+    .onChange(apply)
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'placementScale', 0.05, 3, 0.01)
+    .name('整體縮放')
+    .onChange(apply)
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'spinDegrees', -180, 180, 1)
+    .name('自轉 (°)')
+    .onChange(apply)
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'lightIntensity', 0, 3, 0.02)
+    .name('光照強度')
+    .onChange(apply)
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'emissiveBoost', 0.2, 3, 0.02)
+    .name('發光倍率')
+    .onChange(applyVisuals)
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'jiggleStrength', 0, 2.5, 0.02)
+    .name('抖動幅度')
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'jiggleSpeed', 0.08, 1.2, 0.02)
+    .name('抖動速度')
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'whiteMetalness', 0, 0.35, 0.01)
+    .name('蛋白金屬度')
+    .onChange(applyVisuals)
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'whiteRoughness', 0.2, 0.95, 0.01)
+    .name('蛋白粗糙度')
+    .onChange(applyVisuals)
+    .onFinishChange(logEggSun);
+  eggSunFolder
+    .add(sun, 'whiteEnvIntensity', 0, 0.8, 0.02)
+    .name('蛋白環境反射')
+    .onChange(applyVisuals)
+    .onFinishChange(logEggSun);
+  eggSunFolder.add({ log: logEggSun }, 'log').name('印出設定 (console)');
+}
+
 if (puddingFolder) {
   const puddingControls = {
     add() {
@@ -855,6 +966,169 @@ if (puddingFolder) {
   highlightPudding(null);
 }
 
+// 烤玉米（綠球上；拖曳選取後調整）
+const cornFolder = grilledCorns.length > 0 ? gui.addFolder('烤玉米') : null;
+let selectedCorn: WorldGrilledCorn | null = null;
+
+function highlightCorn(entry: WorldGrilledCorn | null) {
+  for (const corn of grilledCorns) {
+    if (corn !== entry) {
+      corn.applyVisuals();
+      continue;
+    }
+    corn.object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        if (!('emissiveIntensity' in material)) continue;
+        const m = material as THREE.MeshStandardMaterial;
+        const name = (m.name || mesh.name || '').toLowerCase();
+        if (!name.includes('kernel') && !name.includes('body')) continue;
+        m.emissiveIntensity = Math.max(m.emissiveIntensity, 0.9);
+      }
+    });
+  }
+}
+
+const CORN_PANEL_ACTIONS = new Set(['add', 'remove', 'log', 'reloadModel']);
+
+function clearCornPanelSliders() {
+  if (!cornFolder) return;
+  cornFolder.title('烤玉米');
+  for (const controller of [...cornFolder.controllers]) {
+    if (CORN_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+function bindCornPanel(entry: WorldGrilledCorn) {
+  if (!cornFolder) return;
+  const alreadyShowing = entry === selectedCorn && cornFolder.controllers.length > CORN_PANEL_ACTIONS.size;
+  selectedCorn = entry;
+  highlightCorn(entry);
+  if (alreadyShowing) return;
+
+  cornFolder.title(`烤玉米 · ${entry.label}`);
+  clearCornPanelSliders();
+
+  const settings = entry.settings;
+  const visual = entry.visualSettings;
+  const apply = () => entry.apply();
+  const applyVisuals = () => entry.applyVisuals();
+
+  cornFolder
+    .add(settings, 'angleFromTopDegrees', 0, 90, 1)
+    .name('離頂端 (°)')
+    .onChange(apply)
+    .onFinishChange(logCornPlacements);
+  cornFolder
+    .add(settings, 'azimuthDegrees', -180, 180, 1)
+    .name('方位 (°)')
+    .onChange(apply)
+    .onFinishChange(logCornPlacements);
+  cornFolder
+    .add(settings, 'spinDegrees', -180, 180, 1)
+    .name('自轉 (°)')
+    .onChange(apply)
+    .onFinishChange(logCornPlacements);
+  cornFolder
+    .add(settings, 'sink', -0.05, 0.08, 0.001)
+    .name('下沉')
+    .onChange(apply)
+    .onFinishChange(logCornPlacements);
+  cornFolder
+    .add(settings, 'placementScale', 0.05, 2, 0.01)
+    .name('縮放')
+    .onChange(apply)
+    .onFinishChange(logCornPlacements);
+  cornFolder
+    .add(settings, 'modelSize', 0.03, 0.35, 0.005)
+    .name('大小 (m)')
+    .onChange(apply)
+    .onFinishChange(logCornPlacements);
+
+  const look = cornFolder.addFolder('外觀（即時）');
+  look
+    .add(visual, 'emissiveIntensity', 0, 1.2, 0.01)
+    .name('發光')
+    .onChange(applyVisuals)
+    .onFinishChange(logCornPlacements);
+  look
+    .add(visual, 'colorBoost', 0.7, 1.4, 0.01)
+    .name('亮度')
+    .onChange(applyVisuals)
+    .onFinishChange(logCornPlacements);
+  look
+    .add(visual, 'orangeBias', 0, 0.25, 0.005)
+    .name('偏橘')
+    .onChange(applyVisuals)
+    .onFinishChange(logCornPlacements);
+  look
+    .add(visual, 'normalScale', 0.5, 2.5, 0.05)
+    .name('顆粒立體')
+    .onChange(applyVisuals);
+  look
+    .add(visual, 'steamDensity', 0, 1.8, 0.05)
+    .name('熱氣濃度')
+    .onChange(applyVisuals)
+    .onFinishChange(logCornPlacements);
+  look
+    .addColor(visual, 'tintColor')
+    .name('染色')
+    .onChange(applyVisuals)
+    .onFinishChange(logCornPlacements);
+  look
+    .add(visual, 'tintMix', 0, 1, 0.01)
+    .name('染色強度')
+    .onChange(applyVisuals)
+    .onFinishChange(logCornPlacements);
+}
+
+function logCornPlacements() {
+  if (grilledCorns.length === 0) return;
+  const text = formatGrilledCornPlacementsForPaste(
+    grilledCorns.map((c) => ({ id: c.id, settings: c.settings, visualSettings: c.visualSettings })),
+  );
+  console.log(text);
+  return text;
+}
+
+if (cornFolder) {
+  const cornControls = {
+    add() {
+      const seed = selectedCorn
+        ? { ...selectedCorn.settings, ...selectedCorn.visualSettings }
+        : undefined;
+      const created = addGrilledCorn(seed);
+      if (!created) return;
+      bindCornPanel(created);
+      refreshPuddingDragTargets();
+    },
+    remove() {
+      if (!selectedCorn || grilledCorns.length <= 1) return;
+      const removed = selectedCorn;
+      if (!removeGrilledCorn(removed)) return;
+      selectedCorn = null;
+      clearCornPanelSliders();
+      highlightCorn(null);
+      refreshPuddingDragTargets();
+    },
+    log() {
+      logCornPlacements();
+    },
+    reloadModel() {
+      window.location.reload();
+    },
+  };
+  cornFolder.add(cornControls, 'add').name('新增玉米');
+  cornFolder.add(cornControls, 'remove').name('移除選中玉米');
+  cornFolder.add(cornControls, 'log').name('印出全部設定 (console)');
+  cornFolder.add(cornControls, 'reloadModel').name('重載頁面（換新 GLB）');
+  if (grilledCorns[0]) bindCornPanel(grilledCorns[0]);
+  else highlightCorn(null);
+}
+
 // 進場時各分組與根面板都收合，需要時再手動展開
 [
   lightFolder,
@@ -868,6 +1142,7 @@ if (puddingFolder) {
   transitionFolder,
   houseFolder,
   puddingFolder,
+  cornFolder,
 ]
   .filter((folder): folder is GUI => folder != null)
   .forEach((folder) => folder.close());
@@ -914,11 +1189,18 @@ function updateHouseLabel() {
 // 開關：false = 關閉，點到房子也只會旋轉鏡頭
 const HOUSE_DRAG_ENABLED = true;
 
-let surfaceDragTargets: Array<WorldHouse | WorldPudding> = [...houses, ...puddings];
+const friedEggsOnSphere = () => friedEggs.filter((egg) => egg.settings.mode === 'sphere');
+
+let surfaceDragTargets: Array<WorldHouse | WorldPudding | WorldGrilledCorn | WorldFriedEgg> = [
+  ...houses,
+  ...puddings,
+  ...grilledCorns,
+  ...friedEggsOnSphere(),
+];
 
 function refreshPuddingDragTargets() {
   surfaceDragTargets.length = 0;
-  surfaceDragTargets.push(...houses, ...puddings);
+  surfaceDragTargets.push(...houses, ...puddings, ...grilledCorns, ...friedEggsOnSphere());
 }
 
 if (HOUSE_DRAG_ENABLED) {
@@ -938,20 +1220,26 @@ if (HOUSE_DRAG_ENABLED) {
       }
       const puddingEntry = puddings.find((item) => item.object === target.object);
       if (puddingEntry) bindPuddingPanel(puddingEntry);
+      const cornEntry = grilledCorns.find((item) => item.object === target.object);
+      if (cornEntry) bindCornPanel(cornEntry);
     },
     onDrag: (normal, target) => {
       target.setNormal(normal);
       houseFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       puddingFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      cornFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
     onDragEnd: (target) => {
       if (houses.some((house) => house.object === target.object)) logHouse();
       else if (puddings.some((item) => item.object === target.object)) logPuddingPlacements();
+      else if (grilledCorns.some((item) => item.object === target.object)) logCornPlacements();
     },
     onClick: (target) => {
       if (houses.some((house) => house.object === target.object)) markHouseSelected();
       const puddingEntry = puddings.find((item) => item.object === target.object);
       if (puddingEntry) bindPuddingPanel(puddingEntry);
+      const cornEntry = grilledCorns.find((item) => item.object === target.object);
+      if (cornEntry) bindCornPanel(cornEntry);
     },
   });
 }
@@ -1031,6 +1319,7 @@ function render(time: number) {
   controls.update();
   // 彩虹等跟鏡頭對齊的物件要在 controls 之後更新
   updateObjs(time * 0.001);
+  tryUnlockEnterAfterHouses();
   updateFlashlight();
   // 入場會動 ground pivot，陰影貼圖要用最新的世界矩陣
   all.updateMatrixWorld(true);
@@ -1047,8 +1336,7 @@ renderer.setAnimationLoop(render);
 // 場景迴圈開始後才掀開：黑幕底下已經有畫好的畫面，不會旋開到一片空白
 void playSceneLoad().then(() => {
   worldUiActions?.removeAttribute('hidden');
-  // 開場已選 mainHall，不用先點房子才出現「進入」
-  markHouseSelected();
+  syncWorldActionButtons();
 });
 
 

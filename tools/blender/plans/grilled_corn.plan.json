@@ -2,18 +2,24 @@
   "schema": "lowpoly.asset/1",
   "id": "grilled_corn",
   "reference": "grilled_corn",
-  "notes": "實心烤玉米棒 + Surface Engine 的 corn_kernels 貼圖（fit UV）；竹籤用實木紋。正面朝 -Y。",
-  "dimensions": {"w": 0.075, "d": 0.075, "h": 0.26},
-  "detail": {"preset": "hero", "overrides": {"tertiary_density": 0}},
-  "style": {"edge_wobble": 0.003},
+  "notes": "卡通烤玉米（對齊參考圖）：圓頂玉米粒、底端芯帶；竹籤下長上尖。正面朝 -Y。",
+  "dimensions": {"w": 0.082, "d": 0.082, "h": 0.30},
+  "detail": {
+    "preset": "game_default",
+    "overrides": {"tertiary_density": 0, "geometry_complexity": 7, "bevel_quality": 1, "surface_detail": 0.35}
+  },
+  "style": {"edge_wobble": 0.016},
   "materials": [
-    {"name": "kernel", "hex": "#F0C42E", "roughness": 0.28,
-     "surface": {"class": "food", "pattern": "corn_kernels", "palette": ["#B07A14", "#F0C42E", "#FFE68A"],
-                 "accents": {"char": "#3A2418"}, "tier": "prop", "wear": 0.0, "dirt": 0.0, "normal_strength": 1.4}},
-    {"name": "char", "hex": "#3A2418", "roughness": 0.42},
-    {"name": "cob_pith", "hex": "#E6D2A8", "roughness": 0.52},
-    {"name": "skewer_wood", "hex": "#C9A87A", "roughness": 0.58,
-     "surface": {"class": "wood", "pattern": "wood_grain", "scale_m": 0.04, "tier": "prop", "wear": 0.2, "dirt": 0.1}}
+    {"name": "kernel", "hex": "#FFB820", "roughness": 0.12,
+     "surface": {"class": "food", "pattern": "corn_kernels", "uv": "fit", "units": 6, "kernel_rows": 7,
+                 "palette": ["#E89838", "#FFB820", "#FFE878"],
+                 "accents": {"sauce": "#C83828"},
+                 "tier": "prop", "wear": 0.0, "dirt": 0.0,
+                 "normal_strength": 2.0, "roughness_variation": 0.14, "gap_shade": 0.16,
+                 "posterize_steps": 4, "posterize_mix": 0.62}},
+    {"name": "char", "hex": "#5C3020", "roughness": 0.38},
+    {"name": "cob_pith", "hex": "#F2E0B0", "roughness": 0.45},
+    {"name": "skewer_wood", "hex": "#E8C898", "roughness": 0.42}
   ],
   "budget": {"max_tris": 1800, "max_primitives": 3, "max_texture_kb": 400, "max_gpu_texture_mb": 8},
   "components": [
@@ -24,8 +30,8 @@
       "method": "component",
       "profile": "decoration",
       "material": "kernel",
-      "params": {"pith_material": "cob_pith"},
-      "bounds": [[-0.036, -0.036, 0.0], [0.036, 0.036, 0.20]],
+      "params": {"pith_material": "cob_pith", "sides": 6},
+      "bounds": [[-0.039, -0.039, 0.085], [0.039, 0.039, 0.275]],
       "source": "observed",
       "confidence": 0.94
     },
@@ -36,7 +42,8 @@
       "method": "component",
       "profile": "trim",
       "material": "skewer_wood",
-      "bounds": [[-0.004, -0.004, 0.0], [0.004, 0.004, 0.26]],
+      "params": {"tip_at": "top", "sides": 6},
+      "bounds": [[-0.005, -0.005, 0.0], [0.005, 0.005, 0.30]],
       "source": "observed",
       "confidence": 0.91
     }

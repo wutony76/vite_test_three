@@ -99,22 +99,22 @@ def build_caramel_pudding(ctx):
 @register("grilled_corn_body")
 def build_grilled_corn_body(ctx):
     """實心玉米棒：單一旋轉體，底部芯帶 + 錐台棒身（細節交給貼圖）。"""
-    seg = ctx.segments(1.15, minimum=28)
-    r_bot = ctx.hw * 0.96
-    r_top = ctx.hw * 0.64
+    seg = max(3, int(ctx.param("sides", 6)))
+    r_bot = ctx.hw * 1.02
+    r_top = ctx.hw * 0.72
     h = ctx.h
     pith = ctx.mat(ctx.param("pith_material", "cob_pith"))
     kernel = ctx.material
-    pith_h = max(h * 0.075, 0.008)
+    pith_h = max(h * 0.065, 0.007)
+    r_cap = r_top * 0.90
     profile = [
         (0.0, 0.0),
         (r_bot, 0.0),
         (r_bot, pith_h),
-        (r_bot * 0.99, h * 0.88),
-        (r_top * 0.78, h * 0.96),
-        (0.0, h),
+        (r_bot * 0.99, h * 0.86),
+        (r_cap, h),
     ]
-    bands = [pith, pith, kernel, kernel, kernel]
+    bands = [pith, pith, kernel, kernel]
     return shapes.lathe(profile, seg, bands, axis="z")
 
 
@@ -174,11 +174,53 @@ def build_grilled_corn_end(ctx):
     return shapes.lathe(profile, ctx.segments(0.65, minimum=8), ctx.material, axis="z")
 
 
+@register("fried_egg_white")
+def build_fried_egg_white(ctx):
+    """荷包蛋白：不規則圓盤（圓周 ≤16 段），略帶起伏。"""
+    seg = min(16, max(6, int(ctx.param("sides", 16))))
+    wobble = float(ctx.param("wobble", 0.11))
+    aspect = ctx.hd / ctx.hw if ctx.hw > 1e-9 else 1.0
+    h = max(ctx.h, 0.0025)
+    r0 = ctx.hw * 0.96
+
+    def ring(z, bulge=0.0):
+        pts = []
+        for k in range(seg):
+            angle = math.tau * k / seg
+            w = 1.0 + wobble * math.sin(angle * 2.3 + 0.4) + wobble * 0.55 * math.cos(angle * 5.1 + 1.2)
+            x = math.cos(angle) * r0 * w
+            y = math.sin(angle) * r0 * w * aspect
+            zz = z + bulge * math.sin(angle * 3.0 + 0.8)
+            pts.append((x, y, zz))
+        return pts
+
+    return shapes.loft([ring(0.0), ring(h, h * 0.12)], ctx.material, cap_start=True, cap_end=True)
+
+
+@register("fried_egg_yolk")
+def build_fried_egg_yolk(ctx):
+    """蛋黃：半球頂（圓周 ≤16 段）。"""
+    seg = min(16, max(6, int(ctx.param("sides", 16))))
+    r = min(ctx.hw, ctx.hd) * 0.94
+    h = max(ctx.h, 0.004)
+    steps = max(3, min(8, int(ctx.param("dome_steps", 4))))
+    ratio = h / r if r > 1e-9 else 1.0
+    profile = []
+    for i in range(steps):
+        theta = (i / (steps - 1)) * (math.pi / 2)
+        profile.append((r * math.cos(theta), r * math.sin(theta) * ratio))
+    return shapes.lathe(profile, seg, ctx.material, axis="z")
+
+
 @register("bamboo_skewer")
 def build_bamboo_skewer(ctx):
-    """竹籤：細軸 + 頂端尖頭。"""
+    """竹籤：細軸 + 一端尖頭（plan 可設 tip_at: top／bottom）。"""
     h = ctx.h
     r = min(ctx.hw, ctx.hd) * 0.88
-    tip_z = h * 0.94
-    profile = [(0.0, 0.0), (r, 0.0), (r, tip_z), (0.0, h)]
-    return shapes.lathe(profile, ctx.segments(0.45, minimum=6), ctx.material, axis="z")
+    tip_tail = h * 0.06
+    if ctx.param("tip_at", "top") == "bottom":
+        profile = [(0.0, 0.0), (r, tip_tail), (r, h)]
+    else:
+        profile = [(0.0, 0.0), (r, 0.0), (r, h - tip_tail), (0.0, h)]
+    seg = max(3, int(ctx.param("sides", 6)))
+    return shapes.lathe(profile, seg, ctx.material, axis="z")

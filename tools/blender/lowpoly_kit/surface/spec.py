@@ -53,6 +53,8 @@ PATTERNS = {
     "stripes": {"units": 6, "scale_m": 0.2, "tileable": True, "relief": False},
     # 不平鋪：整個物件展開成一張圖（fit UV），units 是「一圈幾顆」的參考
     "corn_kernels": {"units": 20, "scale_m": 0.01, "tileable": False, "relief": True},
+    "fried_egg_white": {"units": 1, "scale_m": 0.14, "tileable": False, "relief": True},
+    "fried_egg_yolk": {"units": 1, "scale_m": 0.055, "tileable": False, "relief": True},
 }
 # relief = False：表面幾乎平的圖樣不產生法線貼圖（省下 1/3 的 GPU 記憶體，看起來也沒差）
 
@@ -78,8 +80,9 @@ TIERS = {
 TIER_ORDER = ("prop", "standard", "hero")
 
 SOURCES = ("procedural", "library", "manual", "provider")
-SURFACE_KEYS = {"class", "pattern", "palette", "accents", "scale_m", "wear", "dirt", "uv", "tier", "source",
-                "normal_strength", "roughness_variation"}
+SURFACE_KEYS = {"class", "pattern", "palette", "accents", "scale_m", "units", "kernel_rows", "wear", "dirt", "uv",
+                "tier", "source", "normal_strength", "roughness_variation", "posterize_steps", "posterize_mix",
+                "gap_shade"}
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +152,8 @@ def resolve_surface(material, profile=None, quality="standard", detail_strength=
     tier_info = TIERS[tier]
     scale_m = float(surface.get("scale_m", pattern_info["scale_m"]))
     tileable = pattern_info["tileable"]
-    units = pattern_info["units"]
+    units = int(surface.get("units", pattern_info["units"]))
+    kernel_rows = surface.get("kernel_rows")
     uv = surface.get("uv") or ("fit" if not tileable else PROFILE_UV.get(profile, "planar"))
     size = tier_info["tile"] if tileable else tier_info["unique"]
     palette = surface.get("palette") or derive_palette(material["hex"])
@@ -158,13 +162,16 @@ def resolve_surface(material, profile=None, quality="standard", detail_strength=
     pixels_key = {
         "pattern": pattern, "palette": [p.upper() for p in palette],
         "accents": {k: v.upper() for k, v in sorted(surface.get("accents", {}).items())},
-        "units": units, "size": size,
+        "units": units, "kernel_rows": int(kernel_rows) if kernel_rows is not None else None, "size": size,
         "wear": round(float(surface.get("wear", 0.3)) * detail_strength, 3),
         "dirt": round(float(surface.get("dirt", 0.2)) * detail_strength, 3),
         "roughness": round(float(material.get("roughness", base["roughness"])), 3),
         "metallic": round(float(material.get("metallic", base["metallic"])), 3),
         "roughness_variation": round(float(surface.get("roughness_variation", 0.12)), 3),
         "normal_strength": round(float(surface.get("normal_strength", 1.0)), 3),
+        "posterize_steps": int(surface.get("posterize_steps", 4)),
+        "posterize_mix": round(float(surface.get("posterize_mix", 0.3)), 3),
+        "gap_shade": round(float(surface.get("gap_shade", 0.42)), 3),
         "source": source,
         "relief": bool(pattern_info["relief"]),
     }
@@ -219,11 +226,17 @@ def validate_surface(c, surface, path, hex_pattern):
     for name, value in (surface.get("accents") or {}).items():
         if not (isinstance(value, str) and hex_pattern.match(value)):
             c.error("PLAN_FIELD_TYPE", f"{path}.accents.{name}", f"需要 #RRGGBB，拿到 {value!r}")
-    for key, low, high in (("wear", 0, 1), ("dirt", 0, 1), ("roughness_variation", 0, 0.5), ("normal_strength", 0, 4)):
+    for key, low, high in (
+        ("wear", 0, 1), ("dirt", 0, 1), ("roughness_variation", 0, 0.5), ("normal_strength", 0, 4), ("gap_shade", 0, 1),
+    ):
         if key in surface:
             c.in_range(c.get(surface, key, path, "number"), low, high, f"{path}.{key}")
     if "scale_m" in surface:
         c.in_range(c.get(surface, "scale_m", path, "number"), 0.001, 20, f"{path}.scale_m")
+    if "units" in surface:
+        c.in_range(c.get(surface, "units", path, "number"), 3, 48, f"{path}.units")
+    if "kernel_rows" in surface:
+        c.in_range(c.get(surface, "kernel_rows", path, "number"), 3, 24, f"{path}.kernel_rows")
     if "uv" in surface:
         c.enum(c.get(surface, "uv", path, "str"), UV_STRATEGIES, f"{path}.uv")
     if "tier" in surface:

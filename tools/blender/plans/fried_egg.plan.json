@@ -1,0 +1,87 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "fried_egg",
+  "reference": "fried_egg",
+  "notes": "卡通荷包蛋（俯視參考圖）：不規則蛋白盤 + 半球蛋黃；圓周分段 ≤16。正面朝 -Y。",
+  "dimensions": {"w": 0.14, "d": 0.12, "h": 0.024},
+  "detail": {
+    "preset": "game_default",
+    "overrides": {"tertiary_density": 0, "geometry_complexity": 6, "bevel_quality": 1, "surface_detail": 0.4}
+  },
+  "style": {"edge_wobble": 0.008},
+  "materials": [
+    {
+      "name": "egg_white",
+      "hex": "#F5F0E8",
+      "roughness": 0.2,
+      "surface": {
+        "class": "food",
+        "pattern": "fried_egg_white",
+        "uv": "planar",
+        "tier": "standard",
+        "units": 3,
+        "palette": ["#D8D0C4", "#F8F4EC", "#FFFFFF"],
+        "accents": {"crispy": "#7A4E2C"},
+        "wear": 0.02,
+        "dirt": 0.0,
+        "normal_strength": 1.6,
+        "roughness_variation": 0.28,
+        "gap_shade": 0.38,
+        "posterize_steps": 5,
+        "posterize_mix": 0.55
+      }
+    },
+    {
+      "name": "egg_yolk",
+      "hex": "#F07818",
+      "roughness": 0.1,
+      "surface": {
+        "class": "food",
+        "pattern": "fried_egg_yolk",
+        "uv": "planar",
+        "tier": "standard",
+        "units": 3,
+        "palette": ["#C84810", "#F08020", "#FFE8B0"],
+        "accents": {"highlight": "#FFF4E0", "rim": "#B83808"},
+        "wear": 0.0,
+        "dirt": 0.0,
+        "normal_strength": 2.0,
+        "roughness_variation": 0.32,
+        "gap_shade": 0.22,
+        "posterize_steps": 5,
+        "posterize_mix": 0.48
+      }
+    }
+  ],
+  "budget": {"max_tris": 1200, "max_primitives": 4, "max_texture_kb": 900, "max_gpu_texture_mb": 36},
+  "components": [
+    {
+      "id": "white",
+      "kind": "fried_egg_white",
+      "tier": "primary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "egg_white",
+      "params": {"sides": 16, "wobble": 0.11},
+      "bounds": [[-0.07, -0.06, 0.0], [0.07, 0.06, 0.007]],
+      "source": "observed",
+      "confidence": 0.92
+    },
+    {
+      "id": "yolk",
+      "kind": "fried_egg_yolk",
+      "tier": "primary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "egg_yolk",
+      "params": {"sides": 10, "dome_steps": 3},
+      "bounds": [[-0.032, -0.028, 0.0055], [0.032, 0.028, 0.023]],
+      "source": "observed",
+      "confidence": 0.94
+    }
+  ],
+  "export": {
+    "path": "public/models/fried_egg/fried_egg.glb",
+    "compress": true
+  }
+}

@@ -316,44 +316,107 @@ def crust(size, units, seed):
     return out
 
 
-def corn_kernels(size, units, seed):
+def corn_kernels(size, units, seed, kernel_rows=None):
     """玉米粒（不平鋪，整根展開）：u = 繞一圈、v = 由下往上。
 
-    每列 units 顆、錯開排列；每顆是圓角的隆起，中間偏左一帶有部分烤焦（accents.char）。
+    units = 一圈幾粒；kernel_rows 可指定縱向層數（預設約 0.8×units）。
     u 方向可以無縫（繞回起點），v 方向不需要（上下兩端是玉米的頭尾）。
     """
     gen = noise.rng(seed)
-    cols = max(6, units)
-    # 一顆粒大約正方形：玉米周長 ≈ 0.2 m、粒區高度 ≈ 0.17 m → 列數約是行數的 0.8 倍
-    rows = max(6, round(cols * 0.8))
+    cols = max(3, int(units))
+    rows = max(3, int(kernel_rows)) if kernel_rows is not None else max(6, round(cols * 0.8))
     cell_w, cell_h = size / cols, size / rows
     xs, ys = (np.arange(size, dtype=np.float32) + 0.5,) * 2
     row = np.floor(ys / cell_h).astype(int)
     offset = np.where(row % 2 == 1, cell_w / 2, 0.0)
     xx = (xs[None, :] + offset[:, None]) % size
     col = np.floor(xx / cell_w).astype(int)
-    # 圓角方形（超橢圓，指數 3）：玉米粒彼此擠在一起，比圓形更填滿格子，縫隙只剩細線
-    nx = ((xx - col * cell_w) / cell_w - 0.5) / 0.47
-    ny = ((((ys - row * cell_h) / cell_h) - 0.5) / 0.46)[:, None]
-    dome = np.clip(1 - np.abs(nx) ** 3 - np.abs(ny) ** 3, 0, 1)
+    ux = (xx - col * cell_w) / cell_w - 0.5
+    uy = ((ys - row * cell_h) / cell_h - 0.5)[:, None]
+    # kernel_fill 越大 → 單粒在格子內越大（與 ux 同單位，勿小於 ~0.32）
+    kernel_fill = 0.43
+    nx, ny = ux / kernel_fill, uy / kernel_fill
+    dome = np.clip(1 - np.abs(nx) ** 2.0 - np.abs(ny) ** 2.0, 0, 1)
     out = _empty(size)
-    out["height"] = (0.2 + 0.8 * dome ** 0.35).astype(np.float32)
-    out["gap"] = np.clip(0.08 - dome, 0, 1) / 0.08
+    out["height"] = (0.18 + 0.90 * dome ** 0.26).astype(np.float32)
+    edge_dist = 0.5 - np.maximum(np.abs(ux), np.abs(uy))
+    out["gap"] = np.clip((0.017 - edge_dist) / 0.007, 0, 1)
     tone_table = gen.uniform(-1, 1, (rows, cols)).astype(np.float32)
     out["tone"] = tone_table[row[:, None], col % cols]
-    out["detail"] = (1 - nx ** 2 * 0.55 - ny ** 2 * 0.25) * 2 - 1  # 每顆的立體高光
-    # 烤焦區：u 在 0.34～0.56、v 在 0.28～0.72 之間的玉米粒，有 22% 機率整顆焦掉
-    u = (col + 0.5) / cols
-    v = 1 - (row[:, None] + 0.5) / rows
-    burnt_table = (gen.random((rows, cols)) < 0.22).astype(np.float32)
-    zone = (u >= 0.34) & (u <= 0.56) & (v >= 0.28) & (v <= 0.72)
-    char = burnt_table[row[:, None], col % cols] * zone * (dome > 0)
-    out["accents"] = {"char": char.astype(np.float32)}
+    out["detail"] = (1 - nx ** 2 * 0.4 - ny ** 2 * 0.18) * 2.8 - 1
+    out["accents"] = {"sauce": _corn_sauce_drips(size, seed, dome)}
     return out
+
+
+def fried_egg_white(size, units, seed):
+    """荷包蛋白：中央乳白、邊緣焦脆蕾絲帶。"""
+    u, v = _coords(size)
+    dx, dy = (u - 0.5) * 2.0, (v - 0.5) * 2.0
+    r = np.sqrt(dx * dx + dy * dy)
+    out = _empty(size)
+    bubbles = noise.voronoi(size, 20, seed + 2, jitter=0.88)
+    pore = np.clip(0.11 - bubbles["f1"], 0, 1) * (r < 0.78).astype(np.float32)
+    out["height"] = 0.48 + noise.fbm(size, 6, seed, octaves=3) * 0.09 - pore * 0.28
+    edge = np.clip((r - 0.58) / 0.42, 0, 1)
+    lace = noise.fbm(size, 18, seed + 11, octaves=4)
+    crispy = edge * (0.5 + 0.5 * lace)
+    out["height"] = out["height"] + crispy.astype(np.float32) * 0.24
+    out["tone"] = noise.fbm(size, 4, seed + 1, octaves=3) * 2 - 1
+    out["detail"] = noise.fbm(size, 22, seed + 5, octaves=2) * 2 - 1
+    out["gap"] = pore * 0.75 + np.clip((r - 0.94) * 12, 0, 1) * 0.45
+    out["accents"] = {"crispy": np.clip(crispy ** 1.15, 0, 1).astype(np.float32)}
+    return out
+
+
+def fried_egg_yolk(size, units, seed):
+    """蛋黃：橘金球頂、偏左上油亮高光。"""
+    u, v = _coords(size)
+    dx, dy = (u - 0.5) * 2.0, (v - 0.5) * 2.0
+    r = np.sqrt(dx * dx + dy * dy)
+    out = _empty(size)
+    dome = np.clip(1 - r ** 1.35, 0, 1)
+    out["height"] = (0.32 + 0.68 * dome ** 0.85).astype(np.float32)
+    out["tone"] = noise.fbm(size, 5, seed, octaves=3) * 2 - 1
+    out["detail"] = noise.fbm(size, 14, seed + 7, octaves=2) * 2 - 1
+    out["gap"] = np.clip((r - 0.88) * 10, 0, 1) * (1 - dome * 0.35)
+    spec = np.exp(-((u - 0.38) ** 2 + (v - 0.40) ** 2) * size * 0.065) * dome
+    ring = np.clip((r - 0.55) / 0.35, 0, 1) * (1 - r * 0.2)
+    out["accents"] = {
+        "highlight": np.clip(spec * 1.05, 0, 1).astype(np.float32),
+        "rim": np.clip(ring * dome, 0, 1).astype(np.float32),
+    }
+    return out
+
+
+def _corn_sauce_drips(size, seed, dome):
+    """卡通烤醬：幾道細垂落＋上段薄亮帶，只在粒面（dome）上。"""
+    gen = noise.rng(seed + 501)
+    xs = (np.arange(size, dtype=np.float32) + 0.5)
+    ys = (np.arange(size, dtype=np.float32) + 0.5)
+    xx, yy = np.meshgrid(xs, ys)
+    on_kernel = np.clip((dome - 0.12) / 0.55, 0, 1)
+    sauce = np.zeros((size, size), np.float32)
+    for i in range(3):
+        u0 = gen.uniform(0.24, 0.76) * size
+        width = gen.uniform(0.020, 0.034) * size
+        amp = gen.uniform(0.010, 0.024) * size
+        freq = gen.uniform(2.6, 4.0)
+        v0 = gen.uniform(0.42, 0.54) * size
+        v1 = gen.uniform(0.84, 0.97) * size
+        span = max(v1 - v0, 1.0)
+        path_u = u0 + np.sin((yy - v0) / size * freq * np.pi * 2 + i * 1.55) * amp
+        along = np.clip((yy - v0) / span, 0, 1) * np.clip((v1 - yy) / (span * 0.35), 0, 1)
+        radial = np.exp(-((xx - path_u) ** 2) / (2 * width * width))
+        sauce = np.maximum(sauce, radial * along.astype(np.float32))
+    band = np.clip(1 - np.abs(yy - size * 0.60) / (size * 0.055), 0, 1)
+    swirl = 0.55 + 0.45 * np.sin(xx / size * np.pi * 3.5 + yy / size * 1.8)
+    sauce = np.maximum(sauce, band * swirl * 0.28)
+    return np.clip(sauce * on_kernel * 0.68, 0, 1).astype(np.float32)
 
 
 PATTERN_FUNCS = {
     "planks": planks, "wood_grain": wood_grain, "brick": brick, "cobble": cobble, "roof_tiles": roof_tiles,
     "rock": rock, "plaster": plaster, "brushed": brushed, "weave": weave, "foliage": foliage, "ground": ground,
     "crust": crust, "painted": painted, "stripes": stripes, "corn_kernels": corn_kernels,
+    "fried_egg_white": fried_egg_white, "fried_egg_yolk": fried_egg_yolk,
 }

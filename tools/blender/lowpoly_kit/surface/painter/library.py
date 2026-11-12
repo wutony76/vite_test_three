@@ -9,7 +9,10 @@ from .stylize import paint
 def generate(spec):
     """spec：surface.spec.resolve_surface 的回傳值。同一個 spec 每次產生的像素完全相同。"""
     func = PATTERN_FUNCS.get(spec["pattern"], PATTERN_FUNCS["painted"])
-    fields = func(spec["size"], spec["units"], spec["seed"])
+    if spec["pattern"] == "corn_kernels":
+        fields = func(spec["size"], spec["units"], spec["seed"], spec.get("kernel_rows"))
+    else:
+        fields = func(spec["size"], spec["units"], spec["seed"])
     return paint(fields, spec)
 
 

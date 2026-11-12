@@ -71,8 +71,28 @@ def paint(fields, spec):
     # 2. 凹處（cavity）：模糊後的高度比自己高 → 周圍比較高 → 是凹處
     cavity = np.clip((noise.blur(height, max(1, size // 128)) - height) * 3.0, 0, 1)
 
-    value = 0.56 + 0.13 * tone + 0.18 * (height - 0.5) + 0.07 * detail + 0.55 * lit
-    value -= 0.42 * gap + 0.35 * cavity
+    gap_k = float(spec.get("gap_shade", 0.42))
+    is_corn = spec.get("pattern") == "corn_kernels"
+    is_yolk = spec.get("pattern") == "fried_egg_yolk"
+    if is_corn:
+        on_kernel = np.clip((height - 0.28) / 0.40, 0, 1)
+        bump = np.clip((height - 0.38) / 0.42, 0, 1)
+        value = (
+            0.52 + 0.14 * tone * bump
+            + 0.26 * (height - 0.5)
+            + 0.14 * detail * bump
+            + 0.72 * lit * bump
+        )
+        seam = np.power(gap, 1.65)
+        value -= gap_k * seam
+        value -= 0.12 * cavity * seam
+    elif is_yolk:
+        dome = np.clip((height - 0.35) / 0.55, 0, 1)
+        value = 0.54 + 0.16 * tone * dome + 0.22 * (height - 0.5) + 0.08 * detail + 0.78 * lit * dome
+        value -= gap_k * gap * 0.6 + 0.22 * cavity
+    else:
+        value = 0.56 + 0.13 * tone + 0.18 * (height - 0.5) + 0.07 * detail + 0.55 * lit
+        value -= gap_k * gap + 0.35 * cavity
 
     # 3. 磨損：邊緣（斜率大的地方）在雜訊遮罩內提亮
     edge = np.clip(np.sqrt(gx * gx + gy * gy) * size / 24.0, 0, 1)
@@ -83,8 +103,14 @@ def paint(fields, spec):
     dirt = spec["dirt"] * np.clip((0.55 - height) * 2.2 + (dirt_mask - 0.5), 0, 1)
     value -= 0.22 * dirt
 
-    value = soft_posterize(np.clip(value, 0, 1))
+    posterize_steps = int(spec.get("posterize_steps", 4))
+    posterize_mix = float(spec.get("posterize_mix", 0.3))
+    value = soft_posterize(np.clip(value, 0, 1), steps=posterize_steps, amount=posterize_mix)
     rgb = _map_palette(value, spec["palette"])
+    if is_corn:
+        seam = np.power(gap, 1.2)[..., None]
+        bump = np.clip((height - 0.36) / 0.44, 0, 1)[..., None]
+        rgb = np.clip(rgb * (0.82 + 0.34 * bump + 0.10 * lit[..., None] * bump) * (1 - 0.12 * seam), 0, 1)
     rgb = rgb * (1 - 0.25 * dirt[..., None]) + np.array([0.24, 0.18, 0.12], np.float32) * 0.25 * dirt[..., None]
 
     # 5. accents：第四種顏色（烤焦、條紋），一樣跟著明暗走
@@ -97,9 +123,18 @@ def paint(fields, spec):
         rgb = rgb * (1 - mask[..., None]) + np.clip(shaded, 0, 1) * mask[..., None]
 
     # 6. ORM：R = 小尺度 AO（縫隙與凹處），G = roughness，B = metallic
-    rough = spec["roughness"] + spec["roughness_variation"] * (gap * 1.2 + cavity - lit * 2 + detail * 0.3)
-    occlusion = 1.0 - np.clip(cavity * 0.6 + gap * 0.35, 0, 0.8)
-    metallic = np.full_like(height, spec["metallic"]) * (1 - gap * 0.7)
+    gap_orm = np.power(gap, 2.0) if is_corn else gap
+    rough = spec["roughness"] + spec["roughness_variation"] * (gap_orm * 1.2 + cavity - lit * 2 + detail * 0.3)
+    if is_corn:
+        sauce_m = fields.get("accents", {}).get("sauce")
+        if sauce_m is not None:
+            rough = rough - sauce_m * 0.24
+    elif is_yolk:
+        hi = fields.get("accents", {}).get("highlight")
+        if hi is not None:
+            rough = rough - hi * 0.42
+    occlusion = 1.0 - np.clip(cavity * (0.2 if is_corn else 0.6) + gap_orm * 0.35 * (gap_k / 0.42), 0, 0.8)
+    metallic = np.full_like(height, spec["metallic"]) * (1 - gap_orm * 0.7)
 
     ones = np.ones((size, size, 1), dtype=np.float32)
     base = np.concatenate([np.clip(rgb, 0, 1), ones], axis=2)

@@ -1,0 +1,55 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "fried_egg",
+  "image": {"path": "tools/img/fried_egg.jpg", "width": 1024, "height": 1024},
+  "medium": "watercolor illustration, top-down fried egg",
+  "view": {"type": "top_ortho", "source": "observed", "confidence": 0.93},
+  "scale_anchor": {"component": "white", "axis": "width", "meters": 0.14},
+  "silhouette": {
+    "outline": [
+      [0.12, 0.22], [0.88, 0.18], [0.92, 0.78], [0.14, 0.84], [0.12, 0.22]
+    ],
+    "source": "observed",
+    "confidence": 0.9
+  },
+  "palette": [
+    {"name": "egg_white", "hex": "#F5F0E8", "usage": "半透明蛋白", "sample": [0.22, 0.35, 0.78, 0.72]},
+    {"name": "crispy_edge", "hex": "#8B5A34", "usage": "焦褐脆邊", "sample": [0.08, 0.42, 0.92, 0.88]},
+    {"name": "egg_yolk", "hex": "#F07818", "usage": "飽和蛋黃", "sample": [0.38, 0.38, 0.62, 0.62]}
+  ],
+  "surfaces": [
+    {
+      "id": "white",
+      "region": [[0.14, 0.20], [0.86, 0.20], [0.90, 0.80], [0.12, 0.84]],
+      "class": "food",
+      "pattern": "fried_egg_white",
+      "base_hex": "#F5F0E8",
+      "scale_m": 0.14,
+      "components": ["white"],
+      "source": "observed",
+      "confidence": 0.91
+    },
+    {
+      "id": "yolk",
+      "region": [[0.36, 0.34], [0.64, 0.34], [0.64, 0.66], [0.36, 0.66]],
+      "class": "food",
+      "pattern": "fried_egg_yolk",
+      "base_hex": "#F07818",
+      "scale_m": 0.055,
+      "components": ["yolk"],
+      "source": "observed",
+      "confidence": 0.94
+    }
+  ],
+  "components": [
+    {"id": "white", "kind": "fried_egg_white", "tier": "primary", "bbox": [0.12, 0.18, 0.88, 0.82], "material_hint": "egg_white", "source": "observed", "confidence": 0.92},
+    {"id": "yolk", "kind": "fried_egg_yolk", "tier": "primary", "bbox": [0.36, 0.34, 0.64, 0.66], "material_hint": "egg_yolk", "parent": "white", "source": "observed", "confidence": 0.94}
+  ],
+  "hidden": [
+    {"id": "thickness", "assumption": "蛋白厚度約直徑 5%，蛋黃隆起約 16 mm", "source": "inferred", "confidence": 0.55}
+  ],
+  "excluded": [
+    {"what": "水彩紙白邊與背景", "reason": "僅取蛋本體"},
+    {"what": "盤子", "reason": "參考圖無盤面"}
+  ]
+}
