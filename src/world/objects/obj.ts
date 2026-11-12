@@ -7,6 +7,7 @@ import { createKetchup } from './ketchup';
 import { createHouse, type HouseSettings } from './house';
 import { createCartoonRainbow } from './rainbow';
 import { createGameHallLights, type GameHallLights } from './gameHallLights';
+import { createGroundFlowers, type GroundFlowers } from './groundFlowers';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -72,6 +73,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   // 用模型時沒有綠球，就退回種在 all 上
   let ground: THREE.Object3D = all;
   let groundSurface: THREE.Mesh | null = null;
+  let groundFlowers: GroundFlowers | null = null;
   if (USE_MODEL) {
     loadModel(all);
   } else {
@@ -84,6 +86,12 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   // 番茄醬緞帶：繞著中間的物件流動
   const ketchup = createKetchup({ envMap, camera });
   all.add(ketchup.object);
+
+  if (ground !== all) {
+    // 花的正／背面依緞帶軸（球繞軸轉時朝鏡頭／背鏡頭），需在緞帶建立後才算軸
+    groundFlowers = createGroundFlowers(GROUND_RADIUS, camera, ground, ketchup.ringObject);
+    ground.add(groundFlowers.mesh);
+  }
 
   const rainbow = createCartoonRainbow(camera);
   all.add(rainbow.object);
@@ -264,8 +272,24 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     });
   }
 
+  function placeFlowers(elapsed: number) {
+    if (!groundFlowers) return;
+    const houseStart = introSettings.emptyHold + introSettings.ballSeconds;
+    const grows = introHouses.map((_, index) => {
+      const t = THREE.MathUtils.clamp(
+        (elapsed - houseStart - index * introSettings.houseStagger) / introSettings.houseSeconds,
+        0,
+        1,
+      );
+      return Math.max(0.0001, easeOutBack(t, introSettings.houseOvershoot));
+    });
+    groundFlowers.setIntroHouseGrows(grows);
+  }
+
   // 房子先收成 0。開場先不要綠球，等空景一段再從遠處跑進來
   placeHouses(0);
+  groundFlowers?.resetIntro(introHouses.length);
+  placeFlowers(0);
   if (ground !== all) ground.visible = false;
 
   /** 每幀呼叫：time 單位是秒，讓會動的物件更新動畫 */
@@ -278,9 +302,11 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
 
     if (introDone) {
       rainbow.finishIntro();
+      groundFlowers?.finishIntro();
     } else {
       placeBall(introElapsed);
       placeHouses(introElapsed);
+      placeFlowers(introElapsed);
       // 最後一棟長到一半，醬才從球後方沿環流出來
       const ketchupStart =
         introSettings.emptyHold +
@@ -308,6 +334,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
           ground.scale.setScalar(1);
         }
         introHouses.forEach((house) => house.object.scale.setScalar(house.settings.scale));
+        groundFlowers?.finishIntro();
         ketchup.setWrap(1);
         rainbow.finishIntro();
         introDone = true;
@@ -335,6 +362,8 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     introElapsed = 0;
     startReady = false;
     placeHouses(0);
+    groundFlowers?.resetIntro(introHouses.length);
+    placeFlowers(0);
     if (ground !== all) {
       ground.visible = false;
       ground.position.copy(restPos);
@@ -365,6 +394,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     // ground、groundSurface、groundRadius：拖曳與地表材質；ground 是 pivot，groundSurface 才是綠球 mesh
     ground,
     groundSurface,
+    groundFlowers,
     groundRadius: GROUND_RADIUS,
     isHouseGrown,
     isIntroComplete: () => introDone,
