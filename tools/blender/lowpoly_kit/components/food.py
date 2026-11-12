@@ -1,4 +1,4 @@
-"""食物道具：整隻烤雞等。"""
+"""食物道具：整隻烤雞、焦糖布丁等。"""
 
 import math
 
@@ -67,3 +67,30 @@ def build_chicken_bone(ctx):
         (0.0, h),
     ]
     return shapes.lathe(profile, ctx.segments(0.6, minimum=5), ctx.material, axis="z", phase=ctx.rng.random() * math.tau * 0.05)
+
+
+@register("caramel_pudding")
+def build_caramel_pudding(ctx):
+    """日式布丁：底寬頂窄的肋狀圓台，頂部焦糖帶（custard + caramel 雙材質）。"""
+    flutes = int(ctx.param("flutes", 10))
+    seg = max(flutes * 2, ctx.segments(1.15, minimum=20))
+    rings = max(5, ctx.segments(0.55, minimum=6))
+    r_bottom = min(ctx.hw * 0.94, 0.052)
+    r_top = min(ctx.hw * 0.70, 0.038)
+    cap = ctx.mat(ctx.param("caramel_material", "caramel"))
+    body = ctx.material
+    phase = ctx.rng.random() * math.tau / flutes
+    depth = float(ctx.param("flute_depth", 0.085))
+    return shapes.fluted_frustum(
+        r_bottom,
+        r_top,
+        ctx.h,
+        body,
+        cap,
+        flutes=flutes,
+        flute_depth=depth,
+        rings=rings,
+        segments=seg,
+        cap_fraction=float(ctx.param("cap_fraction", 0.16)),
+        phase=phase,
+    )

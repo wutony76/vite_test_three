@@ -1,0 +1,37 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "pudding",
+  "image": {"path": "tools/img/pudding.jpg", "width": 512, "height": 512},
+  "medium": "2D 焦糖布丁（purin）插畫參考",
+  "view": {"type": "three_quarter", "source": "observed", "confidence": 0.88},
+  "scale_anchor": {"component": "body", "axis": "height", "meters": 0.095},
+  "silhouette": {
+    "outline": [
+      [0.28, 0.22], [0.72, 0.22], [0.82, 0.48], [0.78, 0.78], [0.22, 0.78], [0.18, 0.48], [0.28, 0.22]
+    ],
+    "source": "observed",
+    "confidence": 0.86
+  },
+  "palette": [
+    {"name": "custard", "hex": "#F5D78E", "usage": "布丁本體", "sample": [0.32, 0.42, 0.68, 0.72]},
+    {"name": "caramel", "hex": "#8B4518", "usage": "頂部焦糖醬", "sample": [0.38, 0.26, 0.62, 0.36]}
+  ],
+  "components": [
+    {
+      "id": "body",
+      "kind": "caramel_pudding",
+      "tier": "primary",
+      "bbox": [0.20, 0.20, 0.80, 0.82],
+      "material_hint": "custard",
+      "source": "observed",
+      "confidence": 0.9
+    }
+  ],
+  "hidden": [
+    {"id": "depth", "assumption": "俯仰約 15° 的 3/4 視角，深度約為正面寬度的 0.88", "source": "inferred", "confidence": 0.5}
+  ],
+  "excluded": [
+    {"what": "盤子與背景", "reason": "只要單顆布丁道具"},
+    {"what": "焦糖鏡面高光", "reason": "用材質 roughness 表現，不做額外幾何"}
+  ]
+}

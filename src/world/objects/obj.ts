@@ -8,6 +8,8 @@ import { createHouse, type HouseSettings } from './house';
 import { createCartoonRainbow } from './rainbow';
 import { createGameHallLights, type GameHallLights } from './gameHallLights';
 import { createGroundFlowers, type GroundFlowers } from './groundFlowers';
+import { createPudding, type PuddingSettings } from './pudding';
+import { PUDDING_LAYOUT_DEFAULT, PUDDING_PLACEMENTS, type PuddingLayout } from './puddingLayout';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -101,6 +103,66 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   // 加成 ground pivot 的子物件（跟綠球同層）：球怎麼移動、縮放，房子都會跟著走，且影子能落在球面上
   const mainHall = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   ground.add(mainHall.object);
+
+  type PuddingRuntime = ReturnType<typeof createPudding>;
+  const puddingEntries: Array<{ world: WorldPudding; runtime: PuddingRuntime }> = [];
+  const puddings: WorldPudding[] = [];
+  const puddingAxes =
+    ground !== all ? { groundRadius: GROUND_RADIUS, envMap, ...getGroundAxes(ketchup.ringObject, camera) } : null;
+
+  function nextPuddingId() {
+    let n = puddingEntries.length + 1;
+    let id = `pudding_${n}`;
+    while (puddings.some((item) => item.id === id)) {
+      n += 1;
+      id = `pudding_${n}`;
+    }
+    return id;
+  }
+
+  function spawnPudding(id: string, layout: PuddingLayout, grown = false) {
+    if (!puddingAxes) return null;
+    const runtime = createPudding({ ...puddingAxes, layout: { ...layout } });
+    ground.add(runtime.object);
+    const world = exposePudding(id, runtime);
+    puddingEntries.push({ world, runtime });
+    puddings.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  if (puddingAxes) {
+    for (const placement of PUDDING_PLACEMENTS) {
+      const { id, ...layout } = placement;
+      spawnPudding(id, layout);
+    }
+  }
+
+  function addPudding(layout?: Partial<PuddingLayout>): WorldPudding | null {
+    if (!puddingAxes) return null;
+    const base = { ...PUDDING_LAYOUT_DEFAULT, ...layout };
+    const n = puddingEntries.length + 1;
+    base.azimuthDegrees = layout?.azimuthDegrees ?? PUDDING_LAYOUT_DEFAULT.azimuthDegrees + n * 14;
+    return spawnPudding(nextPuddingId(), base, introDone);
+  }
+
+  function removePudding(entry: WorldPudding) {
+    const index = puddingEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    const { runtime, world } = puddingEntries[index];
+    runtime.object.removeFromParent();
+    runtime.object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.geometry?.dispose();
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) material.dispose();
+    });
+    puddingEntries.splice(index, 1);
+    const puddingIndex = puddings.indexOf(world);
+    if (puddingIndex >= 0) puddings.splice(puddingIndex, 1);
+    return true;
+  }
 
   // Rroject
   const projectRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
@@ -288,6 +350,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
 
   // 房子先收成 0。開場先不要綠球，等空景一段再從遠處跑進來
   placeHouses(0);
+  for (const { runtime } of puddingEntries) runtime.setIntroGrow(0);
   groundFlowers?.resetIntro(introHouses.length);
   placeFlowers(0);
   if (ground !== all) ground.visible = false;
@@ -343,6 +406,13 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
 
     rainbow.update(deltaTime);
     gameHallLights?.update(time);
+
+    puddingEntries.forEach(({ runtime }, index) => {
+      const puddingStart = introSettings.emptyHold + introSettings.ballSeconds * 0.72 + index * 0.08;
+      const puddingT = THREE.MathUtils.clamp((introElapsed - puddingStart) / 0.95, 0, 1);
+      runtime.setIntroGrow(easeOutBack(puddingT, 2.4));
+      runtime.update(deltaTime, introDone);
+    });
   }
 
   function isHouseGrown(object: THREE.Object3D) {
@@ -371,6 +441,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     }
     ketchup.resetIntro();
     rainbow.resetIntro();
+    for (const { runtime } of puddingEntries) runtime.setIntroGrow(0);
   }
 
   // 緞帶擺放參數也往外交出去，讓 main.ts 的控制面板可以調整
@@ -401,6 +472,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     introSettings,
     replayIntro,
     gameHallLights,
+    puddings,
+    addPudding,
+    removePudding,
     houses: [
       exposeHouse('mainHall', mainHall),
       exposeHouse('projectRoom', projectRoom),
@@ -419,6 +493,28 @@ export type WorldHouse = {
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;
 };
+
+export type WorldPudding = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: PuddingSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+function exposePudding(id: string, pudding: ReturnType<typeof createPudding>): WorldPudding {
+  return {
+    id,
+    label: id,
+    object: pudding.object,
+    settings: pudding.settings,
+    apply: pudding.applySettings,
+    getNormal: pudding.getNormal,
+    setNormal: pudding.setNormal,
+  };
+}
 
 /** 把 createHouse 的回傳整理成面板、射線選取都能用的同一種形狀 */
 /** 開始快、結束慢 */

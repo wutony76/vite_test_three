@@ -452,6 +452,73 @@ def blob(center, radii, mat, segments=6, rings=4, jitter=0.0, rng=None):
     return shape.map(scale)
 
 
+def fluted_frustum(
+    r_bottom,
+    r_top,
+    height,
+    mat_body,
+    mat_cap,
+    *,
+    flutes=10,
+    flute_depth=0.09,
+    rings=7,
+    segments=20,
+    cap_fraction=0.14,
+    phase=0.0,
+):
+    """肋狀圓台（布丁模具形）：單一封閉幾何，頂部可換成焦糖材質帶。
+
+    r_bottom > r_top 時底寬頂窄。flute_depth 為肋條相對半徑的起伏比例。
+    """
+    if rings < 2 or segments < flutes * 2:
+        raise ValueError("fluted_frustum 需要 rings ≥ 2 且 segments ≥ 2×flutes")
+    if not 0 < cap_fraction < 1:
+        raise ValueError("cap_fraction 必須在 (0, 1)")
+
+    verts = []
+    grid = []
+    cap_z = height * (1.0 - cap_fraction)
+
+    for ri in range(rings + 1):
+        z = height * ri / rings
+        row = []
+        t = ri / rings
+        r_mean = r_bottom + (r_top - r_bottom) * t
+        for si in range(segments):
+            theta = phase + math.tau * si / segments
+            r = r_mean * (1.0 + flute_depth * math.cos(flutes * theta))
+            verts.append((r * math.cos(theta), r * math.sin(theta), z))
+            row.append(len(verts) - 1)
+        grid.append(row)
+
+    bottom_i = len(verts)
+    verts.append((0.0, 0.0, 0.0))
+    top_i = len(verts)
+    verts.append((0.0, 0.0, height))
+
+    faces, mats = [], []
+
+    for si in range(segments):
+        si2 = (si + 1) % segments
+        faces.append((grid[0][si2], grid[0][si], bottom_i))
+        mats.append(mat_body)
+
+    for ri in range(rings):
+        z_mid = height * (ri + 0.5) / rings
+        m = mat_cap if z_mid >= cap_z else mat_body
+        for si in range(segments):
+            si2 = (si + 1) % segments
+            faces.append((grid[ri][si], grid[ri][si2], grid[ri + 1][si2], grid[ri + 1][si]))
+            mats.append(m)
+
+    for si in range(segments):
+        si2 = (si + 1) % segments
+        faces.append((grid[rings][si], grid[rings][si2], top_i))
+        mats.append(mat_cap)
+
+    return single(verts, faces, mats)
+
+
 def rotate_x(data, angle, pivot=(0.0, 0.0, 0.0)):
     """繞 x 軸旋轉（A 字黑板的斜板）。"""
     c, s = math.cos(angle), math.sin(angle)

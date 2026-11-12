@@ -84,6 +84,12 @@ def test_lathe_band_materials():
     assert data.material_names() == ["base", "glow", "cap"]
 
 
+def test_fluted_frustum_is_closed():
+    data = shapes.fluted_frustum(1.0, 0.7, 0.9, "custard", "caramel", flutes=10, segments=20, rings=6)
+    _closed_single(data)
+    assert "caramel" in data.material_names()
+
+
 # ---------------------------------------------------------------------------
 # 零件庫
 # ---------------------------------------------------------------------------

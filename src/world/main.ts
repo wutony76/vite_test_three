@@ -7,7 +7,8 @@ import gradientFragmentShader from './shader/gradient.frag.glsl?raw';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // RoomEnvironment：three.js 內建的「虛擬攝影棚」，拿來當反射用的環境，不用另外下載 HDR 圖
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { createObjs, INTRO_BALL_EASE_OPTIONS, type WorldHouse } from './objects/obj';
+import { createObjs, INTRO_BALL_EASE_OPTIONS, type WorldHouse, type WorldPudding } from './objects/obj';
+import { formatPuddingPlacementsForPaste } from './objects/pudding';
 // lil-gui：three.js 內建的小型控制面板，拖拉滑桿就能即時調整數值，不用改程式碼重新整理
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { enableViewPlaneDrag } from './debug/viewPlaneDrag';
@@ -176,6 +177,9 @@ const {
   introSettings,
   replayIntro,
   gameHallLights,
+  puddings,
+  addPudding,
+  removePudding,
 } = createObjs({ envMap, camera });
 
 scene.add(all);
@@ -671,6 +675,133 @@ function highlightHouse(entry: WorldHouse) {
 
 bindHousePanel(houses[0]);
 
+// DEBUG...布丁（綠球上，可多顆）
+const puddingFolder = puddings.length > 0 ? gui.addFolder('布丁') : null;
+let selectedPudding: WorldPudding | null = null;
+
+function highlightPudding(entry: WorldPudding | null) {
+  for (const pudding of puddings) {
+    const active = pudding === entry;
+    pudding.object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        if (!('emissive' in material)) continue;
+        const m = material as THREE.MeshStandardMaterial;
+        if (!active) {
+          if (m.userData.puddingEmissiveIntensity !== undefined) {
+            m.emissiveIntensity = m.userData.puddingEmissiveIntensity;
+          }
+          continue;
+        }
+        if (m.userData.puddingEmissiveIntensity === undefined) {
+          m.userData.puddingEmissiveIntensity = m.emissiveIntensity;
+        }
+        m.emissiveIntensity = Math.max(m.emissiveIntensity, 0.85);
+      }
+    });
+  }
+}
+
+const PUDDING_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+
+function clearPuddingPanelSliders() {
+  if (!puddingFolder) return;
+  puddingFolder.title('布丁');
+  for (const controller of [...puddingFolder.controllers]) {
+    if (PUDDING_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+function bindPuddingPanel(entry: WorldPudding) {
+  if (!puddingFolder) return;
+  const alreadyShowing = entry === selectedPudding && puddingFolder.controllers.length > PUDDING_PANEL_ACTIONS.size;
+  selectedPudding = entry;
+  highlightPudding(entry);
+  if (alreadyShowing) return;
+
+  puddingFolder.title(`布丁 · ${entry.label}`);
+  puddingFolder.open();
+  clearPuddingPanelSliders();
+
+  const settings = entry.settings;
+  const apply = () => entry.apply();
+  puddingFolder
+    .add(settings, 'angleFromTopDegrees', 0, 90, 1)
+    .name('離頂端 PUDDING_ANGLE (°)')
+    .onChange(apply)
+    .onFinishChange(logPuddingPlacements);
+  puddingFolder
+    .add(settings, 'azimuthDegrees', -180, 180, 1)
+    .name('方位 PUDDING_AZIMUTH (°)')
+    .onChange(apply)
+    .onFinishChange(logPuddingPlacements);
+  puddingFolder
+    .add(settings, 'spinDegrees', -180, 180, 1)
+    .name('自轉 PUDDING_SPIN (°)')
+    .onChange(apply)
+    .onFinishChange(logPuddingPlacements);
+  puddingFolder
+    .add(settings, 'sink', -0.05, 0.08, 0.001)
+    .name('下沉 PUDDING_SINK')
+    .onChange(apply)
+    .onFinishChange(logPuddingPlacements);
+  puddingFolder
+    .add(settings, 'placementScale', 0.05, 2, 0.01)
+    .name('縮放 PUDDING_SCALE')
+    .onChange(apply)
+    .onFinishChange(logPuddingPlacements);
+  puddingFolder
+    .add(settings, 'modelSize', 0.03, 0.35, 0.005)
+    .name('大小 modelSize (m)')
+    .onChange(apply)
+    .onFinishChange(logPuddingPlacements);
+  puddingFolder
+    .add(settings, 'jiggleStrength', 0, 2.5, 0.02)
+    .name('Q彈強度')
+    .onFinishChange(logPuddingPlacements);
+  puddingFolder
+    .add(settings, 'jiggleSpeed', 0.2, 3, 0.05)
+    .name('Q彈速度')
+    .onFinishChange(logPuddingPlacements);
+}
+
+function logPuddingPlacements() {
+  if (puddings.length === 0) return;
+  console.log(
+    formatPuddingPlacementsForPaste(puddings.map((p) => ({ id: p.id, settings: p.settings }))),
+  );
+}
+
+if (puddingFolder) {
+  const puddingControls = {
+    add() {
+      const created = addPudding();
+      if (!created) return;
+      bindPuddingPanel(created);
+      refreshPuddingDragTargets();
+    },
+    remove() {
+      if (!selectedPudding || puddings.length <= 1) return;
+      const removed = selectedPudding;
+      if (!removePudding(removed)) return;
+      selectedPudding = null;
+      clearPuddingPanelSliders();
+      highlightPudding(null);
+      refreshPuddingDragTargets();
+    },
+    log() {
+      logPuddingPlacements();
+    },
+  };
+  puddingFolder.add(puddingControls, 'add').name('新增布丁');
+  puddingFolder.add(puddingControls, 'remove').name('移除選中布丁');
+  puddingFolder.add(puddingControls, 'log').name('印出全部佈局 (console)');
+  highlightPudding(null);
+}
+
 // 選中那棟的名字：用 HTML 畫在畫面上，而不是貼在 3D 房子上
 // 房子會跟著地球傾斜，3D 文字也會跟著歪、變小；HTML 永遠正對螢幕、大小固定，才是「2D 的名字」
 const houseLabel = document.createElement('div');
@@ -712,28 +843,44 @@ function updateHouseLabel() {
 // 開關：false = 關閉，點到房子也只會旋轉鏡頭
 const HOUSE_DRAG_ENABLED = true;
 
+let surfaceDragTargets: Array<WorldHouse | WorldPudding> = [...houses, ...puddings];
+
+function refreshPuddingDragTargets() {
+  surfaceDragTargets.length = 0;
+  surfaceDragTargets.push(...houses, ...puddings);
+}
+
 if (HOUSE_DRAG_ENABLED) {
   enableSurfaceDrag({
-    targets: houses,
+    targets: surfaceDragTargets,
     ground,
     groundRadius,
     camera,
     domElement: renderer.domElement,
     controls,
     onDragStart: (target) => {
-      const entry = houses.find((house) => house.object === target.object);
-      if (entry) bindHousePanel(entry);
-      markHouseSelected();
+      const houseEntry = houses.find((house) => house.object === target.object);
+      if (houseEntry) {
+        bindHousePanel(houseEntry);
+        markHouseSelected();
+        return;
+      }
+      const puddingEntry = puddings.find((item) => item.object === target.object);
+      if (puddingEntry) bindPuddingPanel(puddingEntry);
     },
     onDrag: (normal, target) => {
       target.setNormal(normal);
-      // 數值是程式改的、不是在面板上改的，面板不會自己重畫，要手動叫它更新顯示
       houseFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      puddingFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
-    onDragEnd: logHouse,
-    // 點一下只選房子；轉場改按 HUD「進入」
-    onClick: () => {
-      markHouseSelected();
+    onDragEnd: (target) => {
+      if (houses.some((house) => house.object === target.object)) logHouse();
+      else if (puddings.some((item) => item.object === target.object)) logPuddingPlacements();
+    },
+    onClick: (target) => {
+      if (houses.some((house) => house.object === target.object)) markHouseSelected();
+      const puddingEntry = puddings.find((item) => item.object === target.object);
+      if (puddingEntry) bindPuddingPanel(puddingEntry);
     },
   });
 }

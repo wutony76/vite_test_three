@@ -1,0 +1,37 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "pudding",
+  "reference": "pudding",
+  "notes": "卡通焦糖布丁（參考 tools/img/pudding.jpg）。正面朝 -Y，原點在 footprint 中心地面。",
+  "dimensions": {"w": 0.11, "d": 0.11, "h": 0.095},
+  "detail": {"preset": "game_default", "overrides": {}},
+  "style": {"edge_wobble": 0.006},
+  "materials": [
+    {"name": "custard", "hex": "#F5D78E", "roughness": 0.38},
+    {"name": "caramel", "hex": "#9A4E28", "roughness": 0.18}
+  ],
+  "budget": {"max_tris": 1200, "max_primitives": 3},
+  "components": [
+    {
+      "id": "body",
+      "kind": "caramel_pudding",
+      "tier": "primary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "custard",
+      "params": {
+        "flutes": 10,
+        "flute_depth": 0.085,
+        "caramel_material": "caramel",
+        "cap_fraction": 0.16
+      },
+      "bounds": [[-0.055, -0.055, 0.0], [0.055, 0.055, 0.095]],
+      "source": "observed",
+      "confidence": 0.9
+    }
+  ],
+  "export": {
+    "path": "public/models/pudding/pudding.glb",
+    "compress": true
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "pudding",
+  "glb": "pudding.glb",
+  "requires": [
+    "EXT_meshopt_compression"
+  ],
+  "root": "pudding_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 280,
+    "primitives": 1,
+    "meshes": 1,
+    "materials": 1,
+    "file_bytes": 13184
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass"
+  }
+}
