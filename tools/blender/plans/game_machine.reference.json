@@ -1,0 +1,37 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "game_machine",
+  "image": {"path": "tools/img/game_machine.jpg", "width": 1000, "height": 1000},
+  "medium": "vector sticker / kitbash arcade illustration",
+  "view": {"type": "three_quarter", "source": "observed", "confidence": 0.85},
+  "scale_anchor": {"component": "cabinet", "axis": "height", "meters": 1.78},
+  "silhouette": {
+    "outline": [
+      [0.12, 0.08], [0.88, 0.08], [0.92, 0.94], [0.18, 0.94], [0.12, 0.52], [0.12, 0.08]
+    ],
+    "source": "observed",
+    "confidence": 0.7
+  },
+  "palette": [
+    {"name": "teal", "hex": "#3DB8C4", "usage": "主機殼青綠色", "sample": [0.35, 0.25, 0.55, 0.65]},
+    {"name": "orange", "hex": "#F47B20", "usage": "側貼、相機、裝飾", "sample": [0.15, 0.20, 0.30, 0.35]},
+    {"name": "white", "hex": "#F2EBDA", "usage": "操控台、模組面板", "sample": [0.42, 0.62, 0.58, 0.72]},
+    {"name": "black", "hex": "#1A1410", "usage": "螢幕、描邊、鏡頭", "sample": [0.45, 0.38, 0.55, 0.50]},
+    {"name": "red", "hex": "#E63B2E", "usage": "搖桿球頭", "sample": [0.40, 0.68, 0.48, 0.74]}
+  ],
+  "components": [
+    {"id": "cabinet", "kind": "arcade_cabinet", "tier": "primary", "bbox": [0.18, 0.10, 0.82, 0.92], "material_hint": "teal", "source": "observed", "confidence": 0.9},
+    {"id": "screen", "kind": "glass_pane", "tier": "secondary", "bbox": [0.32, 0.28, 0.68, 0.52], "material_hint": "black", "parent": "cabinet", "source": "observed", "confidence": 0.85},
+    {"id": "controls", "kind": "arcade_controls", "tier": "secondary", "bbox": [0.25, 0.54, 0.75, 0.72], "material_hint": "white", "parent": "cabinet", "source": "observed", "confidence": 0.88},
+    {"id": "kitbash", "kind": "arcade_kitbash", "tier": "secondary", "bbox": [0.08, 0.22, 0.42, 0.88], "material_hint": "orange", "parent": "cabinet", "source": "observed", "confidence": 0.8}
+  ],
+  "hidden": [
+    {"id": "depth", "assumption": "機台深度約為正面寬度的 0.78（直立街機常見比例）", "source": "inferred", "confidence": 0.5},
+    {"id": "right_attachments", "assumption": "右側只做薄貼花，不做獨立模組", "source": "inferred", "confidence": 0.55}
+  ],
+  "excluded": [
+    {"what": "貼紙上的塗鴉文字與細線", "reason": "不做文字幾何，改用色塊暗示"},
+    {"what": "黑色描邊", "reason": "Three.js 用材質對比代替 stroke"},
+    {"what": "底部滾輪", "reason": "遊戲場景中機台固定擺放"}
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "game_machine",
+  "glb": "game_machine.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "KHR_materials_emissive_strength"
+  ],
+  "root": "game_machine_Root",
+  "clickable": [
+    "game_machine_controls",
+    "game_machine_screen"
+  ],
+  "anim_groups": {
+    "screen_glow": [
+      "game_machine_screen"
+    ]
+  },
+  "stats": {
+    "triangles": 608,
+    "primitives": 4,
+    "meshes": 4,
+    "materials": 2,
+    "file_bytes": 33168
+  },
+  "qa": {
+    "topology": "warn",
+    "geometry": "warn"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "game_machine",
+  "notes": "Kitbash 貼紙風街機（參考 tools/img/game_machine.jpg）。正面朝 -Y，原點在 footprint 中心。",
+  "dimensions": {"w": 1.36, "d": 1.28, "h": 1.78},
+  "detail": {"preset": "game_default", "overrides": {}},
+  "style": {"edge_wobble": 0.02},
+  "materials": [
+    {"name": "teal", "hex": "#3DB8C4", "roughness": 0.55},
+    {"name": "orange", "hex": "#F47B20", "roughness": 0.48},
+    {"name": "white", "hex": "#F2EBDA", "roughness": 0.52},
+    {"name": "black", "hex": "#141210", "roughness": 0.62},
+    {"name": "red", "hex": "#E63B2E", "roughness": 0.45},
+    {"name": "blue", "hex": "#2E6FB8", "roughness": 0.42},
+    {"name": "grey", "hex": "#8A8A86", "roughness": 0.58},
+    {"name": "screen", "hex": "#080A0C", "roughness": 0.25, "emissive": true}
+  ],
+  "budget": {"max_tris": 4500, "max_primitives": 12},
+  "components": [
+    {
+      "id": "cabinet",
+      "kind": "arcade_cabinet",
+      "tier": "primary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "teal",
+      "bounds": [[-0.46, -0.36, 0.0], [0.46, 0.36, 1.78]],
+      "source": "observed",
+      "confidence": 0.9
+    },
+    {
+      "id": "controls",
+      "kind": "arcade_controls",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "white",
+      "bounds": [[-0.32, -0.62, 0.78], [0.32, -0.28, 1.02]],
+      "source": "observed",
+      "confidence": 0.88
+    },
+    {
+      "id": "kitbash",
+      "kind": "arcade_kitbash",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "orange",
+      "bounds": [[0.28, -0.36, 0.0], [0.68, 0.36, 1.72]],
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "screen",
+      "kind": "glass_pane",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "glass",
+      "material": "screen",
+      "parent": "cabinet",
+      "bounds": [[-0.26, -0.50, 1.04], [0.26, -0.44, 1.50]],
+      "source": "observed",
+      "confidence": 0.85
+    }
+  ],
+  "export": {
+    "path": "public/models/game_machine/game_machine.glb",
+    "compress": true,
+    "clickable": ["controls", "screen"],
+    "anim_groups": {"screen_glow": ["screen"]}
+  }
+}
