@@ -168,7 +168,14 @@ async function run() {
 async function runLoad(prepare?: () => Promise<void>) {
   const curtain = mountCurtain();
   if (!curtain) {
-    if (prepare) await prepare();
+    removeSceneCover();
+    if (prepare) {
+      try {
+        await Promise.race([prepare(), wait(18_000)]);
+      } catch (err) {
+        console.warn('[world] scene load prepare failed:', err);
+      }
+    }
     return;
   }
   const { canvas, paint, cellCount } = curtain;
@@ -177,9 +184,14 @@ async function runLoad(prepare?: () => Promise<void>) {
   document.body.appendChild(canvas);
   removeSceneCover();
   try {
-    if (prepare) await prepare();
+    if (prepare) {
+      await Promise.race([prepare(), wait(18_000)]);
+    }
     await wait(LOAD_HOLD_MS);
     await tween(cellCount, 0, LOAD_OPEN_MS, (value) => paint(Math.ceil(value)));
+    paint(0);
+  } catch (err) {
+    console.warn('[world] scene load prepare failed, opening anyway:', err);
     paint(0);
   } finally {
     canvas.remove();

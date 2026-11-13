@@ -989,7 +989,7 @@ if (puddingFolder) {
 }
 
 // 烤玉米（綠球上；拖曳選取後調整）
-const cornFolder = grilledCorns.length > 0 ? gui.addFolder('烤玉米') : null;
+const cornFolder = gui.addFolder('烤玉米');
 let selectedCorn: WorldGrilledCorn | null = null;
 
 function highlightCorn(entry: WorldGrilledCorn | null) {
@@ -1128,7 +1128,7 @@ if (cornFolder) {
       applyFoodGroupVisibility();
     },
     remove() {
-      if (!selectedCorn || grilledCorns.length <= 1) return;
+      if (!selectedCorn || grilledCorns.length === 0) return;
       const removed = selectedCorn;
       if (!removeGrilledCorn(removed)) return;
       selectedCorn = null;
@@ -1301,7 +1301,7 @@ if (salmonFolder) {
 }
 
 // 檸檬片（綠球上；拖曳選取後調整，可複製）
-const lemonFolder = lemonSlices.length > 0 ? gui.addFolder('檸檬片') : null;
+const lemonFolder = gui.addFolder('檸檬片');
 let selectedLemon: WorldLemonSlice | null = null;
 
 function highlightLemon(entry: WorldLemonSlice | null) {
@@ -1430,7 +1430,7 @@ if (lemonFolder) {
       applyFoodGroupVisibility();
     },
     remove() {
-      if (!selectedLemon || lemonSlices.length <= 1) return;
+      if (!selectedLemon || lemonSlices.length === 0) return;
       if (!removeLemonSlice(selectedLemon)) return;
       selectedLemon = null;
       clearLemonPanelSliders();
@@ -1687,11 +1687,22 @@ function render(time: number) {
 renderer.setAnimationLoop(render);
 // 蓋板後先等 glb、分幀掛載、著色器預熱，再旋開，避免重整時畫面頓一下
 async function warmSceneShaders() {
-  if (typeof renderer.compileAsync === 'function') {
-    await renderer.compileAsync(scene, camera);
-    return;
-  }
-  renderer.compile(scene, camera);
+  const compileMs = 10_000;
+  const work = (async () => {
+    if (typeof renderer.compileAsync === 'function') {
+      await renderer.compileAsync(scene, camera);
+      return;
+    }
+    renderer.compile(scene, camera);
+  })();
+  await Promise.race([
+    work,
+    new Promise<void>((_, reject) => {
+      setTimeout(() => reject(new Error('shader precompile timeout')), compileMs);
+    }),
+  ]).catch((err) => {
+    console.warn('[world] shader precompile skipped:', err);
+  });
 }
 
 void playSceneLoad(async () => {
@@ -1699,10 +1710,16 @@ void playSceneLoad(async () => {
   await whenGltfMountsIdle();
   all.updateMatrixWorld(true);
   await warmSceneShaders();
-}).then(() => {
-  worldUiActions?.removeAttribute('hidden');
-  syncWorldActionButtons();
-});
+})
+  .then(() => {
+    worldUiActions?.removeAttribute('hidden');
+    syncWorldActionButtons();
+  })
+  .catch((err) => {
+    console.error('[world] playSceneLoad failed:', err);
+    worldUiActions?.removeAttribute('hidden');
+    syncWorldActionButtons();
+  });
 
 
 window.addEventListener('resize', () => {
