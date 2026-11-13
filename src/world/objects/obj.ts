@@ -24,6 +24,12 @@ import {
 } from './grilledCornLayout';
 import { createPudding, type PuddingSettings } from './pudding';
 import { PUDDING_LAYOUT_DEFAULT, PUDDING_PLACEMENTS, type PuddingLayout } from './puddingLayout';
+import { createSalmonSteak, type SalmonSteakSettings } from './salmonSteak';
+import {
+  SALMON_STEAK_LAYOUT_DEFAULT,
+  SALMON_STEAK_PLACEMENTS,
+  type SalmonSteakLayout,
+} from './salmonSteakLayout';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -177,6 +183,57 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       const { id, ...rest } = placement;
       spawnGrilledCorn(id, rest);
     }
+  }
+
+  type SalmonSteakRuntime = ReturnType<typeof createSalmonSteak>;
+  const salmonSteakEntries: Array<{ world: WorldSalmonSteak; runtime: SalmonSteakRuntime }> = [];
+  const salmonSteaks: WorldSalmonSteak[] = [];
+
+  function spawnSalmonSteak(id: string, layout: SalmonSteakLayout, grown = false) {
+    if (!puddingAxes) return null;
+    const runtime = createSalmonSteak({ ...puddingAxes, layout: { ...layout } });
+    ground.add(runtime.object);
+    const world = exposeSalmonSteak(id, runtime);
+    salmonSteakEntries.push({ world, runtime });
+    salmonSteaks.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  if (puddingAxes) {
+    for (const placement of SALMON_STEAK_PLACEMENTS) {
+      const { id, ...layout } = placement;
+      spawnSalmonSteak(id, layout);
+    }
+  }
+
+  function nextSalmonSteakId() {
+    let n = salmonSteakEntries.length + 1;
+    let id = `salmon_steak_${n}`;
+    while (salmonSteaks.some((item) => item.id === id)) {
+      n += 1;
+      id = `salmon_steak_${n}`;
+    }
+    return id;
+  }
+
+  function addSalmonSteak(seed?: Partial<SalmonSteakLayout>): WorldSalmonSteak | null {
+    if (!puddingAxes) return null;
+    const base: SalmonSteakLayout = { ...SALMON_STEAK_LAYOUT_DEFAULT, ...seed };
+    const azimuth = seed?.azimuthDegrees ?? SALMON_STEAK_LAYOUT_DEFAULT.azimuthDegrees;
+    base.azimuthDegrees = wrapDegrees(azimuth + 14);
+    return spawnSalmonSteak(nextSalmonSteakId(), base, introDone);
+  }
+
+  function removeSalmonSteak(entry: WorldSalmonSteak) {
+    const index = salmonSteakEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    const { runtime, world } = salmonSteakEntries[index];
+    runtime.dispose();
+    salmonSteakEntries.splice(index, 1);
+    const steakIndex = salmonSteaks.indexOf(world);
+    if (steakIndex >= 0) salmonSteaks.splice(steakIndex, 1);
+    return true;
   }
 
   type FriedEggRuntime = ReturnType<typeof createFriedEgg>;
@@ -465,6 +522,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   for (const { runtime } of puddingEntries) runtime.setIntroGrow(0);
   for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(0);
   for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
+  for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
   groundFlowers?.resetIntro(introHouses.length);
   placeFlowers(0);
   if (ground !== all) ground.visible = false;
@@ -517,6 +575,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         for (const { runtime } of friedEggEntries) runtime.setIntroGrow(1);
         for (const { runtime } of puddingEntries) runtime.setIntroGrow(1);
         for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(1);
       }
     }
 
@@ -534,6 +593,12 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       const cornT = THREE.MathUtils.clamp((introElapsed - cornStart) / 0.9, 0, 1);
       runtime.setIntroGrow(easeOutBack(cornT, 2.2));
       runtime.update(deltaTime, introDone);
+    });
+    salmonSteakEntries.forEach(({ runtime }, index) => {
+      const steakStart = introSettings.emptyHold + introSettings.ballSeconds * 0.74 + index * 0.08;
+      const steakT = THREE.MathUtils.clamp((introElapsed - steakStart) / 0.9, 0, 1);
+      runtime.setIntroGrow(easeOutBack(steakT, 2.1));
+      runtime.update();
     });
     friedEggEntries.forEach(({ runtime }, index) => {
       if (introDone) {
@@ -599,6 +664,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     for (const { runtime } of puddingEntries) runtime.setIntroGrow(0);
     for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(0);
     for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
   }
 
   // 緞帶擺放參數也往外交出去，讓 main.ts 的控制面板可以調整
@@ -637,6 +703,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     addGrilledCorn,
     removeGrilledCorn,
     friedEggs,
+    salmonSteaks,
+    addSalmonSteak,
+    removeSalmonSteak,
     houses: [
       exposeHouse('mainHall', mainHall),
       exposeHouse('projectRoom', projectRoom),
@@ -652,6 +721,17 @@ export type WorldHouse = {
   object: THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhongMaterial>;
   settings: HouseSettings;
   apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldSalmonSteak = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: SalmonSteakSettings;
+  apply: () => void;
+  applyVisuals: () => void;
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;
 };
@@ -716,6 +796,19 @@ function exposeGrilledCorn(id: string, corn: ReturnType<typeof createGrilledCorn
   };
 }
 
+function exposeSalmonSteak(id: string, steak: ReturnType<typeof createSalmonSteak>): WorldSalmonSteak {
+  return {
+    id,
+    label: id,
+    object: steak.object,
+    settings: steak.settings,
+    apply: steak.applySettings,
+    applyVisuals: steak.applyVisuals,
+    getNormal: steak.getNormal,
+    setNormal: steak.setNormal,
+  };
+}
+
 function exposePudding(id: string, pudding: ReturnType<typeof createPudding>): WorldPudding {
   return {
     id,
@@ -740,6 +833,10 @@ function easeInOutCubic(t: number) {
 }
 
 /** 略衝過終點再彈回。overshoot 越大，跳動越明顯 */
+function wrapDegrees(degrees: number) {
+  return Math.round((((degrees + 180) % 360) + 360) % 360 - 180);
+}
+
 function easeOutBack(t: number, overshoot = 1.70158) {
   return 1 + (overshoot + 1) * Math.pow(t - 1, 3) + overshoot * Math.pow(t - 1, 2);
 }

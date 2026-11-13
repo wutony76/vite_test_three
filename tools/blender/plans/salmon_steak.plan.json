@@ -1,0 +1,87 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "salmon_steak",
+  "reference": "salmon_steak",
+  "notes": "俯視鮭魚排輪切。肉身是水滴形厚片，腹尖朝 -Y；中央脊骨略高出肉面。切面是卡通白筋，側面 UV 採貼圖底部的暗色魚皮。正面朝 -Y。",
+  "dimensions": {"w": 0.15, "d": 0.244, "h": 0.032},
+  "detail": {
+    "preset": "game_default",
+    "overrides": {"tertiary_density": 0, "geometry_complexity": 6, "bevel_quality": 0, "surface_detail": 0.25, "material_quality": "palette"}
+  },
+  "style": {"edge_wobble": 0.0},
+  "materials": [
+    {
+      "name": "flesh",
+      "hex": "#ED5D4A",
+      "roughness": 0.32,
+      "surface": {
+        "class": "food",
+        "pattern": "salmon_marbling",
+        "uv": "fit",
+        "tier": "standard",
+        "units": 3,
+        "scale_m": 0.15,
+        "palette": ["#ED5D4A", "#ED5D4A", "#ED5D4A"],
+        "accents": {"fat": "#ED864A", "cleft": "#8E2E28", "skin": "#8C939C"},
+        "wear": 0.0,
+        "dirt": 0.0,
+        "normal_strength": 0.35,
+        "roughness_variation": 0.04,
+        "gap_shade": 0.2,
+        "posterize_steps": 4,
+        "posterize_mix": 0.72
+      }
+    },
+    {
+      "name": "bone",
+      "hex": "#F5B7A1",
+      "roughness": 0.55,
+      "surface": {
+        "class": "food",
+        "pattern": "painted",
+        "uv": "planar",
+        "tier": "prop",
+        "units": 3,
+        "palette": ["#E8A890", "#F5B7A1", "#FFF1E8"],
+        "wear": 0.0,
+        "dirt": 0.0,
+        "normal_strength": 0.4,
+        "roughness_variation": 0.08,
+        "gap_shade": 0.2,
+        "posterize_steps": 4,
+        "posterize_mix": 0.25
+      }
+    }
+  ],
+  "budget": {"max_tris": 800, "max_primitives": 4, "max_texture_kb": 1200, "max_gpu_texture_mb": 24},
+  "components": [
+    {
+      "id": "flesh",
+      "kind": "salmon_steak",
+      "tier": "primary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "flesh",
+      "params": {"sides": 36},
+      "bounds": [[-0.075, -0.122, 0.0], [0.075, 0.122, 0.022]],
+      "source": "observed",
+      "confidence": 0.95
+    },
+    {
+      "id": "bone",
+      "kind": "salmon_vertebra",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "bone",
+      "params": {"sides": 12},
+      "bounds": [[-0.009, -0.002, 0.016], [0.012, 0.022, 0.030]],
+      "source": "observed",
+      "confidence": 0.9
+    }
+  ],
+  "export": {
+    "path": "public/models/salmon_steak/salmon_steak.glb",
+    "compress": true
+  }
+}

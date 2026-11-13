@@ -414,9 +414,116 @@ def _corn_sauce_drips(size, seed, dome):
     return np.clip(sauce * on_kernel * 0.68, 0, 1).astype(np.float32)
 
 
+# 參考圖外框對到貼圖 0～1（左上是背側）。肉身 mesh 的 fit UV 用同一圈。
+_SALMON_OUTLINE = np.array([
+    [0.564, 0.000], [0.801, 0.062], [0.895, 0.124], [0.949, 0.186], [0.980, 0.248],
+    [0.995, 0.310], [1.000, 0.373], [0.995, 0.435], [0.979, 0.497], [0.966, 0.559],
+    [0.940, 0.621], [0.901, 0.683], [0.855, 0.745], [0.817, 0.807], [0.766, 0.870],
+    [0.725, 0.932], [0.583, 0.995], [0.557, 1.000], [0.457, 1.000], [0.431, 0.995],
+    [0.316, 0.932], [0.207, 0.870], [0.167, 0.807], [0.131, 0.745], [0.115, 0.683],
+    [0.073, 0.621], [0.044, 0.559], [0.020, 0.497], [0.007, 0.435], [0.000, 0.373],
+    [0.005, 0.310], [0.020, 0.248], [0.051, 0.186], [0.110, 0.124], [0.225, 0.062],
+    [0.496, 0.000],
+], dtype=np.float32)
+
+
+def salmon_outline_ring(z, hw=0.075, hd=0.122):
+    """參考圖外框，原點在底面中心。u 向右、down 向下（背側在 +Y）。"""
+    ring = []
+    for u, down in _SALMON_OUTLINE:
+        ring.append(((float(u) - 0.5) * hw * 2, (0.5 - float(down)) * hd * 2, z))
+    return ring
+
+
+def _band(phase, width):
+    """phase 的整數附近畫一條線，width 是相位單位的半寬。"""
+    frac = np.abs(phase - np.round(phase))
+    return np.clip(1.0 - frac / width, 0.0, 1.0)
+
+
+def _outline_distance(u, down):
+    """到鮭魚排外框各邊的最短距離（UV 單位）。"""
+    dist = np.full(u.shape, np.float32(4.0))
+    count = len(_SALMON_OUTLINE)
+    for index in range(count):
+        ax, ay = _SALMON_OUTLINE[index]
+        bx, by = _SALMON_OUTLINE[(index + 1) % count]
+        abx, aby = float(bx - ax), float(by - ay)
+        denom = abx * abx + aby * aby + 1e-8
+        t = np.clip(((u - ax) * abx + (down - ay) * aby) / denom, 0.0, 1.0)
+        px = ax + t * abx
+        py = ay + t * aby
+        dist = np.minimum(dist, np.sqrt((u - px) ** 2 + (down - py) ** 2))
+    return dist
+
+
+def _hard_band(phase, half_width):
+    """整數相位附近的硬邊色帶。half_width 是相位單位的半寬，只留很窄的抗鋸齒。"""
+    frac = np.abs(phase - np.round(phase))
+    return np.clip((half_width - frac) / 0.012, 0.0, 1.0)
+
+
+def salmon_marbling(size, units, seed):
+    """卡通鮭魚排：平塗橙紅、少數粗白筋、腹裂。貼圖下方一條是側面用的暗色魚皮。
+
+    切面 UV 用 v≥0.10（down<0.90），外框對在這一段裡。down≥0.90 整條是魚皮，側面 UV 只採這裡。
+    """
+    u, down = _coords(size)
+    out = _empty(size)
+    out["height"] = np.full((size, size), 0.55, np.float32)
+    out["tone"] = np.zeros((size, size), np.float32)
+    out["detail"] = np.zeros((size, size), np.float32)
+
+    # 切面圖畫在魚皮帶之上，腹尖對到 down=0.90
+    art_down = np.clip(down / 0.90, 0.0, 1.0)
+    spine_u = 0.50
+    edge = _outline_distance(u, art_down)
+    upper = _hard_band(edge * 8.0, 0.13)
+    upper = upper * (art_down < 0.50) * (edge > 0.025)
+
+    def lobe(ox, oy, freq):
+        rad = np.sqrt(((u - ox) / 0.30) ** 2 + ((art_down - oy) / 0.36) ** 2)
+        return _hard_band(rad * freq, 0.14)
+
+    lower = np.maximum(
+        lobe(0.34, 0.68, 2.8) * (u < spine_u),
+        lobe(0.66, 0.68, 2.8) * (u >= spine_u),
+    )
+    lower = lower * (art_down > 0.46)
+
+    spine = np.clip((0.020 - np.abs(u - spine_u)) / 0.006, 0, 1) * (art_down < 0.56)
+    fork_t = np.clip((art_down - 0.50) / 0.42, 0, 1)
+    fork_l = np.clip((0.016 - np.abs(u - (spine_u - fork_t * 0.10))) / 0.005, 0, 1)
+    fork_r = np.clip((0.016 - np.abs(u - (spine_u + fork_t * 0.10))) / 0.005, 0, 1)
+    fork = np.maximum(fork_l, fork_r) * (art_down > 0.48) * (art_down < 0.97)
+    fat = np.clip(np.maximum(np.maximum(upper, lower), np.maximum(spine, fork)), 0, 1)
+
+    cleft = np.clip((0.030 - np.abs(u - spine_u)) / 0.006, 0, 1)
+    cleft = cleft * np.clip((art_down - 0.54) / 0.015, 0, 1) * (art_down < 0.94)
+    cleft = cleft * (1.0 - np.clip(fork, 0, 1))
+
+    # 切面左緣一圈硬邊魚皮，跟側面同一色
+    skin_rim = ((edge < 0.026) & (u < 0.40) & (art_down < 0.80)).astype(np.float32)
+    side_skin = (down >= 0.90).astype(np.float32)
+    fat = fat * (1.0 - side_skin)
+    cleft = cleft * (1.0 - side_skin)
+    skin = np.maximum(skin_rim * (1.0 - side_skin), side_skin)
+
+    out["height"] = np.clip(0.55 + fat * 0.05 - cleft * 0.06, 0, 1).astype(np.float32)
+    out["height"] = np.where(side_skin > 0.5, 0.50, out["height"]).astype(np.float32)
+    out["gap"] = (cleft * 0.15 * (1.0 - side_skin)).astype(np.float32)
+    out["accents"] = {
+        "fat": fat.astype(np.float32),
+        "cleft": cleft.astype(np.float32),
+        "skin": skin.astype(np.float32),
+    }
+    return out
+
+
 PATTERN_FUNCS = {
     "planks": planks, "wood_grain": wood_grain, "brick": brick, "cobble": cobble, "roof_tiles": roof_tiles,
     "rock": rock, "plaster": plaster, "brushed": brushed, "weave": weave, "foliage": foliage, "ground": ground,
     "crust": crust, "painted": painted, "stripes": stripes, "corn_kernels": corn_kernels,
     "fried_egg_white": fried_egg_white, "fried_egg_yolk": fried_egg_yolk,
+    "salmon_marbling": salmon_marbling,
 }

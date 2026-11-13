@@ -14,9 +14,11 @@ import {
   type WorldGrilledCorn,
   type WorldHouse,
   type WorldPudding,
+  type WorldSalmonSteak,
 } from './objects/obj';
 import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatPuddingPlacementsForPaste } from './objects/pudding';
+import { formatSalmonSteakPlacementsForPaste } from './objects/salmonSteak';
 import { formatFriedEggPlacementsForPaste } from './objects/friedEgg';
 import type { FriedEggSunLayout } from './objects/friedEggLayout';
 // lil-gui：three.js 內建的小型控制面板，拖拉滑桿就能即時調整數值，不用改程式碼重新整理
@@ -196,6 +198,9 @@ const {
   addGrilledCorn,
   removeGrilledCorn,
   friedEggs,
+  salmonSteaks,
+  addSalmonSteak,
+  removeSalmonSteak,
 } = createObjs({ envMap, camera });
 
 scene.add(all);
@@ -1129,6 +1134,155 @@ if (cornFolder) {
   else highlightCorn(null);
 }
 
+// 魚排（綠球上；拖曳選取後調整，可複製）
+const salmonFolder = salmonSteaks.length > 0 ? gui.addFolder('魚排') : null;
+let selectedSalmon: WorldSalmonSteak | null = null;
+
+function highlightSalmon(entry: WorldSalmonSteak | null) {
+  for (const steak of salmonSteaks) {
+    steak.applyVisuals();
+    if (steak !== entry) continue;
+    steak.object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        if (!('emissive' in material)) continue;
+        const m = material as THREE.MeshStandardMaterial;
+        m.emissive.copy(m.color);
+        m.emissiveIntensity = 0.35;
+      }
+    });
+  }
+}
+
+const SALMON_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+
+function clearSalmonPanelSliders() {
+  if (!salmonFolder) return;
+  salmonFolder.title('魚排');
+  for (const controller of [...salmonFolder.controllers]) {
+    if (SALMON_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+function bindSalmonPanel(entry: WorldSalmonSteak) {
+  if (!salmonFolder) return;
+  const alreadyShowing = entry === selectedSalmon && salmonFolder.controllers.length > SALMON_PANEL_ACTIONS.size;
+  selectedSalmon = entry;
+  highlightSalmon(entry);
+  if (alreadyShowing) return;
+
+  clearSalmonPanelSliders();
+  salmonFolder.title(`魚排 · ${entry.label}`);
+
+  const settings = entry.settings;
+  const apply = () => entry.apply();
+  const applyVisuals = () => {
+    entry.applyVisuals();
+    highlightSalmon(entry);
+  };
+
+  salmonFolder
+    .add(settings, 'angleFromTopDegrees', 0, 90, 1)
+    .name('離頂端 (°)')
+    .onChange(apply)
+    .onFinishChange(logSalmonPlacements);
+  salmonFolder
+    .add(settings, 'azimuthDegrees', -180, 180, 1)
+    .name('方位 (°)')
+    .onChange(apply)
+    .onFinishChange(logSalmonPlacements);
+  salmonFolder
+    .add(settings, 'spinDegrees', -180, 180, 1)
+    .name('自轉 (°)')
+    .onChange(apply)
+    .onFinishChange(logSalmonPlacements);
+  salmonFolder
+    .add(settings, 'tiltXDegrees', -180, 180, 1)
+    .name('前傾 (°)')
+    .onChange(apply)
+    .onFinishChange(logSalmonPlacements);
+  salmonFolder
+    .add(settings, 'tiltZDegrees', -180, 180, 1)
+    .name('側傾 (°)')
+    .onChange(apply)
+    .onFinishChange(logSalmonPlacements);
+  salmonFolder
+    .add(settings, 'sink', -0.6, 0.12, 0.001)
+    .name('下沉（負值上浮）')
+    .onChange(apply)
+    .onFinishChange(logSalmonPlacements);
+  salmonFolder
+    .add(settings, 'placementScale', 0.15, 2.5, 0.01)
+    .name('縮放')
+    .onChange(apply)
+    .onFinishChange(logSalmonPlacements);
+  salmonFolder
+    .add(settings, 'modelSize', 0.04, 0.4, 0.005)
+    .name('大小 (m)')
+    .onChange(apply)
+    .onFinishChange(logSalmonPlacements);
+  salmonFolder
+    .add(settings, 'heightScale', 0.4, 3, 0.05)
+    .name('增高')
+    .onChange(apply)
+    .onFinishChange(logSalmonPlacements);
+  salmonFolder
+    .add(settings, 'colorBoost', 0.6, 1.5, 0.01)
+    .name('亮度')
+    .onChange(applyVisuals)
+    .onFinishChange(logSalmonPlacements);
+  salmonFolder
+    .addColor(settings, 'tintColor')
+    .name('顏色')
+    .onChange(applyVisuals)
+    .onFinishChange(logSalmonPlacements);
+  salmonFolder
+    .add(settings, 'tintMix', 0, 1, 0.01)
+    .name('顏色強度')
+    .onChange(applyVisuals)
+    .onFinishChange(logSalmonPlacements);
+}
+
+function logSalmonPlacements() {
+  if (salmonSteaks.length === 0) return;
+  const text = formatSalmonSteakPlacementsForPaste(
+    salmonSteaks.map((steak) => ({ id: steak.id, settings: steak.settings })),
+  );
+  console.log(text);
+  return text;
+}
+
+if (salmonFolder) {
+  const salmonControls = {
+    add() {
+      const created = addSalmonSteak(selectedSalmon ? { ...selectedSalmon.settings } : undefined);
+      if (!created) return;
+      bindSalmonPanel(created);
+      refreshPuddingDragTargets();
+    },
+    remove() {
+      if (!selectedSalmon || salmonSteaks.length <= 1) return;
+      if (!removeSalmonSteak(selectedSalmon)) return;
+      selectedSalmon = null;
+      clearSalmonPanelSliders();
+      const next = salmonSteaks[salmonSteaks.length - 1];
+      if (next) bindSalmonPanel(next);
+      else highlightSalmon(null);
+      refreshPuddingDragTargets();
+    },
+    log() {
+      logSalmonPlacements();
+    },
+  };
+  salmonFolder.add(salmonControls, 'add').name('複製魚排');
+  salmonFolder.add(salmonControls, 'remove').name('移除選中魚排');
+  salmonFolder.add(salmonControls, 'log').name('印出全部佈局 (console)');
+  if (salmonSteaks[0]) bindSalmonPanel(salmonSteaks[0]);
+}
+
 // 進場時各分組與根面板都收合，需要時再手動展開
 [
   lightFolder,
@@ -1143,6 +1297,7 @@ if (cornFolder) {
   houseFolder,
   puddingFolder,
   cornFolder,
+  salmonFolder,
 ]
   .filter((folder): folder is GUI => folder != null)
   .forEach((folder) => folder.close());
@@ -1191,16 +1346,17 @@ const HOUSE_DRAG_ENABLED = true;
 
 const friedEggsOnSphere = () => friedEggs.filter((egg) => egg.settings.mode === 'sphere');
 
-let surfaceDragTargets: Array<WorldHouse | WorldPudding | WorldGrilledCorn | WorldFriedEgg> = [
+let surfaceDragTargets: Array<WorldHouse | WorldPudding | WorldGrilledCorn | WorldFriedEgg | WorldSalmonSteak> = [
   ...houses,
   ...puddings,
   ...grilledCorns,
   ...friedEggsOnSphere(),
+  ...salmonSteaks,
 ];
 
 function refreshPuddingDragTargets() {
   surfaceDragTargets.length = 0;
-  surfaceDragTargets.push(...houses, ...puddings, ...grilledCorns, ...friedEggsOnSphere());
+  surfaceDragTargets.push(...houses, ...puddings, ...grilledCorns, ...friedEggsOnSphere(), ...salmonSteaks);
 }
 
 if (HOUSE_DRAG_ENABLED) {
@@ -1222,17 +1378,21 @@ if (HOUSE_DRAG_ENABLED) {
       if (puddingEntry) bindPuddingPanel(puddingEntry);
       const cornEntry = grilledCorns.find((item) => item.object === target.object);
       if (cornEntry) bindCornPanel(cornEntry);
+      const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
+      if (salmonEntry) bindSalmonPanel(salmonEntry);
     },
     onDrag: (normal, target) => {
       target.setNormal(normal);
       houseFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       puddingFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       cornFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      salmonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
     onDragEnd: (target) => {
       if (houses.some((house) => house.object === target.object)) logHouse();
       else if (puddings.some((item) => item.object === target.object)) logPuddingPlacements();
       else if (grilledCorns.some((item) => item.object === target.object)) logCornPlacements();
+      else if (salmonSteaks.some((item) => item.object === target.object)) logSalmonPlacements();
     },
     onClick: (target) => {
       if (houses.some((house) => house.object === target.object)) markHouseSelected();
@@ -1240,6 +1400,8 @@ if (HOUSE_DRAG_ENABLED) {
       if (puddingEntry) bindPuddingPanel(puddingEntry);
       const cornEntry = grilledCorns.find((item) => item.object === target.object);
       if (cornEntry) bindCornPanel(cornEntry);
+      const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
+      if (salmonEntry) bindSalmonPanel(salmonEntry);
     },
   });
 }

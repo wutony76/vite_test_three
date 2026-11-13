@@ -211,6 +211,16 @@ def test_rock_pile_and_bush_islands():
     assert shapes.topology_stats(built["bush_right"][1])["islands"] <= 6
 
 
+def test_salmon_steak_is_closed_and_fills_bounds():
+    """魚排是一塊封閉厚片，外框要碰到 plan 的寬和深，腹尖才跟參考圖一樣大。"""
+    _doc, _lay, built = _build_all("salmon_steak.plan.json")
+    for cid in ("flesh", "bone"):
+        stats = _closed_single(built[cid][1])
+        assert stats["triangles"] < 1000, (cid, stats)
+    (x0, y0, z0), (x1, y1, z1) = shapes.topology_stats(built["flesh"][1])["bounds"]
+    assert x1 - x0 > 0.14 and y1 - y0 > 0.23 and z1 - z0 > 0.02
+
+
 def test_registry_covers_plans():
     kinds = implemented_kinds()
     for plan in PLAN_FILES:

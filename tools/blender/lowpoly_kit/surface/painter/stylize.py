@@ -113,13 +113,22 @@ def paint(fields, spec):
         rgb = np.clip(rgb * (0.82 + 0.34 * bump + 0.10 * lit[..., None] * bump) * (1 - 0.12 * seam), 0, 1)
     rgb = rgb * (1 - 0.25 * dirt[..., None]) + np.array([0.24, 0.18, 0.12], np.float32) * 0.25 * dirt[..., None]
 
-    # 5. accents：第四種顏色（烤焦、條紋），一樣跟著明暗走
+    # 5. accents：第四種顏色（烤焦、條紋），一樣跟著明暗走。
+    # 鮭魚排的肉、白筋、魚皮要對上指定色碼，不再乘明暗。
     accent_colors = {**DEFAULT_ACCENTS, **spec.get("accents", {})}
+    exact_salmon = spec.get("pattern") == "salmon_marbling"
+    if exact_salmon:
+        flesh = np.array(hex_to_rgb(spec["palette"][1]), dtype=np.float32)
+        rgb = np.empty((size, size, 3), dtype=np.float32)
+        rgb[:] = flesh
     for name, mask in fields.get("accents", {}).items():
         if name not in accent_colors:
             continue
         color = np.array(hex_to_rgb(accent_colors[name]), dtype=np.float32)
-        shaded = color[None, None, :] * (0.65 + 0.7 * value[..., None])
+        if exact_salmon:
+            shaded = color[None, None, :]
+        else:
+            shaded = color[None, None, :] * (0.65 + 0.7 * value[..., None])
         rgb = rgb * (1 - mask[..., None]) + np.clip(shaded, 0, 1) * mask[..., None]
 
     # 6. ORM：R = 小尺度 AO（縫隙與凹處），G = roughness，B = metallic

@@ -9,7 +9,8 @@ UV0 策略（plan 的 surface.uv，或依 profile 決定）：
 - planar：每個面依自己的平面投影，u 水平、v 沿表面往上。斜屋頂不會被拉長，瓦片列順著坡面排
 - along：u 沿物件最長軸。樑、木箱的木紋順著長邊走；和長軸垂直的面（端面）退回 planar
 - cylinder：圓柱展開（u = 弧長、v = 高度），一圈剛好是整數張貼圖，接縫看不出來
-- fit：圓柱展開並正規化到 0～1（一圈 = 1、底到頂 = 1），給不平鋪的 unique 貼圖（例如玉米）
+- fit：圓柱展開並正規化到 0～1（一圈 = 1、底到頂 = 1），給不平鋪的 unique 貼圖（例如玉米）。
+  很扁的物件（魚排切面）把上下切面對到貼圖上半；側面單獨展開到貼圖底部的魚皮帶。
 
 為什麼不用一律 Cube Projection：盒狀投影在 45° 斜面上會拉長 1.41 倍，圓柱面上則會出現明顯的接縫與扭曲。
 """
@@ -136,12 +137,34 @@ def apply_uv0(mesh, assignments):
             uv[loops, 1] = np.einsum("ij,ij->i", p, v_dir[pl]) / tile
         else:  # cylinder／fit：繞 z 軸
             cx, cy = (low[0] + high[0]) / 2, (low[1] + high[1]) / 2
+            span_x = max(float(high[0] - low[0]), 1e-6)
+            span_y = max(float(high[1] - low[1]), 1e-6)
+            height = max(float(high[2] - low[2]), 1e-6)
+            # 平放的切面：上下切面用貼圖 v≥0.10 的卡通肉紋。
+            # 側面展開到 v<0.10 的暗色魚皮帶（patterns.salmon_marbling 的 down≥0.90）。
+            # 側面若跟切面共用 XY，厚度面的 UV 會塌成線。
+            if strategy == "fit" and height < 0.45 * max(span_x, span_y):
+                inset = 0.001
+                skin_v = 0.10
+                side_poly = np.abs(normals[:, 2]) < 0.72
+                side = loops & side_poly[poly_of_loop]
+                cap = loops & ~side_poly[poly_of_loop]
+                raw_u = (points[cap, 0] - low[0]) / span_x
+                raw_v = (points[cap, 1] - low[1]) / span_y
+                uv[cap, 0] = raw_u * (1 - 2 * inset) + inset
+                uv[cap, 1] = skin_v + inset + raw_v * (1 - skin_v - 2 * inset)
+                angles = _cylinder_angles(points[side], arrays["center"], poly_of_loop[side], cx, cy)
+                uv[side, 0] = (angles / (2 * math.pi) + 0.5) * (1 - 2 * inset) + inset
+                side_t = (points[side, 2] - low[2]) / height
+                uv[side, 1] = 0.018 + side_t * 0.055
+                info["repeats_around"] = 1
+                report[int(index)] = info
+                continue
             side_poly = np.abs(normals[:, 2]) < 0.8
             side = loops & side_poly[poly_of_loop]
             cap = loops & ~side_poly[poly_of_loop]
             radius = float(np.mean(np.hypot(selected_points[:, 0] - cx, selected_points[:, 1] - cy))) or 1e-3
             angles = _cylinder_angles(points[side], arrays["center"], poly_of_loop[side], cx, cy)
-            height = max(high[2] - low[2], 1e-6)
             if strategy == "fit":
                 repeats = 1
                 uv[side, 0] = angles / (2 * math.pi) + 0.5

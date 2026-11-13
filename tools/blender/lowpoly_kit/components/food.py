@@ -1,8 +1,9 @@
-"""食物道具：整隻烤雞、焦糖布丁等。"""
+"""食物道具：整隻烤雞、焦糖布丁、鮭魚排等。"""
 
 import math
 
 from .. import shapes
+from ..surface.painter.patterns import salmon_outline_ring
 from . import register
 
 
@@ -210,6 +211,32 @@ def build_fried_egg_yolk(ctx):
         theta = (i / (steps - 1)) * (math.pi / 2)
         profile.append((r * math.cos(theta), r * math.sin(theta) * ratio))
     return shapes.lathe(profile, seg, ctx.material, axis="z")
+
+
+@register("salmon_steak")
+def build_salmon_steak(ctx):
+    """鮭魚排切面：參考圖外框的厚片。白筋與魚皮在貼圖上，輪廓點不抽稀，腹尖才不會被吃掉。"""
+    h = max(ctx.h, 0.002)
+    return shapes.loft(
+        [salmon_outline_ring(0.0, ctx.hw, ctx.hd), salmon_outline_ring(h, ctx.hw, ctx.hd)],
+        ctx.material,
+        cap_start=True,
+        cap_end=True,
+    )
+
+
+@register("salmon_vertebra")
+def build_salmon_vertebra(ctx):
+    """中央脊椎骨：略扁的橢球，填在 bounds 裡。"""
+    seg = max(8, min(16, int(ctx.param("sides", 12))))
+    return shapes.blob(
+        (0.0, 0.0, ctx.h * 0.5),
+        (ctx.hw * 0.92, ctx.hd * 0.92, ctx.h * 0.46),
+        ctx.material,
+        segments=seg,
+        rings=4,
+        jitter=0.0,
+    )
 
 
 @register("bamboo_skewer")

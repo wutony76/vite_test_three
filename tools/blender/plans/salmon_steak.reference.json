@@ -1,0 +1,109 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "salmon_steak",
+  "image": {"path": "tools/img/salmon_steak.jpg", "width": 736, "height": 736},
+  "medium": "studio product photo, top-down raw salmon steak",
+  "view": {"type": "top", "source": "observed", "confidence": 0.97},
+  "scale_anchor": {"component": "flesh", "axis": "width", "meters": 0.15},
+  "silhouette": {
+    "outline": [
+      [0.530, 0.033], [0.664, 0.090], [0.717, 0.147], [0.747, 0.204], [0.765, 0.261],
+      [0.773, 0.318], [0.776, 0.375], [0.773, 0.432], [0.764, 0.489], [0.757, 0.546],
+      [0.742, 0.603], [0.720, 0.660], [0.694, 0.717], [0.673, 0.774], [0.644, 0.832],
+      [0.621, 0.889], [0.541, 0.946], [0.526, 0.951], [0.470, 0.951], [0.455, 0.946],
+      [0.390, 0.889], [0.329, 0.832], [0.306, 0.774], [0.286, 0.717], [0.277, 0.660],
+      [0.253, 0.603], [0.237, 0.546], [0.223, 0.489], [0.216, 0.432], [0.212, 0.375],
+      [0.215, 0.318], [0.223, 0.261], [0.241, 0.204], [0.274, 0.147], [0.339, 0.090],
+      [0.492, 0.033]
+    ],
+    "source": "observed",
+    "confidence": 0.93
+  },
+  "palette": [
+    {"name": "flesh", "hex": "#F46E33", "usage": "橙紅魚肉", "sample": [0.32, 0.26, 0.44, 0.40]},
+    {"name": "fat", "hex": "#FED5C1", "usage": "白色肌隔與脊線", "sample": [0.492, 0.140, 0.508, 0.240]},
+    {"name": "bone", "hex": "#F5B7A1", "usage": "中央脊椎骨", "sample": [0.470, 0.420, 0.530, 0.480]},
+    {"name": "cleft", "hex": "#943329", "usage": "腹側深色裂縫", "sample": [0.485, 0.560, 0.515, 0.700]},
+    {"name": "skin", "hex": "#94949E", "usage": "左側魚皮", "sample": [0.218, 0.420, 0.230, 0.460]}
+  ],
+  "surfaces": [
+    {
+      "id": "flesh",
+      "region": [[0.212, 0.033], [0.776, 0.033], [0.776, 0.951], [0.212, 0.951]],
+      "class": "food",
+      "pattern": "salmon_marbling",
+      "base_hex": "#F46E33",
+      "scale_m": 0.15,
+      "components": ["flesh"],
+      "source": "observed",
+      "confidence": 0.95
+    },
+    {
+      "id": "marbling",
+      "region": [[0.30, 0.12], [0.70, 0.12], [0.68, 0.88], [0.32, 0.88]],
+      "class": "food",
+      "pattern": "salmon_marbling",
+      "base_hex": "#FED5C1",
+      "scale_m": 0.02,
+      "components": ["flesh"],
+      "source": "observed",
+      "confidence": 0.92
+    },
+    {
+      "id": "vertebra",
+      "region": [[0.462, 0.408], [0.538, 0.408], [0.538, 0.498], [0.462, 0.498]],
+      "class": "food",
+      "pattern": "painted",
+      "base_hex": "#F5B7A1",
+      "scale_m": 0.02,
+      "components": ["bone"],
+      "source": "observed",
+      "confidence": 0.9
+    },
+    {
+      "id": "skin_rim",
+      "region": [[0.212, 0.300], [0.250, 0.260], [0.270, 0.620], [0.220, 0.680]],
+      "class": "food",
+      "pattern": "salmon_marbling",
+      "base_hex": "#94949E",
+      "scale_m": 0.01,
+      "components": ["flesh"],
+      "source": "observed",
+      "confidence": 0.84
+    }
+  ],
+  "components": [
+    {
+      "id": "flesh",
+      "kind": "salmon_steak",
+      "tier": "primary",
+      "bbox": [0.212, 0.033, 0.776, 0.951],
+      "material_hint": "flesh",
+      "source": "observed",
+      "confidence": 0.95
+    },
+    {
+      "id": "bone",
+      "kind": "salmon_vertebra",
+      "tier": "secondary",
+      "bbox": [0.462, 0.408, 0.538, 0.498],
+      "material_hint": "bone",
+      "parent": "flesh",
+      "source": "observed",
+      "confidence": 0.9
+    }
+  ],
+  "hidden": [
+    {
+      "id": "thickness",
+      "assumption": "俯視看不到厚度；輪切魚排肉厚約 2.2 cm，脊椎骨再高出約 0.8 cm",
+      "source": "inferred",
+      "confidence": 0.55
+    }
+  ],
+  "excluded": [
+    {"what": "Adobe Stock 浮水印與圖片編號", "reason": "圖庫文字，不是魚排的一部分"},
+    {"what": "白背景", "reason": "只取魚排本體"},
+    {"what": "左下接觸陰影", "reason": "打光造成的影子，不建幾何"}
+  ]
+}

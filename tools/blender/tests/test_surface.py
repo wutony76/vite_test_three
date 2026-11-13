@@ -103,6 +103,26 @@ def test_fit_uv_spans_zero_to_one():
     assert abs(min(vs)) < 1e-6 and abs(max(vs) - 1) < 1e-6
 
 
+def test_fit_uv_flat_top_fills_texture():
+    """扁的 fit（魚排）切面貼在魚皮帶之上，側面 UV 落在底部魚皮帶。"""
+    def build(bm):
+        bmesh.ops.create_cube(bm, size=1.0, matrix=__import__("mathutils").Matrix.Diagonal((0.15, 0.24, 0.02, 1.0)))
+    obj = _mesh_object("flat_fit", build)
+    apply_uv0(obj.data, {0: {"uv": "fit"}})
+    uv = obj.data.uv_layers[UV0].data
+    tops = [p for p in obj.data.polygons if p.normal.z > 0.9]
+    assert len(tops) == 1
+    us = [uv[i].uv[0] for i in tops[0].loop_indices]
+    vs = [uv[i].uv[1] for i in tops[0].loop_indices]
+    assert min(us) < 0.02 and max(us) > 0.98
+    assert min(vs) < 0.13 and max(vs) > 0.98
+    sides = [p for p in obj.data.polygons if abs(p.normal.z) < 0.5]
+    assert sides
+    for poly in sides:
+        side_v = [uv[i].uv[1] for i in poly.loop_indices]
+        assert max(side_v) < 0.10
+
+
 # ---------------------------------------------------------------------------
 # Material Builder 與 glTF 相容性
 # ---------------------------------------------------------------------------

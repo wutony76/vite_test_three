@@ -1,0 +1,71 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "salmon_steak",
+  "glb": "salmon_steak.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
+  ],
+  "root": "salmon_steak_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 216,
+    "primitives": 2,
+    "meshes": 2,
+    "materials": 2,
+    "file_bytes": 109168
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "warn",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "flesh": {
+        "class": "food",
+        "pattern": "salmon_marbling",
+        "tier": "standard",
+        "size": 1024,
+        "tile_m": null,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "salmon_marbling",
+          "seed": 2701851676,
+          "hash": "a10afc1cb193"
+        }
+      },
+      "bone": {
+        "class": "food",
+        "pattern": "painted",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 3.0,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "painted",
+          "seed": 1791831223,
+          "hash": "6acd2cb730bd"
+        }
+      }
+    },
+    "bake": {
+      "mode": "ao",
+      "size": 512,
+      "seconds": 0.34
+    },
+    "decals": 0,
+    "gpu_texture_mb": 18.0,
+    "flat_ratio": 0.0,
+    "texture_count": 6,
+    "texture_kb": 91.2,
+    "images": 6,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 106.6
+  }
+}
