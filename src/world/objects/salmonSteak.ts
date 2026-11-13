@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { conformChildrenToSphere } from './conformToSphere';
+import { cloneGltfInstance, loadGltfOnce, scheduleGltfMount } from './sharedGltf';
 import {
   SALMON_STEAK_LAYOUT_DEFAULT,
   type SalmonSteakLayout,
@@ -161,21 +160,18 @@ export function createSalmonSteak({
     applyVisuals();
   }
 
-  const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
-  loader.load(
-    SALMON_STEAK_URL,
-    (gltf) => {
-      model = gltf.scene;
-      model.name = 'salmon_steak_model';
-      fitModel(model);
-      prepareMaterials(model);
-      anchor.add(model);
-      applyPlacement();
-    },
-    undefined,
-    (error) => console.error(`[salmonSteak] 載入失敗：${SALMON_STEAK_URL}`, error),
-  );
+  loadGltfOnce(SALMON_STEAK_URL)
+    .then((gltf) => {
+      scheduleGltfMount(() => {
+        model = cloneGltfInstance(gltf.scene);
+        model.name = 'salmon_steak_model';
+        fitModel(model);
+        prepareMaterials(model);
+        anchor.add(model);
+        applyPlacement();
+      });
+    })
+    .catch((error) => console.error(`[salmonSteak] 載入失敗：${SALMON_STEAK_URL}`, error));
 
   applyPlacement();
 

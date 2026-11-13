@@ -37,10 +37,10 @@ export function playHouseTransition() {
   return playing;
 }
 
-/** 場景載入：黑幕先蓋滿，等畫面畫出來再從中心旋開 */
-export function playSceneLoad() {
+/** 場景載入：黑幕先蓋滿，可選的 prepare 完成後再從中心旋開 */
+export function playSceneLoad(prepare?: () => Promise<void>) {
   if (playing) return playing;
-  playing = runLoad().finally(() => {
+  playing = runLoad(prepare).finally(() => {
     playing = null;
   });
   return playing;
@@ -165,15 +165,19 @@ async function run() {
   }
 }
 
-async function runLoad() {
+async function runLoad(prepare?: () => Promise<void>) {
   const curtain = mountCurtain();
-  if (!curtain) return;
+  if (!curtain) {
+    if (prepare) await prepare();
+    return;
+  }
   const { canvas, paint, cellCount } = curtain;
   // 先塗滿再掛上，第一眼就是蓋住的，不會先閃出場景
   paint(cellCount);
   document.body.appendChild(canvas);
   removeSceneCover();
   try {
+    if (prepare) await prepare();
     await wait(LOAD_HOLD_MS);
     await tween(cellCount, 0, LOAD_OPEN_MS, (value) => paint(Math.ceil(value)));
     paint(0);

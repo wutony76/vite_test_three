@@ -1,8 +1,5 @@
 import * as THREE from 'three';
-// GLTFLoader：讀取 .glb / .gltf，網路上下載的 3D 模型最常見的格式
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-// 有些模型會用 meshopt 壓縮幾何資料，少了解碼器就讀不出來；沒壓縮的模型掛著也不影響
-import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { cloneGltfInstance, loadGltfOnce, preloadGltfs, scheduleGltfMount } from './sharedGltf';
 import { createKetchup } from './ketchup';
 import { createHouse, type HouseSettings } from './house';
 import { createCartoonRainbow } from './rainbow';
@@ -45,6 +42,18 @@ const MODEL_URL = `${import.meta.env.BASE_URL}models/chicken_leg/chicken_leg.glb
 // projectRoom 的外觀：用 Blender 做的 low poly 房子（匯出時已拿掉底下那塊平的地面，才能種在球面上）
 const PROJECT_ROOM_MODEL_URL = `${import.meta.env.BASE_URL}models/project_room/project_room.glb`;
 const GAME_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/game_hall/gameHall.glb`;
+
+export const WORLD_GLTF_URLS = [
+  MODEL_URL,
+  PROJECT_ROOM_MODEL_URL,
+  GAME_HALL_MODEL_URL,
+  `${import.meta.env.BASE_URL}models/pudding/pudding.glb`,
+  `${import.meta.env.BASE_URL}models/grilled_corn/grilled_corn.glb`,
+  `${import.meta.env.BASE_URL}models/salmon_steak/salmon_steak.glb`,
+  `${import.meta.env.BASE_URL}models/lemon_slice/lemon_slice.glb`,
+  `${import.meta.env.BASE_URL}models/fried_egg/fried_egg.glb`,
+  `${import.meta.env.BASE_URL}models/roast_chicken/roast_chicken.glb`,
+] as const;
 
 // true = 載入網路下載的模型；false = 顯示原本的綠色球
 const USE_MODEL = false;
@@ -94,6 +103,7 @@ export const INTRO_BALL_EASE_OPTIONS = [
 export type IntroBallEase = (typeof INTRO_BALL_EASE_OPTIONS)[number];
 
 export function createObjs({ envMap, camera }: CreateObjsOptions) {
+  preloadGltfs(WORLD_GLTF_URLS);
   const all = new THREE.Object3D();
 
   // 地表：綠球 + 房子共用同一個 pivot（球心在原點），入場時整組移動、縮放
@@ -647,21 +657,32 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       runtime.setIntroGrow(easeOutBack(puddingT, 2.4));
       runtime.update(deltaTime, introDone);
     });
+    const houseStart = introSettings.emptyHold + introSettings.ballSeconds;
+    const lastHouseIndex = Math.max(0, introHouses.length - 1);
+    const housesIntroEnd =
+      houseStart + lastHouseIndex * introSettings.houseStagger + introSettings.houseSeconds;
+
     grilledCornEntries.forEach(({ runtime }, index) => {
-      const cornStart = introSettings.emptyHold + introSettings.ballSeconds * 0.78 + index * 0.1;
-      const cornT = THREE.MathUtils.clamp((introElapsed - cornStart) / 0.9, 0, 1);
+      const cornStart = housesIntroEnd + index * 0.1;
+      const cornT = introDone
+        ? 1
+        : THREE.MathUtils.clamp((introElapsed - cornStart) / 0.9, 0, 1);
       runtime.setIntroGrow(easeOutBack(cornT, 2.2));
       runtime.update(deltaTime, introDone);
     });
     salmonSteakEntries.forEach(({ runtime }, index) => {
-      const steakStart = introSettings.emptyHold + introSettings.ballSeconds * 0.74 + index * 0.08;
-      const steakT = THREE.MathUtils.clamp((introElapsed - steakStart) / 0.9, 0, 1);
+      const steakStart = housesIntroEnd + index * 0.08;
+      const steakT = introDone
+        ? 1
+        : THREE.MathUtils.clamp((introElapsed - steakStart) / 0.9, 0, 1);
       runtime.setIntroGrow(easeOutBack(steakT, 2.1));
       runtime.update();
     });
     lemonSliceEntries.forEach(({ runtime }, index) => {
-      const lemonStart = introSettings.emptyHold + introSettings.ballSeconds * 0.7 + index * 0.08;
-      const lemonT = THREE.MathUtils.clamp((introElapsed - lemonStart) / 0.85, 0, 1);
+      const lemonStart = housesIntroEnd + index * 0.08;
+      const lemonT = introDone
+        ? 1
+        : THREE.MathUtils.clamp((introElapsed - lemonStart) / 0.85, 0, 1);
       runtime.setIntroGrow(easeOutBack(lemonT, 2.0));
       runtime.update();
     });
@@ -1028,20 +1049,17 @@ function createBall() {
 // 炸雞模型：載入是非同步的，先把空的 all 交給場景，載完再把模型塞進去
 // 這樣 main.ts 不用改成 await，畫面也不會因為等模型而整個卡住
 function loadModel(all: THREE.Object3D) {
-  const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
-  loader.load(
-    MODEL_URL,
-    (gltf) => {
-      const model = gltf.scene;
-      fitToSize(model, MODEL_SIZE);
-      all.add(model);
-    },
-    undefined,
-    (error) => {
+  loadGltfOnce(MODEL_URL)
+    .then((gltf) => {
+      scheduleGltfMount(() => {
+        const model = cloneGltfInstance(gltf.scene);
+        fitToSize(model, MODEL_SIZE);
+        all.add(model);
+      });
+    })
+    .catch((error) => {
       console.error(`[obj] 模型載入失敗，請確認檔案存在：${MODEL_URL}`, error);
-    },
-  );
+    });
 }
 
 /**
@@ -1059,29 +1077,26 @@ function attachHouseModel(
   // 不能用 object.visible = false：那會連子物件（模型）一起藏起來
   house.object.material.visible = false;
 
-  const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
-  loader.load(
-    url,
-    (gltf) => {
-      const model = gltf.scene;
-      fitIntoHouseBox(model, house.settings);
-      model.traverse((child) => {
-        const mesh = child as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        // 跟原本的長方體一樣會投影、也接得到影子；少了這兩行，房子在手電筒光下會像貼紙一樣沒有影子
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+  loadGltfOnce(url)
+    .then((gltf) => {
+      scheduleGltfMount(() => {
+        const model = cloneGltfInstance(gltf.scene);
+        fitIntoHouseBox(model, house.settings);
+        model.traverse((child) => {
+          const mesh = child as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          // 跟原本的長方體一樣會投影、也接得到影子；少了這兩行，房子在手電筒光下會像貼紙一樣沒有影子
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+        });
+        house.object.add(model);
+        house.applySettings();
+        onLoaded?.(model);
       });
-      house.object.add(model);
-      house.applySettings();
-      onLoaded?.(model);
-    },
-    undefined,
-    (error) => {
+    })
+    .catch((error) => {
       console.error(`[obj] 房子模型載入失敗，請確認檔案存在：${url}`, error);
-    },
-  );
+    });
 }
 
 /**

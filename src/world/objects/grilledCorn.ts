@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { conformChildrenToSphere } from './conformToSphere';
+import { cloneGltfInstance, loadGltfOnce, scheduleGltfMount } from './sharedGltf';
 import {
   GRILLED_CORN_LAYOUT_DEFAULT,
   GRILLED_CORN_VISUAL_DEFAULT,
@@ -248,20 +247,17 @@ export function createGrilledCorn({
     applyVisuals();
   }
 
-  const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
-  loader.load(
-    CORN_URL,
-    (gltf) => {
-      model = gltf.scene;
-      fitModel(model);
-      enhanceCornMaterials(model);
-      anchor.add(model);
-      applyPlacement();
-    },
-    undefined,
-    (error) => console.error(`[grilledCorn] 載入失敗：${CORN_URL}`, error),
-  );
+  loadGltfOnce(CORN_URL)
+    .then((gltf) => {
+      scheduleGltfMount(() => {
+        model = cloneGltfInstance(gltf.scene);
+        fitModel(model);
+        enhanceCornMaterials(model);
+        anchor.add(model);
+        applyPlacement();
+      });
+    })
+    .catch((error) => console.error(`[grilledCorn] 載入失敗：${CORN_URL}`, error));
 
   applyPlacement();
 

@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { conformChildrenToSphere } from './conformToSphere';
+import { cloneGltfInstance, loadGltfOnce, scheduleGltfMount } from './sharedGltf';
 import { PUDDING_LAYOUT_DEFAULT, type PuddingLayout, type PuddingPlacement } from './puddingLayout';
 
 const PUDDING_URL = `${import.meta.env.BASE_URL}models/pudding/pudding.glb`;
@@ -93,20 +92,17 @@ export function createPudding({ groundRadius, up, front, envMap, layout = PUDDIN
     });
   }
 
-  const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
-  loader.load(
-    PUDDING_URL,
-    (gltf) => {
-      model = gltf.scene;
-      fitModel(model);
-      enhanceJellyMaterials(model);
-      anchor.add(model);
-      applyPlacement();
-    },
-    undefined,
-    (error) => console.error(`[pudding] 載入失敗：${PUDDING_URL}`, error),
-  );
+  loadGltfOnce(PUDDING_URL)
+    .then((gltf) => {
+      scheduleGltfMount(() => {
+        model = cloneGltfInstance(gltf.scene);
+        fitModel(model);
+        enhanceJellyMaterials(model);
+        anchor.add(model);
+        applyPlacement();
+      });
+    })
+    .catch((error) => console.error(`[pudding] 載入失敗：${PUDDING_URL}`, error));
 
   applyPlacement();
 

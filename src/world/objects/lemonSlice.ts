@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { conformChildrenToSphere } from './conformToSphere';
+import { cloneGltfInstance, loadGltfOnce, scheduleGltfMount } from './sharedGltf';
 import {
   LEMON_SLICE_LAYOUT_DEFAULT,
   type LemonSliceLayout,
@@ -160,21 +159,18 @@ export function createLemonSlice({
     applyVisuals();
   }
 
-  const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
-  loader.load(
-    LEMON_SLICE_URL,
-    (gltf) => {
-      model = gltf.scene;
-      model.name = 'lemon_slice_model';
-      fitModel(model);
-      prepareMaterials(model);
-      anchor.add(model);
-      applyPlacement();
-    },
-    undefined,
-    (error) => console.error(`[lemonSlice] 載入失敗：${LEMON_SLICE_URL}`, error),
-  );
+  loadGltfOnce(LEMON_SLICE_URL)
+    .then((gltf) => {
+      scheduleGltfMount(() => {
+        model = cloneGltfInstance(gltf.scene);
+        model.name = 'lemon_slice_model';
+        fitModel(model);
+        prepareMaterials(model);
+        anchor.add(model);
+        applyPlacement();
+      });
+    })
+    .catch((error) => console.error(`[lemonSlice] 載入失敗：${LEMON_SLICE_URL}`, error));
 
   applyPlacement();
 

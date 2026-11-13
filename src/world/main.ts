@@ -10,6 +10,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   createObjs,
   INTRO_BALL_EASE_OPTIONS,
+  WORLD_GLTF_URLS,
   type WorldFriedEgg,
   type WorldGrilledCorn,
   type WorldHouse,
@@ -17,6 +18,7 @@ import {
   type WorldLemonSlice,
   type WorldSalmonSteak,
 } from './objects/obj';
+import { whenGltfMountsIdle, whenGltfsReady } from './objects/sharedGltf';
 import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
 import { formatPuddingPlacementsForPaste } from './objects/pudding';
@@ -36,6 +38,9 @@ import { isHouseTransitionPlaying, playHouseTransition, playSceneLoad, transitio
  * 
  */
 const renderer = new THREE.WebGLRenderer();
+// 第一次畫到新材質時，預設會同步讀著色器日誌，主執行緒會停到編譯結束。
+// 這裡的材質都是已知能畫的，關掉檢查，重新載入才不會卡在那一下。
+renderer.debug.checkShaderErrors = false;
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -207,6 +212,13 @@ const {
   addLemonSlice,
   removeLemonSlice,
 } = createObjs({ envMap, camera });
+
+/** 一次關掉整類食物（仍保留佈局，取消勾選即再顯示） */
+const foodVisibility = {
+  showCorn: true,
+  showLemon: true,
+  showSalmon: true,
+};
 
 scene.add(all);
 enableMeshShadows(all);
@@ -1113,7 +1125,7 @@ if (cornFolder) {
       const created = addGrilledCorn(seed);
       if (!created) return;
       bindCornPanel(created);
-      refreshPuddingDragTargets();
+      applyFoodGroupVisibility();
     },
     remove() {
       if (!selectedCorn || grilledCorns.length <= 1) return;
@@ -1266,7 +1278,7 @@ if (salmonFolder) {
       const created = addSalmonSteak(selectedSalmon ? { ...selectedSalmon.settings } : undefined);
       if (!created) return;
       bindSalmonPanel(created);
-      refreshPuddingDragTargets();
+      applyFoodGroupVisibility();
     },
     remove() {
       if (!selectedSalmon || salmonSteaks.length <= 1) return;
@@ -1415,7 +1427,7 @@ if (lemonFolder) {
       const created = addLemonSlice(selectedLemon ? { ...selectedLemon.settings } : undefined);
       if (!created) return;
       bindLemonPanel(created);
-      refreshPuddingDragTargets();
+      applyFoodGroupVisibility();
     },
     remove() {
       if (!selectedLemon || lemonSlices.length <= 1) return;
@@ -1437,6 +1449,18 @@ if (lemonFolder) {
   if (lemonSlices[0]) bindLemonPanel(lemonSlices[0]);
 }
 
+function applyFoodGroupVisibility() {
+  for (const corn of grilledCorns) corn.object.visible = foodVisibility.showCorn;
+  for (const lemon of lemonSlices) lemon.object.visible = foodVisibility.showLemon;
+  for (const steak of salmonSteaks) steak.object.visible = foodVisibility.showSalmon;
+  refreshPuddingDragTargets();
+}
+
+const foodVisibilityFolder = gui.addFolder('食物顯示');
+foodVisibilityFolder.add(foodVisibility, 'showCorn').name('玉米').onChange(applyFoodGroupVisibility);
+foodVisibilityFolder.add(foodVisibility, 'showLemon').name('檸檬片').onChange(applyFoodGroupVisibility);
+foodVisibilityFolder.add(foodVisibility, 'showSalmon').name('魚排').onChange(applyFoodGroupVisibility);
+
 // 進場時各分組與根面板都收合，需要時再手動展開
 [
   lightFolder,
@@ -1453,6 +1477,7 @@ if (lemonFolder) {
   cornFolder,
   salmonFolder,
   lemonFolder,
+  foodVisibilityFolder,
 ]
   .filter((folder): folder is GUI => folder != null)
   .forEach((folder) => folder.close());
@@ -1512,7 +1537,10 @@ let surfaceDragTargets: Array<WorldHouse | WorldPudding | WorldGrilledCorn | Wor
 
 function refreshPuddingDragTargets() {
   surfaceDragTargets.length = 0;
-  surfaceDragTargets.push(...houses, ...puddings, ...grilledCorns, ...friedEggsOnSphere(), ...salmonSteaks, ...lemonSlices);
+  surfaceDragTargets.push(...houses, ...puddings, ...friedEggsOnSphere());
+  if (foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
+  if (foodVisibility.showSalmon) surfaceDragTargets.push(...salmonSteaks);
+  if (foodVisibility.showLemon) surfaceDragTargets.push(...lemonSlices);
 }
 
 if (HOUSE_DRAG_ENABLED) {
@@ -1657,8 +1685,21 @@ function render(time: number) {
   renderer.render(scene, camera);
 }
 renderer.setAnimationLoop(render);
-// 場景迴圈開始後才掀開：黑幕底下已經有畫好的畫面，不會旋開到一片空白
-void playSceneLoad().then(() => {
+// 蓋板後先等 glb、分幀掛載、著色器預熱，再旋開，避免重整時畫面頓一下
+async function warmSceneShaders() {
+  if (typeof renderer.compileAsync === 'function') {
+    await renderer.compileAsync(scene, camera);
+    return;
+  }
+  renderer.compile(scene, camera);
+}
+
+void playSceneLoad(async () => {
+  await whenGltfsReady(WORLD_GLTF_URLS);
+  await whenGltfMountsIdle();
+  all.updateMatrixWorld(true);
+  await warmSceneShaders();
+}).then(() => {
   worldUiActions?.removeAttribute('hidden');
   syncWorldActionButtons();
 });

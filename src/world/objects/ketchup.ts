@@ -1,6 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { cloneGltfMaterialsOnly, loadGltfOnce } from './sharedGltf';
 import { createSplash } from './splash';
 
 const ROAST_CHICKEN_URL = `${import.meta.env.BASE_URL}models/roast_chicken/roast_chicken.glb`;
@@ -959,19 +958,7 @@ function foodPrototypeFromRoot(
   });
   fitFoodPrototype(root, targetMax, layChickenFlat);
   return {
-    clone: () => {
-      const instance = root.clone(true);
-      instance.traverse((child) => {
-        const mesh = child as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        if (Array.isArray(mesh.material)) {
-          mesh.material = mesh.material.map((m) => m.clone());
-        } else {
-          mesh.material = mesh.material.clone();
-        }
-      });
-      return instance;
-    },
+    clone: () => cloneGltfMaterialsOnly(root),
   };
 }
 
@@ -985,21 +972,16 @@ function prepareFoodPrototype(source: THREE.Object3D, targetMax: number): FoodPr
 function loadFoodPrototypes(onReady: () => void) {
   if (foodPrototypeLoadStarted) return;
   foodPrototypeLoadStarted = true;
-  const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
-  loader.load(
-    ROAST_CHICKEN_URL,
-    (gltf) => {
+  loadGltfOnce(ROAST_CHICKEN_URL)
+    .then((gltf) => {
       chickenSourceRoot = gltf.scene;
       rebuildChickenPrototype();
       onReady();
-    },
-    undefined,
-    (error) => {
+    })
+    .catch((error) => {
       console.error(`[ketchup] 烤雞模型載入失敗：${ROAST_CHICKEN_URL}`, error);
       onReady();
-    },
-  );
+    });
 }
 
 function createFoodMesh(kind: 'nugget' | 'fry') {

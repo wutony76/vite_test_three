@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { conformChildrenToSphere } from './conformToSphere';
+import { cloneGltfInstance, loadGltfOnce, scheduleGltfMount } from './sharedGltf';
 import {
   FRIED_EGG_SUN_DEFAULT,
   type FriedEggAttachLayout,
@@ -232,26 +231,23 @@ export function createFriedEgg({
     applyVisuals();
   }
 
-  const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
-  loader.load(
-    FRIED_EGG_URL,
-    (gltf) => {
-      model = gltf.scene;
-      model.name = 'fried_egg_model';
-      model.traverse((child) => {
-        child.frustumCulled = false;
+  loadGltfOnce(FRIED_EGG_URL)
+    .then((gltf) => {
+      scheduleGltfMount(() => {
+        model = cloneGltfInstance(gltf.scene);
+        model.name = 'fried_egg_model';
+        model.traverse((child) => {
+          child.frustumCulled = false;
+        });
+        fitModel(model);
+        enhanceEggMaterials(model);
+        anchor.add(model);
+        applyPlacement();
+        setIntroGrow(introGrow);
+        console.info('[friedEgg] 已載入', settings.mode);
       });
-      fitModel(model);
-      enhanceEggMaterials(model);
-      anchor.add(model);
-      applyPlacement();
-      setIntroGrow(introGrow);
-      console.info('[friedEgg] 已載入', settings.mode);
-    },
-    undefined,
-    (error) => console.error(`[friedEgg] 載入失敗：${FRIED_EGG_URL}`, error),
-  );
+    })
+    .catch((error) => console.error(`[friedEgg] 載入失敗：${FRIED_EGG_URL}`, error));
 
   if (isSunLayout(settings) && sceneParent) sceneParent.add(anchor);
   else if (isAttachLayout(settings) && attachParent) attachParent.add(anchor);
