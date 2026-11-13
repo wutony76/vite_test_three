@@ -116,8 +116,8 @@ def paint(fields, spec):
     # 5. accents：第四種顏色（烤焦、條紋），一樣跟著明暗走。
     # 鮭魚排的肉、白筋、魚皮要對上指定色碼，不再乘明暗。
     accent_colors = {**DEFAULT_ACCENTS, **spec.get("accents", {})}
-    exact_salmon = spec.get("pattern") == "salmon_marbling"
-    if exact_salmon:
+    exact_flat = spec.get("pattern") in ("salmon_marbling", "lemon_slice")
+    if exact_flat:
         flesh = np.array(hex_to_rgb(spec["palette"][1]), dtype=np.float32)
         rgb = np.empty((size, size, 3), dtype=np.float32)
         rgb[:] = flesh
@@ -125,7 +125,7 @@ def paint(fields, spec):
         if name not in accent_colors:
             continue
         color = np.array(hex_to_rgb(accent_colors[name]), dtype=np.float32)
-        if exact_salmon:
+        if exact_flat:
             shaded = color[None, None, :]
         else:
             shaded = color[None, None, :] * (0.65 + 0.7 * value[..., None])
@@ -142,6 +142,14 @@ def paint(fields, spec):
         hi = fields.get("accents", {}).get("highlight")
         if hi is not None:
             rough = rough - hi * 0.42
+    elif spec.get("pattern") == "lemon_slice":
+        lemon = fields.get("accents", {})
+        rough = (
+            rough
+            + lemon.get("pith", 0) * 0.40
+            + lemon.get("rind", 0) * 0.16
+            + lemon.get("membrane", 0) * 0.08
+        )
     occlusion = 1.0 - np.clip(cavity * (0.2 if is_corn else 0.6) + gap_orm * 0.35 * (gap_k / 0.42), 0, 0.8)
     metallic = np.full_like(height, spec["metallic"]) * (1 - gap_orm * 0.7)
 

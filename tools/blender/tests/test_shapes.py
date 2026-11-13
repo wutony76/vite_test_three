@@ -211,6 +211,15 @@ def test_rock_pile_and_bush_islands():
     assert shapes.topology_stats(built["bush_right"][1])["islands"] <= 6
 
 
+def test_lemon_slice_is_closed_8_gon():
+    """檸檬片是一片封閉的 8 邊厚片，頂點落在軸上，外框要碰到 plan 的寬和深。"""
+    _doc, _lay, built = _build_all("lemon_slice.plan.json")
+    stats = _closed_single(built["slice"][1])
+    assert stats["triangles"] == 32, stats
+    (x0, y0, z0), (x1, y1, z1) = stats["bounds"]
+    assert x1 - x0 > 0.069 and y1 - y0 > 0.069 and z1 - z0 > 0.007, stats["bounds"]
+
+
 def test_salmon_steak_is_closed_and_fills_bounds():
     """魚排是一塊封閉厚片，外框要碰到 plan 的寬和深，腹尖才跟參考圖一樣大。"""
     _doc, _lay, built = _build_all("salmon_steak.plan.json")

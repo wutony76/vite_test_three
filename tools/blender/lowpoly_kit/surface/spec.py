@@ -56,6 +56,7 @@ PATTERNS = {
     "fried_egg_white": {"units": 1, "scale_m": 0.14, "tileable": False, "relief": True},
     "fried_egg_yolk": {"units": 1, "scale_m": 0.055, "tileable": False, "relief": True},
     "salmon_marbling": {"units": 3, "scale_m": 0.15, "tileable": False, "relief": True},
+    "lemon_slice": {"units": 10, "scale_m": 0.07, "tileable": False, "relief": True},
 }
 # relief = False：表面幾乎平的圖樣不產生法線貼圖（省下 1/3 的 GPU 記憶體，看起來也沒差）
 

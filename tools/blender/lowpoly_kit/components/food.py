@@ -225,6 +225,16 @@ def build_salmon_steak(ctx):
     )
 
 
+@register("lemon_slice")
+def build_lemon_slice(ctx):
+    """檸檬片：厚圓盤。瓣數、白瓤、黃皮都在切面貼圖上，側面採貼圖底部的黃皮帶。"""
+    sides = max(6, min(24, int(ctx.param("sides", 8))))
+    radius = min(ctx.hw, ctx.hd)
+    height = max(ctx.h, 0.002)
+    profile = [(0.0, 0.0), (radius, 0.0), (radius, height), (0.0, height)]
+    return shapes.lathe(profile, sides, ctx.material, axis="z")
+
+
 @register("salmon_vertebra")
 def build_salmon_vertebra(ctx):
     """中央脊椎骨：略扁的橢球，填在 bounds 裡。"""

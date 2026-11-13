@@ -30,6 +30,12 @@ import {
   SALMON_STEAK_PLACEMENTS,
   type SalmonSteakLayout,
 } from './salmonSteakLayout';
+import { createLemonSlice, type LemonSliceSettings } from './lemonSlice';
+import {
+  LEMON_SLICE_LAYOUT_DEFAULT,
+  LEMON_SLICE_PLACEMENTS,
+  type LemonSliceLayout,
+} from './lemonSliceLayout';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -205,6 +211,57 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       const { id, ...layout } = placement;
       spawnSalmonSteak(id, layout);
     }
+  }
+
+  type LemonSliceRuntime = ReturnType<typeof createLemonSlice>;
+  const lemonSliceEntries: Array<{ world: WorldLemonSlice; runtime: LemonSliceRuntime }> = [];
+  const lemonSlices: WorldLemonSlice[] = [];
+
+  function spawnLemonSlice(id: string, layout: LemonSliceLayout, grown = false) {
+    if (!puddingAxes) return null;
+    const runtime = createLemonSlice({ ...puddingAxes, layout: { ...layout } });
+    ground.add(runtime.object);
+    const world = exposeLemonSlice(id, runtime);
+    lemonSliceEntries.push({ world, runtime });
+    lemonSlices.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  if (puddingAxes) {
+    for (const placement of LEMON_SLICE_PLACEMENTS) {
+      const { id, ...layout } = placement;
+      spawnLemonSlice(id, layout);
+    }
+  }
+
+  function nextLemonSliceId() {
+    let n = lemonSliceEntries.length + 1;
+    let id = `lemon_slice_${n}`;
+    while (lemonSlices.some((item) => item.id === id)) {
+      n += 1;
+      id = `lemon_slice_${n}`;
+    }
+    return id;
+  }
+
+  function addLemonSlice(seed?: Partial<LemonSliceLayout>): WorldLemonSlice | null {
+    if (!puddingAxes) return null;
+    const base: LemonSliceLayout = { ...LEMON_SLICE_LAYOUT_DEFAULT, ...seed };
+    const azimuth = seed?.azimuthDegrees ?? LEMON_SLICE_LAYOUT_DEFAULT.azimuthDegrees;
+    base.azimuthDegrees = wrapDegrees(azimuth + 18);
+    return spawnLemonSlice(nextLemonSliceId(), base, introDone);
+  }
+
+  function removeLemonSlice(entry: WorldLemonSlice) {
+    const index = lemonSliceEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    const { runtime, world } = lemonSliceEntries[index];
+    runtime.dispose();
+    lemonSliceEntries.splice(index, 1);
+    const sliceIndex = lemonSlices.indexOf(world);
+    if (sliceIndex >= 0) lemonSlices.splice(sliceIndex, 1);
+    return true;
   }
 
   function nextSalmonSteakId() {
@@ -523,6 +580,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(0);
   for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
   for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
+  for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
   groundFlowers?.resetIntro(introHouses.length);
   placeFlowers(0);
   if (ground !== all) ground.visible = false;
@@ -576,6 +634,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         for (const { runtime } of puddingEntries) runtime.setIntroGrow(1);
         for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(1);
         for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(1);
       }
     }
 
@@ -598,6 +657,12 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       const steakStart = introSettings.emptyHold + introSettings.ballSeconds * 0.74 + index * 0.08;
       const steakT = THREE.MathUtils.clamp((introElapsed - steakStart) / 0.9, 0, 1);
       runtime.setIntroGrow(easeOutBack(steakT, 2.1));
+      runtime.update();
+    });
+    lemonSliceEntries.forEach(({ runtime }, index) => {
+      const lemonStart = introSettings.emptyHold + introSettings.ballSeconds * 0.7 + index * 0.08;
+      const lemonT = THREE.MathUtils.clamp((introElapsed - lemonStart) / 0.85, 0, 1);
+      runtime.setIntroGrow(easeOutBack(lemonT, 2.0));
       runtime.update();
     });
     friedEggEntries.forEach(({ runtime }, index) => {
@@ -665,6 +730,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(0);
     for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
     for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
   }
 
   // 緞帶擺放參數也往外交出去，讓 main.ts 的控制面板可以調整
@@ -706,6 +772,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     salmonSteaks,
     addSalmonSteak,
     removeSalmonSteak,
+    lemonSlices,
+    addLemonSlice,
+    removeLemonSlice,
     houses: [
       exposeHouse('mainHall', mainHall),
       exposeHouse('projectRoom', projectRoom),
@@ -730,6 +799,17 @@ export type WorldSalmonSteak = {
   label: string;
   object: THREE.Object3D;
   settings: SalmonSteakSettings;
+  apply: () => void;
+  applyVisuals: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldLemonSlice = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: LemonSliceSettings;
   apply: () => void;
   applyVisuals: () => void;
   getNormal: () => THREE.Vector3;
@@ -793,6 +873,19 @@ function exposeGrilledCorn(id: string, corn: ReturnType<typeof createGrilledCorn
     applyVisuals: corn.applyVisuals,
     getNormal: corn.getNormal,
     setNormal: corn.setNormal,
+  };
+}
+
+function exposeLemonSlice(id: string, slice: ReturnType<typeof createLemonSlice>): WorldLemonSlice {
+  return {
+    id,
+    label: id,
+    object: slice.object,
+    settings: slice.settings,
+    apply: slice.applySettings,
+    applyVisuals: slice.applyVisuals,
+    getNormal: slice.getNormal,
+    setNormal: slice.setNormal,
   };
 }
 

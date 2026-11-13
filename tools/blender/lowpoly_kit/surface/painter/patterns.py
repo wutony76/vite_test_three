@@ -520,10 +520,63 @@ def salmon_marbling(size, units, seed):
     return out
 
 
+def lemon_slice(size, units, seed):
+    """俯視檸檬片：果肉瓣、白膜、淡芯、白瓤、黃皮。貼圖下方一條是側面用的黃皮。
+
+    切面 UV 用 v≥0.10（down<0.90）。正圓對在這一段：u 半徑 0.5、down 半徑 0.45。
+    down≥0.90 整條是黃皮，側面 UV 只採這裡。units 是瓣數。
+    """
+    u, down = _coords(size)
+    out = _empty(size)
+    side = (down >= 0.90).astype(np.float32)
+    au = (u - np.float32(0.5)) / np.float32(0.50)
+    ad = (down - np.float32(0.45)) / np.float32(0.45)
+    radius = np.sqrt(au * au + ad * ad)
+
+    count = int(max(8, min(14, round(units))))
+    ang = np.arctan2(ad, au)
+    warp = np.float32(0.22) * np.sin(ang * 2.0 + 0.6) + np.float32(0.09) * np.sin(ang * 5.0 + 1.3)
+    phase = ((ang + warp) / np.float32(2.0 * np.pi) + np.float32(0.5)) * count
+    membrane = _hard_band(phase, 0.035)
+    membrane = membrane * (radius > 0.12) * (radius < 0.83) * (1.0 - side)
+
+    core = np.clip((0.095 - radius) / 0.018, 0, 1) * (1.0 - side)
+    pith = np.clip((radius - 0.825) / 0.018, 0, 1) * np.clip((0.930 - radius) / 0.016, 0, 1)
+    pith = pith * (1.0 - side)
+    rind = np.clip((radius - 0.910) / 0.016, 0, 1) * np.clip((1.05 - radius) / 0.04, 0, 1)
+    rind = np.maximum(rind * (1.0 - side), side)
+    pith = pith * (1.0 - rind)
+    core = core * (1.0 - rind) * (1.0 - pith)
+    membrane = membrane * (1.0 - rind) * (1.0 - pith) * (1.0 - core)
+
+    pulp = ((radius < 1.02) & (side < 0.5)).astype(np.float32)
+    pulp = pulp * (1.0 - rind) * (1.0 - pith) * (1.0 - core) * (1.0 - membrane)
+
+    vesicles = noise.fbm(size, 14, seed, octaves=3)
+    glands = noise.fbm(size, 22, seed + 7, octaves=2)
+    height = np.full((size, size), 0.52, np.float32)
+    height = height + pulp * (vesicles - 0.5) * 0.14 + rind * (glands - 0.45) * 0.08
+    height = height - membrane * 0.05
+    height = np.clip(height, 0, 1)
+    height = np.where(side > 0.5, np.float32(0.48), height)
+
+    out["height"] = height.astype(np.float32)
+    out["tone"] = (pulp * (vesicles - 0.5) * 0.35).astype(np.float32)
+    out["gap"] = (membrane * 0.4).astype(np.float32)
+    out["detail"] = (pulp * (vesicles - 0.5) * 0.5).astype(np.float32)
+    out["accents"] = {
+        "membrane": membrane.astype(np.float32),
+        "core": core.astype(np.float32),
+        "pith": pith.astype(np.float32),
+        "rind": rind.astype(np.float32),
+    }
+    return out
+
+
 PATTERN_FUNCS = {
     "planks": planks, "wood_grain": wood_grain, "brick": brick, "cobble": cobble, "roof_tiles": roof_tiles,
     "rock": rock, "plaster": plaster, "brushed": brushed, "weave": weave, "foliage": foliage, "ground": ground,
     "crust": crust, "painted": painted, "stripes": stripes, "corn_kernels": corn_kernels,
     "fried_egg_white": fried_egg_white, "fried_egg_yolk": fried_egg_yolk,
-    "salmon_marbling": salmon_marbling,
+    "salmon_marbling": salmon_marbling, "lemon_slice": lemon_slice,
 }

@@ -14,9 +14,11 @@ import {
   type WorldGrilledCorn,
   type WorldHouse,
   type WorldPudding,
+  type WorldLemonSlice,
   type WorldSalmonSteak,
 } from './objects/obj';
 import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
+import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
 import { formatPuddingPlacementsForPaste } from './objects/pudding';
 import { formatSalmonSteakPlacementsForPaste } from './objects/salmonSteak';
 import { formatFriedEggPlacementsForPaste } from './objects/friedEgg';
@@ -201,6 +203,9 @@ const {
   salmonSteaks,
   addSalmonSteak,
   removeSalmonSteak,
+  lemonSlices,
+  addLemonSlice,
+  removeLemonSlice,
 } = createObjs({ envMap, camera });
 
 scene.add(all);
@@ -1283,6 +1288,155 @@ if (salmonFolder) {
   if (salmonSteaks[0]) bindSalmonPanel(salmonSteaks[0]);
 }
 
+// 檸檬片（綠球上；拖曳選取後調整，可複製）
+const lemonFolder = lemonSlices.length > 0 ? gui.addFolder('檸檬片') : null;
+let selectedLemon: WorldLemonSlice | null = null;
+
+function highlightLemon(entry: WorldLemonSlice | null) {
+  for (const slice of lemonSlices) {
+    slice.applyVisuals();
+    if (slice !== entry) continue;
+    slice.object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        if (!('emissive' in material)) continue;
+        const m = material as THREE.MeshStandardMaterial;
+        m.emissive.copy(m.color);
+        m.emissiveIntensity = 0.35;
+      }
+    });
+  }
+}
+
+const LEMON_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+
+function clearLemonPanelSliders() {
+  if (!lemonFolder) return;
+  lemonFolder.title('檸檬片');
+  for (const controller of [...lemonFolder.controllers]) {
+    if (LEMON_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+function bindLemonPanel(entry: WorldLemonSlice) {
+  if (!lemonFolder) return;
+  const alreadyShowing = entry === selectedLemon && lemonFolder.controllers.length > LEMON_PANEL_ACTIONS.size;
+  selectedLemon = entry;
+  highlightLemon(entry);
+  if (alreadyShowing) return;
+
+  clearLemonPanelSliders();
+  lemonFolder.title(`檸檬片 · ${entry.label}`);
+
+  const settings = entry.settings;
+  const apply = () => entry.apply();
+  const applyVisuals = () => {
+    entry.applyVisuals();
+    highlightLemon(entry);
+  };
+
+  lemonFolder
+    .add(settings, 'angleFromTopDegrees', 0, 90, 1)
+    .name('離頂端 (°)')
+    .onChange(apply)
+    .onFinishChange(logLemonPlacements);
+  lemonFolder
+    .add(settings, 'azimuthDegrees', -180, 180, 1)
+    .name('方位 (°)')
+    .onChange(apply)
+    .onFinishChange(logLemonPlacements);
+  lemonFolder
+    .add(settings, 'spinDegrees', -180, 180, 1)
+    .name('自轉 (°)')
+    .onChange(apply)
+    .onFinishChange(logLemonPlacements);
+  lemonFolder
+    .add(settings, 'tiltXDegrees', -180, 180, 1)
+    .name('前傾 (°)')
+    .onChange(apply)
+    .onFinishChange(logLemonPlacements);
+  lemonFolder
+    .add(settings, 'tiltZDegrees', -180, 180, 1)
+    .name('側傾 (°)')
+    .onChange(apply)
+    .onFinishChange(logLemonPlacements);
+  lemonFolder
+    .add(settings, 'sink', -0.6, 0.12, 0.001)
+    .name('下沉（負值上浮）')
+    .onChange(apply)
+    .onFinishChange(logLemonPlacements);
+  lemonFolder
+    .add(settings, 'placementScale', 0.15, 2.5, 0.01)
+    .name('縮放')
+    .onChange(apply)
+    .onFinishChange(logLemonPlacements);
+  lemonFolder
+    .add(settings, 'modelSize', 0.04, 0.45, 0.005)
+    .name('大小 (m)')
+    .onChange(apply)
+    .onFinishChange(logLemonPlacements);
+  lemonFolder
+    .add(settings, 'heightScale', 0.4, 3, 0.05)
+    .name('增高')
+    .onChange(apply)
+    .onFinishChange(logLemonPlacements);
+  lemonFolder
+    .add(settings, 'colorBoost', 0.6, 1.5, 0.01)
+    .name('亮度')
+    .onChange(applyVisuals)
+    .onFinishChange(logLemonPlacements);
+  lemonFolder
+    .addColor(settings, 'tintColor')
+    .name('顏色')
+    .onChange(applyVisuals)
+    .onFinishChange(logLemonPlacements);
+  lemonFolder
+    .add(settings, 'tintMix', 0, 1, 0.01)
+    .name('顏色強度')
+    .onChange(applyVisuals)
+    .onFinishChange(logLemonPlacements);
+}
+
+function logLemonPlacements() {
+  if (lemonSlices.length === 0) return;
+  const text = formatLemonSlicePlacementsForPaste(
+    lemonSlices.map((slice) => ({ id: slice.id, settings: slice.settings })),
+  );
+  console.log(text);
+  return text;
+}
+
+if (lemonFolder) {
+  const lemonControls = {
+    add() {
+      const created = addLemonSlice(selectedLemon ? { ...selectedLemon.settings } : undefined);
+      if (!created) return;
+      bindLemonPanel(created);
+      refreshPuddingDragTargets();
+    },
+    remove() {
+      if (!selectedLemon || lemonSlices.length <= 1) return;
+      if (!removeLemonSlice(selectedLemon)) return;
+      selectedLemon = null;
+      clearLemonPanelSliders();
+      const next = lemonSlices[lemonSlices.length - 1];
+      if (next) bindLemonPanel(next);
+      else highlightLemon(null);
+      refreshPuddingDragTargets();
+    },
+    log() {
+      logLemonPlacements();
+    },
+  };
+  lemonFolder.add(lemonControls, 'add').name('複製檸檬片');
+  lemonFolder.add(lemonControls, 'remove').name('移除選中檸檬片');
+  lemonFolder.add(lemonControls, 'log').name('印出全部佈局 (console)');
+  if (lemonSlices[0]) bindLemonPanel(lemonSlices[0]);
+}
+
 // 進場時各分組與根面板都收合，需要時再手動展開
 [
   lightFolder,
@@ -1298,6 +1452,7 @@ if (salmonFolder) {
   puddingFolder,
   cornFolder,
   salmonFolder,
+  lemonFolder,
 ]
   .filter((folder): folder is GUI => folder != null)
   .forEach((folder) => folder.close());
@@ -1346,17 +1501,18 @@ const HOUSE_DRAG_ENABLED = true;
 
 const friedEggsOnSphere = () => friedEggs.filter((egg) => egg.settings.mode === 'sphere');
 
-let surfaceDragTargets: Array<WorldHouse | WorldPudding | WorldGrilledCorn | WorldFriedEgg | WorldSalmonSteak> = [
+let surfaceDragTargets: Array<WorldHouse | WorldPudding | WorldGrilledCorn | WorldFriedEgg | WorldSalmonSteak | WorldLemonSlice> = [
   ...houses,
   ...puddings,
   ...grilledCorns,
   ...friedEggsOnSphere(),
   ...salmonSteaks,
+  ...lemonSlices,
 ];
 
 function refreshPuddingDragTargets() {
   surfaceDragTargets.length = 0;
-  surfaceDragTargets.push(...houses, ...puddings, ...grilledCorns, ...friedEggsOnSphere(), ...salmonSteaks);
+  surfaceDragTargets.push(...houses, ...puddings, ...grilledCorns, ...friedEggsOnSphere(), ...salmonSteaks, ...lemonSlices);
 }
 
 if (HOUSE_DRAG_ENABLED) {
@@ -1380,6 +1536,8 @@ if (HOUSE_DRAG_ENABLED) {
       if (cornEntry) bindCornPanel(cornEntry);
       const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
       if (salmonEntry) bindSalmonPanel(salmonEntry);
+      const lemonEntry = lemonSlices.find((item) => item.object === target.object);
+      if (lemonEntry) bindLemonPanel(lemonEntry);
     },
     onDrag: (normal, target) => {
       target.setNormal(normal);
@@ -1387,12 +1545,14 @@ if (HOUSE_DRAG_ENABLED) {
       puddingFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       cornFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       salmonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      lemonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
     onDragEnd: (target) => {
       if (houses.some((house) => house.object === target.object)) logHouse();
       else if (puddings.some((item) => item.object === target.object)) logPuddingPlacements();
       else if (grilledCorns.some((item) => item.object === target.object)) logCornPlacements();
       else if (salmonSteaks.some((item) => item.object === target.object)) logSalmonPlacements();
+      else if (lemonSlices.some((item) => item.object === target.object)) logLemonPlacements();
     },
     onClick: (target) => {
       if (houses.some((house) => house.object === target.object)) markHouseSelected();
@@ -1402,6 +1562,8 @@ if (HOUSE_DRAG_ENABLED) {
       if (cornEntry) bindCornPanel(cornEntry);
       const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
       if (salmonEntry) bindSalmonPanel(salmonEntry);
+      const lemonEntry = lemonSlices.find((item) => item.object === target.object);
+      if (lemonEntry) bindLemonPanel(lemonEntry);
     },
   });
 }

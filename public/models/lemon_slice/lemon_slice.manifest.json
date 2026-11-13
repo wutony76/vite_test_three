@@ -1,0 +1,58 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "lemon_slice",
+  "glb": "lemon_slice.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
+  ],
+  "root": "lemon_slice_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 32,
+    "primitives": 1,
+    "meshes": 1,
+    "materials": 1,
+    "file_bytes": 165156
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "pass",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "flesh": {
+        "class": "food",
+        "pattern": "lemon_slice",
+        "tier": "standard",
+        "size": 1024,
+        "tile_m": null,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "lemon_slice",
+          "seed": 3898179696,
+          "hash": "e8598070d12a"
+        }
+      }
+    },
+    "bake": {
+      "mode": "ao",
+      "size": 512,
+      "seconds": 0.43
+    },
+    "decals": 0,
+    "gpu_texture_mb": 17.33,
+    "flat_ratio": 0.0,
+    "texture_count": 4,
+    "texture_kb": 155.0,
+    "images": 4,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 161.3
+  }
+}

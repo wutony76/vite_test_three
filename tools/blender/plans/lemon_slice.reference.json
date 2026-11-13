@@ -1,0 +1,95 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "lemon_slice",
+  "image": {"path": "tools/img/lemon_slice.jpg", "width": 980, "height": 980},
+  "medium": "studio product photo, top-down lemon slice",
+  "view": {"type": "top", "source": "observed", "confidence": 0.98},
+  "scale_anchor": {"component": "slice", "axis": "width", "meters": 0.07},
+  "silhouette": {
+    "outline": [
+      [0.490, 0.036], [0.668, 0.071], [0.818, 0.172], [0.919, 0.322],
+      [0.954, 0.500], [0.919, 0.678], [0.818, 0.828], [0.668, 0.929],
+      [0.490, 0.964], [0.312, 0.929], [0.162, 0.828], [0.061, 0.678],
+      [0.026, 0.500], [0.061, 0.322], [0.162, 0.172], [0.312, 0.071]
+    ],
+    "source": "observed",
+    "confidence": 0.94
+  },
+  "palette": [
+    {"name": "pulp", "hex": "#E8C422", "usage": "果肉瓣的飽和黃", "sample": [0.36, 0.28, 0.64, 0.48]},
+    {"name": "membrane", "hex": "#F2E8B4", "usage": "瓣與瓣之間的淡色膜", "sample": [0.676, 0.418, 0.682, 0.422]},
+    {"name": "core", "hex": "#E8DFBC", "usage": "中心淡芯", "sample": [0.46, 0.47, 0.52, 0.53]},
+    {"name": "pith", "hex": "#F1F0E2", "usage": "白瓤", "sample": [0.45, 0.075, 0.54, 0.125]},
+    {"name": "rind", "hex": "#F9DF30", "usage": "外圈黃皮", "sample": [0.930, 0.488, 0.955, 0.512]}
+  ],
+  "surfaces": [
+    {
+      "id": "pulp",
+      "region": [[0.105, 0.115], [0.875, 0.115], [0.875, 0.885], [0.105, 0.885]],
+      "class": "food",
+      "pattern": "lemon_slice",
+      "base_hex": "#E8C422",
+      "scale_m": 0.058,
+      "components": ["slice"],
+      "source": "observed",
+      "confidence": 0.95
+    },
+    {
+      "id": "pith",
+      "region": [[0.063, 0.073], [0.917, 0.073], [0.917, 0.927], [0.063, 0.927]],
+      "class": "food",
+      "pattern": "lemon_slice",
+      "base_hex": "#F1F0E2",
+      "scale_m": 0.008,
+      "components": ["slice"],
+      "source": "observed",
+      "confidence": 0.9
+    },
+    {
+      "id": "rind",
+      "region": [[0.026, 0.036], [0.954, 0.036], [0.954, 0.964], [0.026, 0.964]],
+      "class": "food",
+      "pattern": "lemon_slice",
+      "base_hex": "#F9DF30",
+      "scale_m": 0.006,
+      "components": ["slice"],
+      "source": "observed",
+      "confidence": 0.93
+    },
+    {
+      "id": "core",
+      "region": [[0.444, 0.454], [0.536, 0.454], [0.536, 0.546], [0.444, 0.546]],
+      "class": "food",
+      "pattern": "lemon_slice",
+      "base_hex": "#E8DFBC",
+      "scale_m": 0.007,
+      "components": ["slice"],
+      "source": "observed",
+      "confidence": 0.88
+    }
+  ],
+  "components": [
+    {
+      "id": "slice",
+      "kind": "lemon_slice",
+      "tier": "primary",
+      "bbox": [0.026, 0.036, 0.954, 0.964],
+      "material_hint": "pulp",
+      "source": "observed",
+      "confidence": 0.96
+    }
+  ],
+  "hidden": [
+    {
+      "id": "thickness",
+      "assumption": "俯視看不到厚度。切片約 8 mm，側面整圈是黃皮",
+      "source": "inferred",
+      "confidence": 0.55
+    }
+  ],
+  "excluded": [
+    {"what": "白背景", "reason": "只取檸檬片本體"},
+    {"what": "切面反光高光", "reason": "打光造成的亮斑，不建幾何，交給粗糙度與法線"},
+    {"what": "接觸陰影", "reason": "不建幾何"}
+  ]
+}

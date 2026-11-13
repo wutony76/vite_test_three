@@ -1,0 +1,65 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "lemon_slice",
+  "reference": "lemon_slice",
+  "notes": "俯視檸檬片。一整片圓盤：切面貼圖畫 10 瓣果肉、白膜、淡芯、白瓤和黃皮；側面走貼圖底部的黃皮帶。直徑 7 cm、厚 8 mm（厚度是推測）。正面朝 -Y。確認後才建模，並加進 world，可複製、可拖曳、可用面板調位置與顏色。",
+  "dimensions": {"w": 0.07, "d": 0.07, "h": 0.008},
+  "detail": {
+    "preset": "game_default",
+    "overrides": {
+      "tertiary_density": 0,
+      "geometry_complexity": 8,
+      "bevel_quality": 0,
+      "surface_detail": 0.12
+    }
+  },
+  "style": {"edge_wobble": 0.0},
+  "materials": [
+    {
+      "name": "flesh",
+      "hex": "#E8C422",
+      "roughness": 0.22,
+      "surface": {
+        "class": "food",
+        "pattern": "lemon_slice",
+        "uv": "fit",
+        "tier": "standard",
+        "units": 10,
+        "scale_m": 0.07,
+        "palette": ["#C4920A", "#E8C422", "#FFF4B8"],
+        "accents": {
+          "membrane": "#F2E8B4",
+          "core": "#E8DFBC",
+          "pith": "#F1F0E2",
+          "rind": "#F9DF30"
+        },
+        "wear": 0.0,
+        "dirt": 0.0,
+        "normal_strength": 0.65,
+        "roughness_variation": 0.06,
+        "gap_shade": 0.2,
+        "posterize_steps": 4,
+        "posterize_mix": 0.45
+      }
+    }
+  ],
+  "budget": {"max_tris": 600, "max_primitives": 2, "max_texture_kb": 1200, "max_gpu_texture_mb": 24},
+  "components": [
+    {
+      "id": "slice",
+      "kind": "lemon_slice",
+      "tier": "primary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "flesh",
+      "params": {"sides": 8, "segments": 10},
+      "bounds": [[-0.035, -0.035, 0.0], [0.035, 0.035, 0.008]],
+      "source": "observed",
+      "confidence": 0.95
+    }
+  ],
+  "export": {
+    "path": "public/models/lemon_slice/lemon_slice.glb",
+    "compress": true
+  }
+}
