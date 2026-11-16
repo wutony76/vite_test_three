@@ -33,6 +33,7 @@ import { whenGltfMountsIdle, whenGltfsReady } from './objects/sharedGltf';
 import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
 import { CAMPFIRE_CHICKEN_SPIN_AXES, formatCampfireSettingsForPaste } from './objects/campfire';
+import { formatFloatingIslandSettingsForPaste } from './objects/floatingIsland';
 import { formatFrenchFriesPlacementsForPaste } from './objects/frenchFries';
 import { formatFrenchFryStickPlacementsForPaste } from './objects/frenchFryStick';
 import { formatPuddingPlacementsForPaste } from './objects/pudding';
@@ -45,6 +46,7 @@ import type { FriedEggSunLayout } from './objects/friedEggLayout';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { enableViewPlaneDrag } from './debug/viewPlaneDrag';
 import { enableSurfaceDrag } from './debug/surfaceDrag';
+import { enableCameraPlaneDrag } from './debug/cameraPlaneDrag';
 import { flyCameraTo, isCameraFlying, type CameraPose } from './cameraFlight';
 import { isHouseTransitionPlaying, playHouseTransition, playSceneLoad, transitionSettings } from './houseTransition';
 
@@ -238,6 +240,7 @@ const {
   removeFrenchFryStick,
   pig,
   campfire,
+  floatingIsland,
 } = createObjs({ envMap, camera });
 
 /** 一次關掉整類食物（仍保留佈局，取消勾選即再顯示） */
@@ -1434,6 +1437,45 @@ if (pigFolder && pig) {
   cloudFolder.add(pig.cloud, 'weightThunder', 0, 10, 0.5).name('權重：打雷').onFinishChange(logCloud);
   cloudFolder.add(pig.cloud, 'weightStorm', 0, 10, 0.5).name('權重：暴雨').onFinishChange(logCloud);
   pigFolder.open();
+}
+
+// 浮空小星球（右後方天空，位置跟著鏡頭）
+{
+  const islandFolder = gui.addFolder('浮空小星球');
+  const s = floatingIsland.settings;
+  const apply = () => floatingIsland.apply();
+  const log = () => console.log(formatFloatingIslandSettingsForPaste(s));
+  islandFolder.add(s, 'enabled').name('顯示').onChange(apply).onFinishChange(log);
+  islandFolder.add(s, 'camX', -6, 6, 0.01).name('畫面位置：左右').onChange(apply).onFinishChange(log);
+  islandFolder.add(s, 'camY', -4, 8, 0.01).name('畫面位置：上下').onChange(apply).onFinishChange(log);
+  islandFolder.add(s, 'camZ', -40, -4, 0.1).name('距離（越負越遠）').onChange(apply).onFinishChange(log);
+  islandFolder.add(s, 'scale', 0.02, 1.5, 0.005).name('大小').onChange(apply).onFinishChange(log);
+  islandFolder.add(s, 'spinDegrees', -180, 180, 1).name('轉向 (°)').onChange(apply).onFinishChange(log);
+  islandFolder.add(s, 'tiltDegrees', -30, 60, 1).name('前傾 (°)').onChange(apply).onFinishChange(log);
+  islandFolder.add(s, 'autoSpinDegreesPerSecond', -30, 30, 0.5).name('自轉 (°/秒)').onFinishChange(log);
+  islandFolder.add(s, 'bobAmount', 0, 3, 0.05).name('漂浮幅度').onFinishChange(log);
+  islandFolder.add(s, 'swingSpeed', 0, 3, 0.05).name('鞦韆擺盪速度').onFinishChange(log);
+  islandFolder.add(s, 'hazeAmount', 0, 1, 0.01).name('遠景霧化（朦朧感）').onChange(apply).onFinishChange(log);
+  islandFolder.addColor(s, 'hazeColor').name('霧的顏色').onChange(apply).onFinishChange(log);
+  islandFolder.add(s, 'mistAmount', 0, 1.5, 0.01).name('霧氣濃度').onFinishChange(log);
+  islandFolder.add(s, 'mistSize', 0.2, 3, 0.05).name('霧氣大小').onFinishChange(log);
+  islandFolder.add(s, 'mistSpeed', 0, 4, 0.05).name('霧氣飄動速度').onFinishChange(log);
+  islandFolder.add({ log }, 'log').name('印出設定 (console)');
+
+  // 直接在畫面上按住小星球拖曳，就能移動它的位置（面板的左右／上下會同步更新）
+  // 要在 enableSurfaceDrag 之前註冊：兩個都用 capture 監聽按下，先註冊的先收到
+  enableCameraPlaneDrag({
+    object: floatingIsland.object,
+    position: s,
+    camera,
+    domElement: renderer.domElement,
+    controls,
+    onDrag: () => {
+      apply();
+      islandFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
+    },
+    onDragEnd: log,
+  });
 }
 
 // 篝火（綠球上；可直接拖曳換位置）

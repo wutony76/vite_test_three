@@ -48,6 +48,7 @@ import {
 import { createPig, type PigSettings } from './pig';
 import type { PigCloudSettings, PigCloudState } from './pigCloud';
 import { createCampfire, type CampfireSettings } from './campfire';
+import { createFloatingIsland } from './floatingIsland';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -612,6 +613,11 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     campfireRuntime.setIntroGrow(0);
   }
 
+  // 浮空小星球：飄在畫面右後方天空，位置跟著鏡頭（跟荷包蛋太陽一樣）
+  const floatingIsland = createFloatingIsland({ camera });
+  all.add(floatingIsland.object);
+  floatingIsland.setIntroGrow(0);
+
   function getPigObstacleRoots(): THREE.Object3D[] {
     const roots: THREE.Object3D[] = introHouses.map((house) => house.object);
     // 只給石圈＋木柴（footprint），火星和煙飛很高，算進去會讓避障範圍變超大
@@ -876,6 +882,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(1);
         pigRuntime?.setIntroGrow(1);
         campfireRuntime?.setIntroGrow(1);
+        floatingIsland.setIntroGrow(1);
       }
     }
 
@@ -933,6 +940,13 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       runtime.setIntroGrow(easeOutBack(stickT, 2.0));
       runtime.update();
     });
+    {
+      // 房子長完後，小星球從遠方彈出來
+      const islandStart = housesIntroEnd + 0.3;
+      const islandT = introDone ? 1 : THREE.MathUtils.clamp((introElapsed - islandStart) / 1.1, 0, 1);
+      floatingIsland.setIntroGrow(easeOutBack(islandT, 1.6));
+      floatingIsland.update(deltaTime);
+    }
     if (campfireRuntime) {
       const fireStart = housesIntroEnd + 0.15;
       const fireT = introDone ? 1 : THREE.MathUtils.clamp((introElapsed - fireStart) / 0.8, 0, 1);
@@ -1020,6 +1034,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(0);
     pigRuntime?.setIntroGrow(0);
     campfireRuntime?.setIntroGrow(0);
+    floatingIsland.setIntroGrow(0);
   }
 
   // 緞帶擺放參數也往外交出去，讓 main.ts 的控制面板可以調整
@@ -1072,6 +1087,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     removeFrenchFryStick,
     pig,
     campfire,
+    floatingIsland: { object: floatingIsland.object, settings: floatingIsland.settings, apply: floatingIsland.applySettings },
     houses: [
       exposeHouse('mainHall', mainHall),
       exposeHouse('projectRoom', projectRoom),
