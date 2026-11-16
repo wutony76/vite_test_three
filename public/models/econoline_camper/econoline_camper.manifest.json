@@ -1,0 +1,99 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "econoline_camper",
+  "glb": "econoline_camper.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
+  ],
+  "root": "econoline_camper_Root",
+  "clickable": [
+    "econoline_camper_door_l"
+  ],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 918,
+    "primitives": 36,
+    "meshes": 20,
+    "materials": 7,
+    "file_bytes": 478056
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "warn",
+    "texture": "warn",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "body_gold": {
+        "class": "painted",
+        "pattern": "painted",
+        "tier": "hero",
+        "size": 1024,
+        "tile_m": 5.0,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "painted",
+          "seed": 4057349252,
+          "hash": "f1d63c84cb75"
+        }
+      },
+      "camper_white": {
+        "class": "painted",
+        "pattern": "plaster",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 6.0,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "plaster",
+          "seed": 2062781411,
+          "hash": "7af38be384ff"
+        }
+      },
+      "chrome": {
+        "class": "metal",
+        "pattern": "brushed",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 1.7999999999999998,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "brushed",
+          "seed": 1384146502,
+          "hash": "528066466867"
+        }
+      },
+      "tire": {
+        "class": "ground",
+        "pattern": "ground",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 9.0,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "ground",
+          "seed": 701508772,
+          "hash": "29d02ca48528"
+        }
+      }
+    },
+    "bake": {
+      "mode": "ao",
+      "size": 2048,
+      "seconds": 10.48
+    },
+    "decals": 5,
+    "gpu_texture_mb": 44.0,
+    "flat_ratio": 0.223,
+    "texture_count": 12,
+    "texture_kb": 365.1,
+    "images": 12,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 466.9
+  }
+}

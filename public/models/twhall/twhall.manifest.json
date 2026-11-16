@@ -1,0 +1,179 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "twhall",
+  "glb": "twhall.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
+  ],
+  "root": "twhall_Root",
+  "clickable": [
+    "twhall_awning",
+    "twhall_grid_window",
+    "twhall_shop_bay"
+  ],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 4240,
+    "primitives": 30,
+    "meshes": 27,
+    "materials": 13,
+    "file_bytes": 738628
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "warn",
+    "texture": "pass",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "plaster_cream": {
+        "class": "plaster",
+        "pattern": "painted",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 1.0,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "painted",
+          "seed": 1534346339,
+          "hash": "5b7444636d0e"
+        }
+      },
+      "wood_dark": {
+        "class": "wood",
+        "pattern": "planks",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 0.36,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "planks",
+          "seed": 2247956441,
+          "hash": "85fd17d971ee"
+        }
+      },
+      "roof_slate": {
+        "class": "roof_tile",
+        "pattern": "brick",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 0.96,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "brick",
+          "seed": 1832510630,
+          "hash": "6d39e4a61949"
+        }
+      },
+      "awning_stripe": {
+        "class": "fabric",
+        "pattern": "painted",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 1.0,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "painted",
+          "seed": 2389733347,
+          "hash": "8e706fe3ba72"
+        }
+      },
+      "sign_white": {
+        "class": "painted",
+        "pattern": "painted",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 1.0,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "painted",
+          "seed": 1176783330,
+          "hash": "462449e2a386"
+        }
+      },
+      "sign_red": {
+        "class": "painted",
+        "pattern": "painted",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 1.0,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "painted",
+          "seed": 3495476802,
+          "hash": "d058be42bba9"
+        }
+      },
+      "concrete_gray": {
+        "class": "stone",
+        "pattern": "cobble",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 1.12,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "cobble",
+          "seed": 4130747617,
+          "hash": "f63634e18ac0"
+        }
+      },
+      "metal_light": {
+        "class": "metal",
+        "pattern": "brushed",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.6,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "brushed",
+          "seed": 2046309273,
+          "hash": "79f833993d05"
+        }
+      },
+      "vine_green": {
+        "class": "vegetation",
+        "pattern": "foliage",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.4,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "foliage",
+          "seed": 2949971940,
+          "hash": "afd4ffe4052f"
+        }
+      },
+      "goods_color": {
+        "class": "painted",
+        "pattern": "painted",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 1.0,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "painted",
+          "seed": 3799817177,
+          "hash": "e27c9bd9329f"
+        }
+      }
+    },
+    "bake": {
+      "mode": "ao",
+      "size": 1024,
+      "seconds": 2.98
+    },
+    "decals": 2,
+    "gpu_texture_mb": 26.71,
+    "flat_ratio": 0.039,
+    "texture_count": 28,
+    "texture_kb": 418.6,
+    "images": 28,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 721.3
+  }
+}

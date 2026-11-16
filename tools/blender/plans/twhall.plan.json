@@ -1,0 +1,63 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "twhall",
+  "reference": "twhall",
+  "notes": "昭和街角菸酒雜貨店（千登屋風）。尺寸由 twhall.reference.json 以立面高度 6.75 m 換算（1 px ≈ 16.5 mm）；原點在 footprint 中心地面，正面朝 -Y。",
+  "dimensions": {"w": 8.6, "d": 5.4, "h": 8.6},
+  "detail": {"preset": "game_default", "overrides": {}},
+  "style": {"edge_wobble": 0.02, "palette": "twhall"},
+  "materials": [
+    {"name": "plaster_cream", "hex": "#E8E0D0", "roughness": 0.9, "surface": {"class": "plaster", "pattern": "painted", "palette": ["#C8C0B0", "#E8E0D0", "#F8F4EC"], "wear": 0.45, "dirt": 0.35}},
+    {"name": "wood_dark", "hex": "#5C4030", "roughness": 0.85, "surface": {"class": "wood", "pattern": "planks", "scale_m": 0.09, "uv": "along", "tier": "standard", "wear": 0.4}},
+    {"name": "roof_slate", "hex": "#4A5560", "roughness": 0.82, "surface": {"class": "roof_tile", "pattern": "brick", "scale_m": 0.12, "palette": ["#3A4248", "#4A5560", "#6A7580"], "wear": 0.35, "dirt": 0.25}},
+    {"name": "awning_stripe", "hex": "#F5D84A", "roughness": 0.78, "surface": {"class": "fabric", "pattern": "painted", "tier": "prop", "wear": 0.35, "dirt": 0.3}},
+    {"name": "sign_white", "hex": "#F2F2EA", "roughness": 0.8, "surface": {"class": "painted", "tier": "prop", "wear": 0.3}},
+    {"name": "sign_red", "hex": "#C03030", "roughness": 0.75, "surface": {"class": "painted", "tier": "prop", "wear": 0.25}},
+    {"name": "concrete_gray", "hex": "#6A6A68", "roughness": 0.95, "surface": {"class": "stone", "pattern": "cobble", "scale_m": 0.28, "tier": "prop", "dirt": 0.45}},
+    {"name": "glass", "hex": "#3A4248", "roughness": 0.1, "alpha": 0.45},
+    {"name": "niche_dark", "hex": "#2A2626", "roughness": 0.9},
+    {"name": "metal_light", "hex": "#D8D8D4", "roughness": 0.45, "metallic": 0.5, "surface": {"class": "metal", "tier": "prop", "wear": 0.2}},
+    {"name": "vine_green", "hex": "#4A7038", "roughness": 0.85, "surface": {"class": "vegetation", "scale_m": 0.08, "tier": "prop"}},
+    {"name": "goods_color", "hex": "#8A9A50", "roughness": 0.8, "surface": {"class": "painted", "tier": "prop", "wear": 0.5}}
+  ],
+  "budget": {"max_tris": 6500, "max_primitives": 48, "max_texture_kb": 1800, "max_gpu_texture_mb": 28},
+  "components": [
+    {"id": "sidewalk", "kind": "foundation", "tier": "primary", "method": "custom_mesh", "profile": "terrain", "material": "concrete_gray", "bounds": [[-4.2, -2.65, 0.0], [4.2, 2.65, 0.12]], "source": "observed", "confidence": 0.9},
+    {"id": "building_base", "kind": "foundation", "tier": "primary", "method": "custom_mesh", "profile": "building_shell", "material": "concrete_gray", "bounds": [[-3.777, -2.108, 0.0], [3.777, 2.108, 0.18]], "source": "inferred", "confidence": 0.6, "assumption": "店基略高於人行道 18 cm"},
+    {"id": "facade", "kind": "wall_block", "tier": "primary", "method": "component", "profile": "building_shell", "material": "plaster_cream", "params": {"openings": ["shop_bay", "grid_window", "win_left", "win_center_l", "win_center_r", "attic_vent"], "reveal": 0.14, "niche_material": "niche_dark"}, "bounds": [[-3.777, -2.108, 0.18], [3.777, 2.108, 6.93]], "source": "observed", "confidence": 0.9},
+    {"id": "roof_main", "kind": "roof_gable", "tier": "primary", "method": "component", "profile": "roof", "material": "roof_slate", "params": {"ridge_at": 0.5, "courses": 7, "lip": 0.1, "thickness": 0.22}, "bounds": [[-3.987, -2.308, 6.52], [3.987, 2.308, 8.35]], "source": "observed", "confidence": 0.85},
+    {"id": "sign_board", "kind": "beam", "tier": "secondary", "method": "component", "profile": "trim", "material": "sign_white", "bounds": [[-3.357, -2.208, 5.498], [3.357, -2.088, 6.112]], "source": "observed", "confidence": 0.88},
+    {"id": "pent_roof", "kind": "canopy", "tier": "secondary", "method": "component", "profile": "trim", "material": "roof_slate", "bounds": [[-3.567, -2.408, 5.089], [3.567, -2.088, 5.498]], "source": "observed", "confidence": 0.75},
+    {"id": "awning", "kind": "awning", "tier": "secondary", "method": "component", "profile": "building_shell", "material": "awning_stripe", "params": {"corrugated": false, "slope_deg": 12, "side_return": true}, "bounds": [[-3.147, -2.508, 2.225], [2.938, -2.088, 3.248]], "source": "observed", "confidence": 0.9},
+    {"id": "shop_bay", "kind": "shop_window", "tier": "secondary", "method": "component", "profile": "opening", "material": "wood_dark", "parent": "facade", "params": {"mullions": [1, 0]}, "bounds": [[-2.938, -2.208, 0.385], [0.839, -2.088, 2.839]], "source": "observed", "confidence": 0.85},
+    {"id": "grid_window", "kind": "shop_window", "tier": "secondary", "method": "component", "profile": "opening", "material": "wood_dark", "parent": "facade", "params": {"mullions": [2, 3]}, "bounds": [[1.049, -2.208, 0.385], [3.567, -2.088, 2.635]], "source": "observed", "confidence": 0.85},
+    {"id": "grid_glass", "kind": "glass_pane", "tier": "secondary", "method": "component", "profile": "glass", "material": "glass", "parent": "grid_window", "bounds": [[1.133, -2.158, 0.48], [3.483, -2.138, 2.54]], "source": "observed", "confidence": 0.8},
+    {"id": "win_left", "kind": "window", "tier": "secondary", "method": "component", "profile": "opening", "material": "wood_dark", "parent": "facade", "params": {"panes": [1, 2], "sill": true}, "bounds": [[-3.147, -2.208, 3.657], [-1.679, -2.088, 5.089]], "source": "observed", "confidence": 0.8},
+    {"id": "win_center_l", "kind": "window", "tier": "secondary", "method": "component", "profile": "opening", "material": "wood_dark", "parent": "facade", "params": {"panes": [1, 2], "sill": true}, "bounds": [[-1.469, -2.208, 3.657], [0.0, -2.088, 5.089]], "source": "observed", "confidence": 0.8},
+    {"id": "win_center_r", "kind": "window", "tier": "secondary", "method": "component", "profile": "opening", "material": "wood_dark", "parent": "facade", "params": {"panes": [1, 2], "sill": true}, "bounds": [[0.21, -2.208, 3.657], [1.679, -2.088, 5.089]], "source": "observed", "confidence": 0.8},
+    {"id": "win_left_glass", "kind": "glass_pane", "tier": "secondary", "method": "component", "profile": "glass", "material": "glass", "parent": "win_left", "bounds": [[-2.981, -2.158, 3.78], [-1.844, -2.138, 4.966]], "source": "observed", "confidence": 0.75},
+    {"id": "win_cl_glass", "kind": "glass_pane", "tier": "secondary", "method": "component", "profile": "glass", "material": "glass", "parent": "win_center_l", "bounds": [[-1.385, -2.158, 3.78], [-0.084, -2.138, 4.966]], "source": "observed", "confidence": 0.75},
+    {"id": "win_cr_glass", "kind": "glass_pane", "tier": "secondary", "method": "component", "profile": "glass", "material": "glass", "parent": "win_center_r", "bounds": [[0.294, -2.158, 3.78], [1.595, -2.138, 4.966]], "source": "observed", "confidence": 0.75},
+    {"id": "attic_vent", "kind": "window", "tier": "tertiary", "method": "component", "profile": "opening", "material": "wood_dark", "parent": "facade", "params": {"panes": [2, 1], "sill": false}, "bounds": [[-0.629, -2.208, 6.214], [0.629, -2.088, 6.725]], "source": "observed", "confidence": 0.75},
+    {"id": "pillar_l", "kind": "pillar", "tier": "secondary", "method": "component", "profile": "trim", "material": "wood_dark", "parent": "shop_bay", "bounds": [[-2.938, -2.248, 0.385], [-2.518, -2.088, 2.839]], "source": "observed", "confidence": 0.8},
+    {"id": "pillar_r", "kind": "pillar", "tier": "secondary", "method": "component", "profile": "trim", "material": "wood_dark", "parent": "shop_bay", "bounds": [[0.42, -2.248, 0.385], [1.049, -2.088, 2.839]], "source": "observed", "confidence": 0.8},
+    {"id": "downpipe", "kind": "pipe", "tier": "tertiary", "method": "component", "profile": "trim", "material": "wood_dark", "parent": "facade", "params": {"hat": false}, "bounds": [[3.567, -2.048, 0.18], [3.777, -1.948, 6.112]], "source": "observed", "confidence": 0.7},
+    {"id": "ac_unit", "kind": "crate", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "metal_light", "parent": "facade", "bounds": [[2.728, -2.308, 4.066], [3.777, -2.048, 4.885]], "source": "observed", "confidence": 0.75},
+    {"id": "vine_right", "kind": "vine", "tier": "tertiary", "method": "component", "profile": "vegetation", "material": "vine_green", "parent": "facade", "params": {"plant_material": "vine_green"}, "bounds": [[2.938, -2.308, 2.225], [3.777, -2.048, 3.862]], "source": "observed", "confidence": 0.65},
+    {"id": "gashapon", "kind": "crate", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "sign_red", "bounds": [[-4.196, -2.758, 0.385], [-3.147, -2.358, 1.816]], "source": "observed", "confidence": 0.7},
+    {"id": "freezer", "kind": "crate", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "sign_white", "bounds": [[1.259, -2.758, -0.025], [2.938, -2.358, 1.203]], "source": "observed", "confidence": 0.75},
+    {"id": "display_stand", "kind": "crate", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "wood_dark", "bounds": [[-4.406, -2.758, 1.612], [-3.357, -2.358, 2.635]], "source": "observed", "confidence": 0.7},
+    {"id": "interior_shelves", "kind": "poster", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "goods_color", "parent": "shop_bay", "params": {"accent_materials": ["sign_red", "goods_color", "awning_stripe"]}, "bounds": [[-2.308, -2.158, 0.794], [0.21, -2.098, 2.43]], "source": "observed", "confidence": 0.6}
+  ],
+  "decals": [
+    {"id": "sign_main", "target": "sign_board", "face": "front", "rect": [[-2.8, 2.55], [2.8, 6.05]], "content": {"type": "text", "text": "千登屋", "color": "#C03030", "background": "#F2F2EA"}},
+    {"id": "tobacco_mark", "target": "sign_board", "face": "front", "rect": [[-3.2, 2.55], [-2.5, 5.8]], "content": {"type": "symbol", "symbol": "circle", "color": "#C03030"}}
+  ],
+  "export": {
+    "path": "public/models/twhall/twhall.glb",
+    "clickable": ["shop_bay", "awning", "grid_window"],
+    "anim_groups": {},
+    "instance_groups": {"street_crate": ["gashapon", "display_stand", "freezer"]},
+    "compress": true
+  }
+}

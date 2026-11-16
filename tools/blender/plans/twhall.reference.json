@@ -1,0 +1,67 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "twhall",
+  "image": {"path": "tools/img/twhall.jpg", "width": 636, "height": 620},
+  "medium": "voxel／低多邊形昭和街角老店（千登屋菸酒雜貨）",
+  "view": {"type": "three_quarter", "source": "observed", "confidence": 0.88},
+  "scale_anchor": {"component": "facade", "axis": "height", "meters": 6.75},
+  "silhouette": {
+    "outline": [[0.12, 0.08], [0.88, 0.08], [0.90, 0.92], [0.10, 0.92], [0.12, 0.08]],
+    "source": "observed",
+    "confidence": 0.82
+  },
+  "palette": [
+    {"name": "plaster_cream", "hex": "#E8E0D0", "usage": "外牆灰泥", "sample": [0.42, 0.28, 0.58, 0.42]},
+    {"name": "wood_dark", "hex": "#5C4030", "usage": "木框、百葉、側板", "sample": [0.62, 0.22, 0.78, 0.38]},
+    {"name": "roof_slate", "hex": "#4A5560", "usage": "和瓦屋頂", "sample": [0.38, 0.06, 0.72, 0.16]},
+    {"name": "awning_stripe", "hex": "#F5D84A", "usage": "黃白條紋雨棚", "sample": [0.30, 0.48, 0.62, 0.56]},
+    {"name": "sign_white", "hex": "#F2F2EA", "usage": "二樓橫幅招牌底", "sample": [0.22, 0.22, 0.78, 0.30]},
+    {"name": "sign_red", "hex": "#C03030", "usage": "招牌紅字區", "sample": [0.28, 0.24, 0.52, 0.28]},
+    {"name": "concrete_gray", "hex": "#6A6A68", "usage": "人行道／車道底板", "sample": [0.08, 0.82, 0.92, 0.96]},
+    {"name": "glass_dark", "hex": "#3A4248", "usage": "玻璃窗", "sample": [0.68, 0.52, 0.78, 0.68]},
+    {"name": "metal_ac", "hex": "#D8D8D4", "usage": "冷氣室外機", "sample": [0.78, 0.30, 0.86, 0.40]},
+    {"name": "vine_green", "hex": "#4A7038", "usage": "牆面藤蔓", "sample": [0.80, 0.48, 0.88, 0.62]}
+  ],
+  "components": [
+    {"id": "sidewalk", "kind": "foundation", "tier": "primary", "bbox": [0.06, 0.78, 0.94, 0.96], "material_hint": "concrete_gray", "source": "observed", "confidence": 0.9},
+    {"id": "facade", "kind": "wall_block", "tier": "primary", "bbox": [0.14, 0.12, 0.86, 0.78], "material_hint": "plaster_cream", "source": "observed", "confidence": 0.9},
+    {"id": "roof_main", "kind": "roof_gable", "tier": "primary", "bbox": [0.12, 0.04, 0.88, 0.14], "material_hint": "roof_slate", "parent": "facade", "source": "observed", "confidence": 0.85},
+    {"id": "sign_board", "kind": "beam", "tier": "secondary", "bbox": [0.18, 0.20, 0.82, 0.26], "material_hint": "sign_white", "parent": "facade", "source": "observed", "confidence": 0.88},
+    {"id": "pent_roof", "kind": "canopy", "tier": "secondary", "bbox": [0.16, 0.26, 0.84, 0.30], "material_hint": "roof_slate", "parent": "facade", "source": "observed", "confidence": 0.75},
+    {"id": "awning", "kind": "awning", "tier": "secondary", "bbox": [0.20, 0.48, 0.78, 0.58], "material_hint": "awning_stripe", "parent": "facade", "source": "observed", "confidence": 0.9},
+    {"id": "shop_bay", "kind": "shop_window", "tier": "secondary", "bbox": [0.22, 0.52, 0.58, 0.76], "material_hint": "wood_dark", "parent": "facade", "source": "observed", "confidence": 0.85},
+    {"id": "grid_window", "kind": "shop_window", "tier": "secondary", "bbox": [0.60, 0.54, 0.84, 0.76], "material_hint": "wood_dark", "parent": "facade", "source": "observed", "confidence": 0.85},
+    {"id": "win_left", "kind": "window", "tier": "secondary", "bbox": [0.20, 0.30, 0.34, 0.44], "material_hint": "wood_dark", "parent": "facade", "source": "observed", "confidence": 0.8},
+    {"id": "win_center_l", "kind": "window", "tier": "secondary", "bbox": [0.36, 0.30, 0.50, 0.44], "material_hint": "wood_dark", "parent": "facade", "source": "observed", "confidence": 0.8},
+    {"id": "win_center_r", "kind": "window", "tier": "secondary", "bbox": [0.52, 0.30, 0.66, 0.44], "material_hint": "wood_dark", "parent": "facade", "source": "observed", "confidence": 0.8},
+    {"id": "shutter", "kind": "window", "tier": "secondary", "bbox": [0.20, 0.30, 0.28, 0.44], "material_hint": "wood_dark", "parent": "win_left", "source": "observed", "confidence": 0.7},
+    {"id": "attic_vent", "kind": "window", "tier": "tertiary", "bbox": [0.44, 0.14, 0.56, 0.19], "material_hint": "wood_dark", "parent": "facade", "source": "observed", "confidence": 0.75},
+    {"id": "pillar_l", "kind": "pillar", "tier": "secondary", "bbox": [0.20, 0.50, 0.26, 0.76], "material_hint": "wood_dark", "parent": "shop_bay", "source": "observed", "confidence": 0.8},
+    {"id": "pillar_r", "kind": "pillar", "tier": "secondary", "bbox": [0.54, 0.50, 0.60, 0.76], "material_hint": "wood_dark", "parent": "shop_bay", "source": "observed", "confidence": 0.8},
+    {"id": "downpipe", "kind": "pipe", "tier": "tertiary", "bbox": [0.84, 0.20, 0.88, 0.78], "material_hint": "wood_dark", "parent": "facade", "source": "observed", "confidence": 0.7},
+    {"id": "ac_unit", "kind": "crate", "tier": "tertiary", "bbox": [0.76, 0.32, 0.86, 0.40], "material_hint": "metal_ac", "parent": "facade", "source": "observed", "confidence": 0.75},
+    {"id": "vine_right", "kind": "vine", "tier": "tertiary", "bbox": [0.78, 0.42, 0.86, 0.58], "material_hint": "vine_green", "parent": "facade", "source": "observed", "confidence": 0.65},
+    {"id": "gashapon", "kind": "crate", "tier": "tertiary", "bbox": [0.10, 0.62, 0.20, 0.76], "material_hint": "sign_red", "source": "observed", "confidence": 0.7},
+    {"id": "freezer", "kind": "crate", "tier": "tertiary", "bbox": [0.62, 0.68, 0.78, 0.80], "material_hint": "sign_white", "source": "observed", "confidence": 0.75},
+    {"id": "display_stand", "kind": "crate", "tier": "tertiary", "bbox": [0.08, 0.54, 0.18, 0.64], "material_hint": "wood_dark", "source": "observed", "confidence": 0.7},
+    {"id": "interior_shelves", "kind": "poster", "tier": "tertiary", "bbox": [0.28, 0.56, 0.52, 0.72], "material_hint": "wood_dark", "parent": "shop_bay", "source": "observed", "confidence": 0.6}
+  ],
+  "surfaces": [
+    {"id": "plaster_wall", "region": [[0.16, 0.14], [0.84, 0.14], [0.84, 0.28], [0.16, 0.28]], "class": "plaster", "pattern": "painted", "base_hex": "#E8E0D0", "scale_m": 0.25, "components": ["facade"], "source": "observed", "confidence": 0.85},
+    {"id": "wood_siding", "region": [[0.72, 0.22], [0.86, 0.22], [0.86, 0.50], [0.72, 0.50]], "class": "wood", "pattern": "planks", "base_hex": "#5C4030", "scale_m": 0.08, "components": ["facade"], "source": "observed", "confidence": 0.8},
+    {"id": "roof_tiles", "region": [[0.14, 0.05], [0.86, 0.05], [0.86, 0.13], [0.14, 0.13]], "class": "roof_tile", "pattern": "brick", "base_hex": "#4A5560", "scale_m": 0.12, "components": ["roof_main"], "source": "observed", "confidence": 0.88},
+    {"id": "sidewalk_concrete", "region": [[0.08, 0.80], [0.92, 0.80], [0.92, 0.95], [0.08, 0.95]], "class": "stone", "pattern": "cobble", "base_hex": "#6A6A68", "scale_m": 0.35, "components": ["sidewalk"], "source": "observed", "confidence": 0.82},
+    {"id": "awning_fabric", "region": [[0.22, 0.49], [0.76, 0.49], [0.76, 0.57], [0.22, 0.57]], "class": "fabric", "pattern": "painted", "base_hex": "#F5D84A", "scale_m": 0.06, "components": ["awning"], "source": "observed", "confidence": 0.85}
+  ],
+  "hidden": [
+    {"id": "depth", "assumption": "店面深度 = 正面寬度 × 0.62（窄長街屋）", "source": "inferred", "confidence": 0.55},
+    {"id": "back_wall", "assumption": "背面無開口，材質同灰泥牆", "source": "inferred", "confidence": 0.6},
+    {"id": "interior", "assumption": "店內貨架以 poster 色塊與木架輪廓表示，不做逐罐幾何", "source": "inferred", "confidence": 0.65}
+  ],
+  "excluded": [
+    {"what": "招牌上的完整日文書法", "reason": "改用 decal 簡化色塊"},
+    {"what": "扭蛋機／冰櫃上的商標貼紙", "reason": "用 crate 體積與純色代替"},
+    {"what": "車道白線細節", "reason": "decal 或貼圖處理"},
+    {"what": "店內個別商品", "reason": "超出 game_default 預算，以貨架色塊暗示"}
+  ]
+}

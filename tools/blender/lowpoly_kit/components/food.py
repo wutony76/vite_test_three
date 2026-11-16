@@ -249,6 +249,91 @@ def build_salmon_vertebra(ctx):
     )
 
 
+@register("cartoon_pig")
+def build_cartoon_pig(ctx):
+    """圓滾滾的卡通小豬：身體種子後 Voxel Remesh 融成一體。"""
+    data = shapes.MeshData()
+    seg = ctx.segments(0.55, minimum=4)
+    jitter = 0.024
+
+    body_rx = min(ctx.hw * 0.78, 0.075)
+    body_ry = min(ctx.hd * 0.72, 0.068)
+    body_rz = min(ctx.h * 0.42, 0.058)
+    data.extend(
+        shapes.blob((0.0, -ctx.hd * 0.06, body_rz * 0.62), (body_rx, body_ry, body_rz), ctx.material,
+                    segments=seg, rings=3, jitter=jitter, rng=ctx.rng)
+    )
+
+    head_r = body_rx * 0.72
+    data.extend(
+        shapes.blob(
+            (0.0, -ctx.hd * 0.62, body_rz * 1.08),
+            (head_r, head_r * 0.92, head_r * 0.95),
+            ctx.material,
+            segments=seg,
+            rings=3,
+            jitter=jitter,
+            rng=ctx.rng,
+        )
+    )
+
+    snout_mat = ctx.param_mat("snout_material", ctx.material)
+    snout_r = head_r * 0.48
+    data.extend(
+        shapes.blob(
+            (0.0, -ctx.hd * 0.96, body_rz * 0.88),
+            (snout_r * 1.15, snout_r * 0.82, snout_r * 0.72),
+            snout_mat,
+            segments=max(4, seg - 1),
+            rings=2,
+            jitter=jitter * 0.6,
+            rng=ctx.rng,
+        )
+    )
+
+    ear_mat = ctx.param_mat("ear_material", ctx.material)
+    for sx in (-1.0, 1.0):
+        data.extend(
+            shapes.blob(
+                (sx * head_r * 0.72, -ctx.hd * 0.48, body_rz * 1.42),
+                (head_r * 0.32, head_r * 0.22, head_r * 0.38),
+                ear_mat,
+                segments=4,
+                rings=2,
+                jitter=jitter * 0.4,
+                rng=ctx.rng,
+            )
+        )
+
+    leg_rx, leg_ry, leg_rz = body_rx * 0.28, body_ry * 0.26, body_rz * 0.55
+    for sx, sy in ((-0.52, -0.28), (0.52, -0.28), (-0.52, 0.22), (0.52, 0.22)):
+        data.extend(
+            shapes.blob(
+                (sx * body_rx, sy * body_ry, leg_rz * 0.52),
+                (leg_rx, leg_ry, leg_rz),
+                ctx.material,
+                segments=4,
+                rings=2,
+                jitter=jitter * 0.35,
+                rng=ctx.rng,
+            )
+        )
+
+    tail_mat = ctx.param_mat("tail_material", ctx.material)
+    data.extend(
+        shapes.blob(
+            (body_rx * 0.08, ctx.hd * 0.65, body_rz * 1.02),
+            (body_rx * 0.2, body_rx * 0.2, body_rx * 0.24),
+            tail_mat,
+            segments=4,
+            rings=2,
+            jitter=0.04,
+            rng=ctx.rng,
+        )
+    )
+    return data
+
+
 @register("bamboo_skewer")
 def build_bamboo_skewer(ctx):
     """竹籤：細軸 + 一端尖頭（plan 可設 tip_at: top／bottom）。"""

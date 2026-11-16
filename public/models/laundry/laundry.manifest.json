@@ -1,0 +1,102 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "laundry",
+  "glb": "laundry.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_materials_emissive_strength"
+  ],
+  "root": "laundry_Root",
+  "clickable": [
+    "laundry_awning",
+    "laundry_laundry_window",
+    "laundry_mahjong_window"
+  ],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 2726,
+    "primitives": 33,
+    "meshes": 30,
+    "materials": 8,
+    "file_bytes": 336368
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "pass",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "wall_beige": {
+        "class": "plaster",
+        "pattern": "plaster",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.3,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "plaster",
+          "seed": 392777761,
+          "hash": "17695021ee81"
+        }
+      },
+      "metal_blue": {
+        "class": "metal",
+        "pattern": "stripes",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.6000000000000001,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "stripes",
+          "seed": 1437561224,
+          "hash": "55af7188fa7f"
+        }
+      },
+      "fabric_blue": {
+        "class": "fabric",
+        "pattern": "weave",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.8,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "weave",
+          "seed": 1429651203,
+          "hash": "5536bf039ab4"
+        }
+      },
+      "base_gray": {
+        "class": "stone",
+        "pattern": "cobble",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 1.2,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "cobble",
+          "seed": 3100551044,
+          "hash": "b8cea7841cb8"
+        }
+      }
+    },
+    "bake": {
+      "mode": "ao",
+      "size": 128,
+      "seconds": 0.17
+    },
+    "decals": 7,
+    "gpu_texture_mb": 4.79,
+    "flat_ratio": 0.112,
+    "texture_count": 14,
+    "texture_kb": 122.2,
+    "images": 14,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 328.5
+  }
+}

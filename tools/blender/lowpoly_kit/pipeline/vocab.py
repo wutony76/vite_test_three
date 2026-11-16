@@ -48,6 +48,10 @@ KINDS = (
     "fried_egg_white", "fried_egg_yolk",
     "salmon_steak", "salmon_vertebra",
     "lemon_slice",
+    "cartoon_pig",
+    "econoline_camper", "vehicle_wheel", "vehicle_bumper", "vehicle_grille",
+    "vehicle_headlight", "side_mirror", "vehicle_antenna", "camper_side_window",
+    "vehicle_side_door", "vehicle_side_glass", "vehicle_windshield",
     # 植物、自然物
     "tree_trunk", "tree_canopy", "bush", "rock", "rock_pile",
     # 暫時找不到合適種類時使用，驗證會給 warning

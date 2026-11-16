@@ -169,14 +169,33 @@ def render_content(decal, width, height, base_dir):
     if kind == "symbol":
         return symbol_image(content["symbol"], width, height, color, background), []
     if kind == "image":
-        image = read_png(os.path.join(base_dir, content["path"]))
-        from .sources.postprocess import resize
         from .pngio import to_rgba
-        return _fit(to_rgba(image), width, height, resize), []
+        image = to_rgba(read_png(os.path.join(base_dir, content["path"])))
+        # 圖片 decal 不放大超過來源像素：250 px 的裁切圖放大到 512 不會多出細節，
+        # 只會讓整張 decal atlas 從 1024 跳到 2048（GPU 記憶體 ×4）。
+        source_h, source_w = image.shape[:2]
+        width, height = max(16, min(width, source_w)), max(16, min(height, source_h))
+        # 直接縮放到 width × height（不像 _fit 先拉成正方形再裁中間，否則比例不同時會切掉上下緣）
+        return _resize_wh(image, width, height), []
     warnings = []
     if any(ord(ch) > 127 for ch in content["text"]):
         warnings.append(f"DECAL_FONT：{decal['id']} 有非拉丁字元，內建字型可能顯示成方框")
     return _compose(text_mask(content["text"], width, height), color, background), warnings
+
+
+def _resize_wh(image, width, height):
+    """雙線性縮放到 width × height（不繞回邊界；decal 不需要平鋪）。"""
+    src_h, src_w = image.shape[:2]
+    if (src_h, src_w) == (height, width):
+        return image.astype(np.float32)
+    ys = np.clip((np.arange(height, dtype=np.float32) + 0.5) * src_h / height - 0.5, 0, src_h - 1)
+    xs = np.clip((np.arange(width, dtype=np.float32) + 0.5) * src_w / width - 0.5, 0, src_w - 1)
+    y0, x0 = np.floor(ys).astype(int), np.floor(xs).astype(int)
+    y1, x1 = np.minimum(y0 + 1, src_h - 1), np.minimum(x0 + 1, src_w - 1)
+    fy, fx = (ys - y0)[:, None, None], (xs - x0)[None, :, None]
+    a, b = image[y0][:, x0], image[y0][:, x1]
+    c, d = image[y1][:, x0], image[y1][:, x1]
+    return ((a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy).astype(np.float32)
 
 
 def _fit(image, width, height, resize):

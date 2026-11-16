@@ -1,0 +1,37 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "pig",
+  "glb": "pig.glb",
+  "requires": [
+    "EXT_meshopt_compression"
+  ],
+  "root": "pig_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 160,
+    "primitives": 1,
+    "meshes": 1,
+    "materials": 1,
+    "file_bytes": 5616
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "warn",
+    "texture": "pass",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {},
+    "bake": {},
+    "decals": 0,
+    "gpu_texture_mb": 0.0,
+    "flat_ratio": 1.0,
+    "texture_count": 0,
+    "texture_kb": 0.0,
+    "images": 0,
+    "mime_types": [],
+    "file_kb": 5.5
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "pig",
+  "notes": "卡通小豬，給 world 綠球上跑來跑去。正面朝 -Y，原點在 footprint 中心地面。",
+  "dimensions": {"w": 0.16, "d": 0.18, "h": 0.11},
+  "detail": {
+    "preset": "preview",
+    "overrides": {"tertiary_density": 0, "geometry_complexity": 4, "bevel_quality": 0}
+  },
+  "style": {"edge_wobble": 0.01},
+  "materials": [
+    {"name": "pink", "hex": "#F5A8C8", "roughness": 0.42},
+    {"name": "snout", "hex": "#E888AA", "roughness": 0.38},
+    {"name": "ear", "hex": "#E07098", "roughness": 0.4}
+  ],
+  "budget": {"max_tris": 520, "max_primitives": 3},
+  "components": [
+    {
+      "id": "body",
+      "kind": "cartoon_pig",
+      "tier": "primary",
+      "method": "remesh",
+      "profile": "organic",
+      "material": "pink",
+      "params": {
+        "voxel_size": 0.026,
+        "snout_material": "snout",
+        "ear_material": "ear",
+        "tail_material": "ear"
+      },
+      "bounds": [[-0.08, -0.09, 0.0], [0.08, 0.09, 0.11]],
+      "source": "inferred",
+      "assumption": "卡通小豬輪廓：圓身、短腿、大頭豬鼻，無參考圖。",
+      "confidence": 0.85
+    }
+  ],
+  "export": {
+    "path": "public/models/pig/pig.glb",
+    "compress": true
+  }
+}

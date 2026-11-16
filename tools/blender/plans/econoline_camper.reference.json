@@ -1,0 +1,68 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "econoline_camper",
+  "image": {"path": "tools/img/econoline_camper.jpg", "width": 1024, "height": 1024},
+  "medium": "stylized Ford Econoline camper van, chibi比例、手繪風化",
+  "view": {"type": "three_quarter", "source": "observed", "confidence": 0.92},
+  "scale_anchor": {"component": "body", "axis": "length", "meters": 4.5},
+  "silhouette": {
+    "outline": [
+      [0.16, 0.24], [0.84, 0.22], [0.88, 0.76], [0.14, 0.80], [0.16, 0.24]
+    ],
+    "source": "observed",
+    "confidence": 0.9
+  },
+  "palette": [
+    {"name": "body_gold", "hex": "#B89A42", "usage": "芥末黃車身", "sample": [0.30, 0.34, 0.74, 0.64]},
+    {"name": "camper_white", "hex": "#D8D4CC", "usage": "白頂", "sample": [0.38, 0.12, 0.70, 0.30]},
+    {"name": "chrome", "hex": "#A8A8A0", "usage": "保險桿／輪圈", "sample": [0.42, 0.50, 0.58, 0.66]},
+    {"name": "glass", "hex": "#3A4248", "usage": "玻璃", "sample": [0.46, 0.38, 0.58, 0.48]}
+  ],
+  "components": [
+    {"id": "body", "kind": "econoline_camper", "tier": "primary", "bbox": [0.12, 0.20, 0.88, 0.82], "material_hint": "body_gold", "source": "observed", "confidence": 0.92},
+    {"id": "windshield", "kind": "vehicle_windshield", "tier": "secondary", "bbox": [0.38, 0.30, 0.66, 0.48], "material_hint": "glass", "source": "observed", "confidence": 0.88},
+    {"id": "door_l", "kind": "vehicle_side_door", "tier": "secondary", "bbox": [0.22, 0.36, 0.42, 0.62], "material_hint": "body_gold", "source": "observed", "confidence": 0.85},
+    {"id": "wheel", "kind": "vehicle_wheel", "tier": "tertiary", "bbox": [0.18, 0.56, 0.36, 0.76], "material_hint": "tire", "source": "observed", "confidence": 0.9},
+    {"id": "camper_window", "kind": "camper_side_window", "tier": "secondary", "bbox": [0.34, 0.14, 0.52, 0.28], "material_hint": "camper_white", "source": "observed", "confidence": 0.8}
+  ],
+  "surfaces": [
+    {
+      "id": "body_paint",
+      "region": [[0.20, 0.32], [0.80, 0.30], [0.82, 0.72], [0.18, 0.74]],
+      "class": "painted",
+      "pattern": "painted",
+      "base_hex": "#B89A42",
+      "scale_m": 0.32,
+      "components": ["body", "door_l"],
+      "source": "observed",
+      "confidence": 0.88
+    },
+    {
+      "id": "camper_top",
+      "region": [[0.28, 0.12], [0.74, 0.10], [0.76, 0.32], [0.26, 0.34]],
+      "class": "painted",
+      "pattern": "plaster",
+      "base_hex": "#D8D4CC",
+      "scale_m": 0.38,
+      "components": ["body", "camper_window"],
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "chrome_trim",
+      "region": [[0.40, 0.46], [0.62, 0.44], [0.64, 0.56], [0.38, 0.58]],
+      "class": "metal",
+      "pattern": "brushed",
+      "base_hex": "#A8A8A0",
+      "scale_m": 0.15,
+      "components": ["bumper", "grille"],
+      "source": "observed",
+      "confidence": 0.8
+    }
+  ],
+  "excluded": [
+    {"what": "塗鴉逐字還原", "reason": "以 decals 符號 + 漆面 wear 近似"},
+    {"what": "黑色描邊", "reason": "Three.js 後處理"},
+    {"what": "HDRI 背景", "reason": "場景環境"}
+  ]
+}

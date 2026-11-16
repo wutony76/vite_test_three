@@ -1,0 +1,65 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "laundry",
+  "image": {"path": "tools/img/laundry.png", "width": 636, "height": 638},
+  "medium": "低多邊形日式街角三層小樓（一樓投幣洗衣店、二樓麻雀館、外側樓梯）",
+  "view": {"type": "three_quarter", "source": "observed", "confidence": 0.85},
+  "scale_anchor": {"component": "laundry_window", "axis": "height", "meters": 2.05},
+  "silhouette": {
+    "outline": [[0.17, 0.03], [0.79, 0.05], [0.80, 0.80], [0.74, 0.92], [0.13, 0.92], [0.15, 0.40], [0.17, 0.03]],
+    "source": "observed",
+    "confidence": 0.8
+  },
+  "palette": [
+    {"name": "wall_beige", "hex": "#CD9366", "usage": "外牆（暖杏色灰泥）", "sample": [0.36, 0.37, 0.44, 0.40]},
+    {"name": "wall_band", "hex": "#BA7D5C", "usage": "一二樓之間的浪板帶", "sample": [0.28, 0.44, 0.36, 0.47]},
+    {"name": "fabric_blue", "hex": "#1F448D", "usage": "投幣洗衣店雨棚", "sample": [0.20, 0.48, 0.28, 0.52]},
+    {"name": "metal_blue", "hex": "#1F2B66", "usage": "右側藍色浪板外牆", "sample": [0.61, 0.45, 0.65, 0.50]},
+    {"name": "frame_brown", "hex": "#95614F", "usage": "窗框", "sample": [0.38, 0.17, 0.41, 0.19]},
+    {"name": "sign_white", "hex": "#EFE6D6", "usage": "頂樓招牌、直立招牌底", "sample": [0.30, 0.08, 0.40, 0.14]},
+    {"name": "sign_green", "hex": "#3B673B", "usage": "立式燈箱招牌", "sample": [0.59, 0.82, 0.62, 0.87]},
+    {"name": "base_gray", "hex": "#5A4A44", "usage": "底座平台", "sample": [0.20, 0.90, 0.40, 0.93]},
+    {"name": "metal_light", "hex": "#E2DDD6", "usage": "冷氣室外機", "sample": [0.18, 0.36, 0.24, 0.42]}
+  ],
+  "components": [
+    {"id": "platform", "kind": "foundation", "tier": "primary", "bbox": [0.10, 0.84, 0.80, 0.97], "material_hint": "base_gray", "source": "observed", "confidence": 0.85},
+    {"id": "gf_shell", "kind": "wall_block", "tier": "primary", "bbox": [0.15, 0.48, 0.44, 0.90], "material_hint": "wall_beige", "source": "observed", "confidence": 0.85},
+    {"id": "upper_shell", "kind": "wall_block", "tier": "primary", "bbox": [0.17, 0.04, 0.78, 0.48], "material_hint": "wall_beige", "source": "observed", "confidence": 0.88},
+    {"id": "gf_back", "kind": "wall_block", "tier": "secondary", "bbox": [0.50, 0.50, 0.66, 0.86], "material_hint": "wall_beige", "source": "inferred", "confidence": 0.5, "assumption": "樓梯後方是儲藏室，只看得到暗門"},
+    {"id": "stairs", "kind": "steps", "tier": "secondary", "bbox": [0.52, 0.60, 0.66, 0.86], "material_hint": "wall_beige", "source": "observed", "confidence": 0.75},
+    {"id": "corner_pillar", "kind": "pillar", "tier": "secondary", "bbox": [0.58, 0.48, 0.62, 0.90], "material_hint": "wall_beige", "source": "observed", "confidence": 0.7},
+    {"id": "laundry_window", "kind": "shop_window", "tier": "secondary", "bbox": [0.17, 0.62, 0.41, 0.89], "material_hint": "frame_brown", "parent": "gf_shell", "source": "observed", "confidence": 0.85},
+    {"id": "awning", "kind": "awning", "tier": "secondary", "bbox": [0.10, 0.47, 0.42, 0.60], "material_hint": "fabric_blue", "parent": "gf_shell", "source": "observed", "confidence": 0.9},
+    {"id": "fascia", "kind": "beam", "tier": "secondary", "bbox": [0.15, 0.42, 0.56, 0.48], "material_hint": "wall_band", "parent": "upper_shell", "source": "observed", "confidence": 0.75},
+    {"id": "mahjong_window", "kind": "window", "tier": "secondary", "bbox": [0.19, 0.18, 0.59, 0.35], "material_hint": "frame_brown", "parent": "upper_shell", "source": "observed", "confidence": 0.88},
+    {"id": "top_sign", "kind": "beam", "tier": "secondary", "bbox": [0.19, 0.06, 0.59, 0.16], "material_hint": "sign_white", "parent": "upper_shell", "source": "observed", "confidence": 0.88},
+    {"id": "side_cladding", "kind": "beam", "tier": "secondary", "bbox": [0.62, 0.30, 0.76, 0.80], "material_hint": "metal_blue", "parent": "upper_shell", "source": "observed", "confidence": 0.75},
+    {"id": "coping", "kind": "coping", "tier": "secondary", "bbox": [0.17, 0.02, 0.79, 0.06], "material_hint": "wall_beige", "parent": "upper_shell", "source": "observed", "confidence": 0.7},
+    {"id": "ac_unit_1", "kind": "crate", "tier": "tertiary", "bbox": [0.17, 0.35, 0.24, 0.42], "material_hint": "metal_light", "parent": "upper_shell", "source": "observed", "confidence": 0.85},
+    {"id": "ac_unit_2", "kind": "crate", "tier": "tertiary", "bbox": [0.24, 0.35, 0.32, 0.42], "material_hint": "metal_light", "parent": "upper_shell", "source": "observed", "confidence": 0.85},
+    {"id": "ac_unit_3", "kind": "crate", "tier": "tertiary", "bbox": [0.48, 0.38, 0.56, 0.45], "material_hint": "metal_light", "parent": "upper_shell", "source": "observed", "confidence": 0.85},
+    {"id": "ac_side", "kind": "crate", "tier": "tertiary", "bbox": [0.61, 0.57, 0.69, 0.68], "material_hint": "metal_light", "source": "observed", "confidence": 0.7},
+    {"id": "vert_sign", "kind": "beam", "tier": "tertiary", "bbox": [0.52, 0.46, 0.57, 0.63], "material_hint": "sign_white", "source": "observed", "confidence": 0.75},
+    {"id": "stand_sign", "kind": "beam", "tier": "tertiary", "bbox": [0.58, 0.78, 0.64, 0.90], "material_hint": "sign_green", "source": "observed", "confidence": 0.75},
+    {"id": "planter", "kind": "planter_box", "tier": "tertiary", "bbox": [0.43, 0.83, 0.50, 0.88], "material_hint": "frame_brown", "source": "observed", "confidence": 0.7},
+    {"id": "downpipe", "kind": "pipe", "tier": "tertiary", "bbox": [0.14, 0.40, 0.16, 0.88], "material_hint": "frame_brown", "source": "observed", "confidence": 0.6}
+  ],
+  "surfaces": [
+    {"id": "plaster_wall", "region": [[0.18, 0.36], [0.58, 0.36], [0.58, 0.42], [0.18, 0.42]], "class": "plaster", "pattern": "plaster", "base_hex": "#CD9366", "scale_m": 0.3, "components": ["upper_shell", "gf_shell", "gf_back"], "source": "observed", "confidence": 0.85},
+    {"id": "band_corrugated", "region": [[0.15, 0.43], [0.56, 0.43], [0.56, 0.48], [0.15, 0.48]], "class": "metal", "pattern": "stripes", "base_hex": "#BA7D5C", "scale_m": 0.08, "components": ["fascia"], "source": "observed", "confidence": 0.75},
+    {"id": "blue_corrugated", "region": [[0.62, 0.32], [0.76, 0.30], [0.76, 0.78], [0.62, 0.80]], "class": "metal", "pattern": "stripes", "base_hex": "#1F2B66", "scale_m": 0.1, "components": ["side_cladding"], "source": "observed", "confidence": 0.8},
+    {"id": "awning_fabric", "region": [[0.11, 0.47], [0.41, 0.47], [0.41, 0.59], [0.11, 0.59]], "class": "fabric", "pattern": "weave", "base_hex": "#1F448D", "scale_m": 0.05, "components": ["awning"], "source": "observed", "confidence": 0.85},
+    {"id": "base_slab", "region": [[0.11, 0.86], [0.79, 0.86], [0.79, 0.96], [0.11, 0.96]], "class": "stone", "pattern": "cobble", "base_hex": "#5A4A44", "scale_m": 0.3, "components": ["platform"], "source": "observed", "confidence": 0.7}
+  ],
+  "hidden": [
+    {"id": "depth", "assumption": "樓深約 4 m（與正面寬 4.6 m 相近的方形街屋）", "source": "inferred", "confidence": 0.55},
+    {"id": "back_wall", "assumption": "背面與左側無開口，材質同灰泥牆", "source": "inferred", "confidence": 0.6},
+    {"id": "interior", "assumption": "洗衣店內部與麻雀館窗內以 reference 裁切的 decal 表現", "source": "inferred", "confidence": 0.65}
+  ],
+  "excluded": [
+    {"what": "招牌上的日文／漢字", "reason": "內建字型只支援拉丁字母，改用 reference 裁切的 image decal"},
+    {"what": "洗衣機、椅子、地磚等店內物件", "reason": "以 decal 暗示，不做幾何"},
+    {"what": "牆面裂縫、電線、電錶箱細節", "reason": "超出 game_default 預算"},
+    {"what": "背景與地面陰影", "reason": "非建築本體"}
+  ]
+}

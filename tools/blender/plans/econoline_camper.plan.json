@@ -1,0 +1,113 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "econoline_camper",
+  "reference": "econoline_camper",
+  "notes": "Ford Econoline chibi camper v2：側視擠出車體 + 門窗玻璃 + 四輪 + 前臉件。正面 -Y。",
+  "dimensions": {"w": 2.35, "d": 4.5, "h": 2.72},
+  "detail": {
+    "preset": "hero",
+    "overrides": {"geometry_complexity": 8, "surface_detail": 0.9, "bevel_quality": 1, "secondary_density": 1, "tertiary_density": 1}
+  },
+  "style": {"edge_wobble": 0.01},
+  "materials": [
+    {
+      "name": "body_gold",
+      "hex": "#B89A42",
+      "roughness": 0.62,
+      "metallic": 0.05,
+      "surface": {
+        "class": "painted",
+        "pattern": "painted",
+        "uv": "planar",
+        "tier": "hero",
+        "units": 5,
+        "palette": ["#6A4A18", "#B89A42", "#E0C868"],
+        "wear": 0.84,
+        "dirt": 0.55,
+        "normal_strength": 1.35,
+        "roughness_variation": 0.38,
+        "gap_shade": 0.45,
+        "posterize_steps": 4,
+        "posterize_mix": 0.58
+      }
+    },
+    {
+      "name": "camper_white",
+      "hex": "#D8D4CC",
+      "roughness": 0.58,
+      "surface": {
+        "class": "painted",
+        "pattern": "plaster",
+        "uv": "planar",
+        "tier": "standard",
+        "units": 4,
+        "palette": ["#989490", "#D8D4CC", "#F4F0E8"],
+        "wear": 0.45,
+        "dirt": 0.3,
+        "normal_strength": 1.1,
+        "roughness_variation": 0.3
+      }
+    },
+    {
+      "name": "chrome",
+      "hex": "#A8A8A0",
+      "roughness": 0.22,
+      "metallic": 0.85,
+      "surface": {"class": "metal", "pattern": "brushed", "tier": "standard", "units": 3, "wear": 0.35, "dirt": 0.2}
+    },
+    {
+      "name": "trim_black",
+      "hex": "#1A1816",
+      "roughness": 0.7
+    },
+    {
+      "name": "accent_red",
+      "hex": "#C83A28",
+      "roughness": 0.55
+    },
+    {
+      "name": "tire",
+      "hex": "#1C1A18",
+      "roughness": 0.92,
+      "surface": {"class": "ground", "pattern": "ground", "tier": "prop", "units": 3, "wear": 0.48, "dirt": 0.42}
+    },
+    {
+      "name": "glass",
+      "hex": "#2A3238",
+      "roughness": 0.12,
+      "metallic": 0.2,
+      "alpha": 0.32
+    }
+  ],
+  "budget": {"max_tris": 10500, "max_primitives": 38, "max_texture_kb": 2800, "max_gpu_texture_mb": 56},
+  "components": [
+    {"id": "body", "kind": "econoline_camper", "tier": "primary", "method": "component", "profile": "building_shell", "material": "body_gold", "bounds": [[-1.08, -2.22, 0.0], [1.08, 2.22, 2.65]], "source": "observed", "confidence": 0.92},
+    {"id": "windshield", "kind": "vehicle_windshield", "tier": "secondary", "method": "component", "profile": "glass", "material": "glass", "bounds": [[-0.92, -2.26, 0.95], [0.92, -2.04, 1.85]], "source": "observed", "confidence": 0.88},
+    {"id": "door_l", "kind": "vehicle_side_door", "tier": "secondary", "method": "component", "profile": "decoration", "material": "body_gold", "bounds": [[-1.08, -0.18, 0.55], [-0.96, 0.68, 1.92]], "source": "observed", "confidence": 0.86},
+    {"id": "side_glass_l", "kind": "vehicle_side_glass", "tier": "secondary", "method": "component", "profile": "glass", "material": "glass", "bounds": [[-1.06, 0.78, 1.05], [-0.96, 1.18, 1.72]], "source": "observed", "confidence": 0.8},
+    {"id": "bumper", "kind": "vehicle_bumper", "tier": "secondary", "method": "component", "profile": "trim", "material": "chrome", "bounds": [[-0.98, -2.34, 0.02], [0.98, -2.16, 0.36]], "source": "observed", "confidence": 0.85},
+    {"id": "grille", "kind": "vehicle_grille", "tier": "secondary", "method": "component", "profile": "trim", "material": "chrome", "bounds": [[-0.72, -2.32, 0.48], [0.72, -2.12, 1.02]], "source": "observed", "confidence": 0.82},
+    {"id": "headlight_l", "kind": "vehicle_headlight", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "chrome", "bounds": [[-0.94, -2.30, 0.0], [-0.58, -2.10, 0.95]], "source": "observed", "confidence": 0.8},
+    {"id": "headlight_r", "kind": "vehicle_headlight", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "chrome", "bounds": [[0.58, -2.30, 0.0], [0.94, -2.10, 0.95]], "source": "observed", "confidence": 0.8},
+    {"id": "mirror_l", "kind": "side_mirror", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "chrome", "parent": "door_l", "bounds": [[-1.14, -0.12, 1.38], [-0.82, 0.22, 1.72]], "source": "observed", "confidence": 0.78},
+    {"id": "camper_window", "kind": "camper_side_window", "tier": "secondary", "method": "component", "profile": "decoration", "material": "camper_white", "bounds": [[-0.26, -0.38, 2.05], [0.44, 0.12, 2.45]], "source": "observed", "confidence": 0.8},
+    {"id": "antenna", "kind": "vehicle_antenna", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "accent_red", "bounds": [[-0.92, -2.05, 2.35], [-0.76, -1.88, 2.92]], "source": "observed", "confidence": 0.72},
+    {"id": "wheel_fl", "kind": "vehicle_wheel", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "tire", "bounds": [[-1.14, -1.72, 0.0], [-0.68, -1.08, 0.54]], "source": "observed", "confidence": 0.9},
+    {"id": "wheel_fr", "kind": "vehicle_wheel", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "tire", "bounds": [[0.68, -1.72, 0.0], [1.14, -1.08, 0.54]], "source": "observed", "confidence": 0.9},
+    {"id": "wheel_rl", "kind": "vehicle_wheel", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "tire", "bounds": [[-1.14, 0.95, 0.0], [-0.68, 1.58, 0.54]], "source": "observed", "confidence": 0.9},
+    {"id": "wheel_rr", "kind": "vehicle_wheel", "tier": "tertiary", "method": "component", "profile": "decoration", "material": "tire", "bounds": [[0.68, 0.95, 0.0], [1.14, 1.58, 0.54]], "source": "observed", "confidence": 0.9}
+  ],
+  "decals": [
+    {"id": "plate_front", "target": "body", "face": "front", "rect": [[-0.32, 0.28], [0.34, 0.48]], "content": {"type": "text", "text": "MER ICA", "color": "#E4E0D4", "background": "#2C5230"}},
+    {"id": "grille_ford", "target": "grille", "face": "front", "rect": [[-0.5, 0.65], [0.5, 0.9]], "content": {"type": "text", "text": "FORD", "color": "#D8D4CC"}},
+    {"id": "graffiti_upper", "target": "body", "face": "left", "rect": [[0.2, 1.42], [1.3, 2.05]], "content": {"type": "symbol", "symbol": "bolt", "color": "#12100E"}},
+    {"id": "graffiti_mid", "target": "body", "face": "left", "rect": [[-0.5, 1.02], [0.7, 1.52]], "content": {"type": "symbol", "symbol": "drop", "color": "#1A1816"}},
+    {"id": "graffiti_lower", "target": "door_l", "face": "left", "rect": [[-0.35, 0.62], [0.55, 1.02]], "content": {"type": "symbol", "symbol": "arrow", "color": "#141210"}}
+  ],
+  "export": {
+    "path": "public/models/econoline_camper/econoline_camper.glb",
+    "compress": true,
+    "clickable": ["door_l"],
+    "anim_groups": {}
+  }
+}
