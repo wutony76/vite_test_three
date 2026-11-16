@@ -33,7 +33,14 @@ import {
   LEMON_SLICE_PLACEMENTS,
   type LemonSliceLayout,
 } from './lemonSliceLayout';
+import { createFrenchFries, type FrenchFriesSettings } from './frenchFries';
+import {
+  FRENCH_FRIES_LAYOUT_DEFAULT,
+  FRENCH_FRIES_PLACEMENTS,
+  type FrenchFriesLayout,
+} from './frenchFriesLayout';
 import { createPig, type PigSettings } from './pig';
+import type { PigCloudSettings, PigCloudState } from './pigCloud';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -57,6 +64,7 @@ export const WORLD_GLTF_URLS = [
   `${import.meta.env.BASE_URL}models/grilled_corn/grilled_corn.glb`,
   `${import.meta.env.BASE_URL}models/salmon_steak/salmon_steak.glb`,
   `${import.meta.env.BASE_URL}models/lemon_slice/lemon_slice.glb`,
+  `${import.meta.env.BASE_URL}models/french_fries/french_fries.glb`,
   `${import.meta.env.BASE_URL}models/fried_egg/fried_egg.glb`,
   `${import.meta.env.BASE_URL}models/roast_chicken/roast_chicken.glb`,
   `${import.meta.env.BASE_URL}models/pig/pig.glb`,
@@ -250,6 +258,57 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       const { id, ...layout } = placement;
       spawnLemonSlice(id, layout);
     }
+  }
+
+  type FrenchFriesRuntime = ReturnType<typeof createFrenchFries>;
+  const frenchFriesEntries: Array<{ world: WorldFrenchFries; runtime: FrenchFriesRuntime }> = [];
+  const frenchFries: WorldFrenchFries[] = [];
+
+  function spawnFrenchFries(id: string, layout: FrenchFriesLayout, grown = false) {
+    if (!puddingAxes) return null;
+    const runtime = createFrenchFries({ ...puddingAxes, layout: { ...layout } });
+    ground.add(runtime.object);
+    const world = exposeFrenchFries(id, runtime);
+    frenchFriesEntries.push({ world, runtime });
+    frenchFries.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  if (puddingAxes) {
+    for (const placement of FRENCH_FRIES_PLACEMENTS) {
+      const { id, ...layout } = placement;
+      spawnFrenchFries(id, layout);
+    }
+  }
+
+  function nextFrenchFriesId() {
+    let n = frenchFriesEntries.length + 1;
+    let id = `french_fries_${n}`;
+    while (frenchFries.some((item) => item.id === id)) {
+      n += 1;
+      id = `french_fries_${n}`;
+    }
+    return id;
+  }
+
+  function addFrenchFries(seed?: Partial<FrenchFriesLayout>): WorldFrenchFries | null {
+    if (!puddingAxes) return null;
+    const base: FrenchFriesLayout = { ...FRENCH_FRIES_LAYOUT_DEFAULT, ...seed };
+    const azimuth = seed?.azimuthDegrees ?? FRENCH_FRIES_LAYOUT_DEFAULT.azimuthDegrees;
+    base.azimuthDegrees = wrapDegrees(azimuth + 16);
+    return spawnFrenchFries(nextFrenchFriesId(), base, introDone);
+  }
+
+  function removeFrenchFries(entry: WorldFrenchFries) {
+    const index = frenchFriesEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    const { runtime, world } = frenchFriesEntries[index];
+    runtime.dispose();
+    frenchFriesEntries.splice(index, 1);
+    const friesIndex = frenchFries.indexOf(world);
+    if (friesIndex >= 0) frenchFries.splice(friesIndex, 1);
+    return true;
   }
 
   function nextLemonSliceId() {
@@ -491,6 +550,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     for (const { world } of grilledCornEntries) roots.push(world.object);
     for (const { world } of salmonSteakEntries) roots.push(world.object);
     for (const { world } of lemonSliceEntries) roots.push(world.object);
+    for (const { world } of frenchFriesEntries) roots.push(world.object);
     for (const { world } of friedEggEntries) {
       if (world.settings.mode === 'sphere') roots.push(world.object);
     }
@@ -546,6 +606,8 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       object: pigRuntime.object,
       settings: pigRuntime.settings,
       apply: pigRuntime.applySettings,
+      cloud: pigRuntime.cloud.settings,
+      getCloudState: pigRuntime.cloud.getState,
     }
   : null;
   // 鏡頭看的方向。小球的起點會落在這個方向和畫面上方之間
@@ -664,6 +726,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
   for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
   for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
+  for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(0);
   pigRuntime?.setIntroGrow(0);
   groundFlowers?.resetIntro(introHouses.length);
   placeFlowers(0);
@@ -719,6 +782,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(1);
         for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(1);
         for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(1);
         pigRuntime?.setIntroGrow(1);
       }
     }
@@ -759,6 +823,14 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         ? 1
         : THREE.MathUtils.clamp((introElapsed - lemonStart) / 0.85, 0, 1);
       runtime.setIntroGrow(easeOutBack(lemonT, 2.0));
+      runtime.update();
+    });
+    frenchFriesEntries.forEach(({ runtime }, index) => {
+      const friesStart = housesIntroEnd + index * 0.08;
+      const friesT = introDone
+        ? 1
+        : THREE.MathUtils.clamp((introElapsed - friesStart) / 0.85, 0, 1);
+      runtime.setIntroGrow(easeOutBack(friesT, 2.0));
       runtime.update();
     });
     if (pigRuntime) {
@@ -838,6 +910,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
     for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
     for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(0);
     pigRuntime?.setIntroGrow(0);
   }
 
@@ -883,6 +956,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     lemonSlices,
     addLemonSlice,
     removeLemonSlice,
+    frenchFries,
+    addFrenchFries,
+    removeFrenchFries,
     pig,
     houses: [
       exposeHouse('mainHall', mainHall),
@@ -925,11 +1001,25 @@ export type WorldLemonSlice = {
   setNormal: (normal: THREE.Vector3) => void;
 };
 
+export type WorldFrenchFries = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: FrenchFriesSettings;
+  apply: () => void;
+  applyVisuals: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
 export type WorldPig = {
   label: string;
   object: THREE.Object3D;
   settings: PigSettings;
   apply: () => void;
+  /** 頭上烏雲的設定（面板即時讀取，不用 apply） */
+  cloud: PigCloudSettings;
+  getCloudState: () => PigCloudState;
 };
 
 export type WorldPudding = {
@@ -1002,6 +1092,19 @@ function exposeLemonSlice(id: string, slice: ReturnType<typeof createLemonSlice>
     applyVisuals: slice.applyVisuals,
     getNormal: slice.getNormal,
     setNormal: slice.setNormal,
+  };
+}
+
+function exposeFrenchFries(id: string, fries: ReturnType<typeof createFrenchFries>): WorldFrenchFries {
+  return {
+    id,
+    label: id,
+    object: fries.object,
+    settings: fries.settings,
+    apply: fries.applySettings,
+    applyVisuals: fries.applyVisuals,
+    getNormal: fries.getNormal,
+    setNormal: fries.setNormal,
   };
 }
 

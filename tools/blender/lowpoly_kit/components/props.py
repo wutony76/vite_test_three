@@ -269,6 +269,29 @@ def build_bucket(ctx):
     return data
 
 
+@register("fence")
+def build_fence(ctx):
+    """木柵欄：等距立柱 + 數道橫桿，沿 bounds 寬度排開。"""
+    posts = max(2, int(ctx.param("posts", 6)))
+    rails = max(1, int(ctx.param("rails", 2)))
+    hw, hd, h = ctx.hw, ctx.hd, ctx.h
+    post_r = min(0.07, hw / posts * 0.12, h * 0.08)
+    data = shapes.MeshData()
+    span = 2 * hw
+    for index in range(posts):
+        fx = -hw + (index + 0.5) * span / posts
+        data.extend(
+            shapes.box(fx - post_r, -hd * 0.35, 0.0, fx + post_r, hd * 0.35, h, ctx.material)
+        )
+    rail_y = hd * 0.22
+    for rail in range(rails):
+        z = h * (rail + 1) / (rails + 1)
+        data.extend(
+            shapes.box(-hw, -rail_y, z - post_r * 0.35, hw, rail_y, z + post_r * 0.35, ctx.material)
+        )
+    return data
+
+
 @register("crate")
 def build_crate(ctx):
     """木箱：正面有兩道淺凹的板縫（grid_slab 的凹槽），看得出是一塊塊木板釘成的。"""

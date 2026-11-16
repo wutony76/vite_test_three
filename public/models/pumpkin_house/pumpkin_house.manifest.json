@@ -1,0 +1,140 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "pumpkin_house",
+  "glb": "pumpkin_house.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_materials_emissive_strength"
+  ],
+  "root": "pumpkin_house_Root",
+  "clickable": [
+    "pumpkin_house_door",
+    "pumpkin_house_porch_wall"
+  ],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 3502,
+    "primitives": 23,
+    "meshes": 21,
+    "materials": 10,
+    "file_bytes": 789748
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "warn",
+    "texture": "pass",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "pumpkin_orange": {
+        "class": "food",
+        "pattern": "crust",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 0.22,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "crust",
+          "seed": 1029324174,
+          "hash": "3d5a3d8e7802"
+        }
+      },
+      "stem_green": {
+        "class": "vegetation",
+        "pattern": "foliage",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.4,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "foliage",
+          "seed": 1628738161,
+          "hash": "61149271de1b"
+        }
+      },
+      "roof_tile": {
+        "class": "roof_tile",
+        "pattern": "brick",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 0.96,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "brick",
+          "seed": 2649509379,
+          "hash": "9dec4e0381b1"
+        }
+      },
+      "wood_plank": {
+        "class": "wood",
+        "pattern": "planks",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 0.52,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "planks",
+          "seed": 1762657586,
+          "hash": "69100532c0c1"
+        }
+      },
+      "stone_porch": {
+        "class": "stone",
+        "pattern": "rock",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.8,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "rock",
+          "seed": 1790330805,
+          "hash": "6ab647b52b7e"
+        }
+      },
+      "fence_wood": {
+        "class": "wood",
+        "pattern": "wood_grain",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.5,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "wood_grain",
+          "seed": 547124924,
+          "hash": "209c76bc251c"
+        }
+      },
+      "ground_grass": {
+        "class": "vegetation",
+        "pattern": "ground",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.35,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "ground",
+          "seed": 2943896357,
+          "hash": "af784b25eab8"
+        }
+      }
+    },
+    "bake": {
+      "mode": "ao",
+      "size": 1024,
+      "seconds": 3.81
+    },
+    "decals": 0,
+    "gpu_texture_mb": 20.71,
+    "flat_ratio": 0.004,
+    "texture_count": 22,
+    "texture_kb": 515.1,
+    "images": 22,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 771.2
+  }
+}

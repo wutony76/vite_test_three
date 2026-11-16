@@ -1,0 +1,126 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "pumpkin_house",
+  "image": {
+    "path": "tools/img/pumpkin_house.jpg",
+    "width": 1024,
+    "height": 749
+  },
+  "medium": "奇幻 RPG 風格手繪概念圖：雙層南瓜疊成的鄉村小屋",
+  "view": {
+    "type": "front_ortho",
+    "source": "observed",
+    "confidence": 0.75
+  },
+  "scale_anchor": {
+    "component": "door",
+    "axis": "height",
+    "meters": 2.1
+  },
+  "silhouette": {
+    "outline": [
+      [0.18, 0.92],
+      [0.18, 0.62],
+      [0.14, 0.55],
+      [0.16, 0.38],
+      [0.22, 0.22],
+      [0.38, 0.12],
+      [0.52, 0.08],
+      [0.64, 0.10],
+      [0.76, 0.18],
+      [0.82, 0.30],
+      [0.84, 0.44],
+      [0.80, 0.58],
+      [0.82, 0.72],
+      [0.78, 0.92]
+    ],
+    "source": "observed",
+    "confidence": 0.7
+  },
+  "palette": [
+    {"name": "pumpkin_orange", "hex": "#D97828", "usage": "雙層南瓜殼", "sample": [0.40, 0.42, 0.55, 0.55]},
+    {"name": "pumpkin_shadow", "hex": "#A85A18", "usage": "南瓜陰影溝槽", "sample": [0.35, 0.50, 0.42, 0.58]},
+    {"name": "stem_green", "hex": "#5A8B3C", "usage": "瓜蒂", "sample": [0.52, 0.06, 0.56, 0.10]},
+    {"name": "roof_tile", "hex": "#9D4B2A", "usage": "紅瓦屋頂、雨遮", "sample": [0.48, 0.28, 0.58, 0.34]},
+    {"name": "wood_plank", "hex": "#8B5A38", "usage": "門、欄杆、陽台、樑", "sample": [0.48, 0.68, 0.52, 0.78]},
+    {"name": "stone_porch", "hex": "#8A8078", "usage": "門廊石砌 A 框", "sample": [0.46, 0.60, 0.52, 0.66]},
+    {"name": "fence_wood", "hex": "#7A4E32", "usage": "木柵欄", "sample": [0.22, 0.78, 0.78, 0.88]},
+    {"name": "ground_grass", "hex": "#6FA84A", "usage": "腳下草地", "sample": [0.10, 0.88, 0.90, 0.98]}
+  ],
+  "components": [
+    {"id": "ground_patch", "kind": "foundation", "tier": "primary", "bbox": [0.12, 0.84, 0.88, 0.98], "material_hint": "ground_grass", "source": "observed", "confidence": 0.8},
+    {"id": "pumpkin_lower", "kind": "pumpkin_body", "tier": "primary", "bbox": [0.16, 0.52, 0.84, 0.92], "material_hint": "pumpkin_orange", "source": "observed", "confidence": 0.9},
+    {"id": "pumpkin_upper", "kind": "pumpkin_body", "tier": "primary", "bbox": [0.22, 0.18, 0.78, 0.58], "material_hint": "pumpkin_orange", "source": "observed", "confidence": 0.88},
+    {"id": "stem", "kind": "pumpkin_stem", "tier": "secondary", "bbox": [0.48, 0.04, 0.56, 0.14], "material_hint": "stem_green", "parent": "pumpkin_upper", "source": "observed", "confidence": 0.85},
+    {"id": "porch_frame", "kind": "beam", "tier": "secondary", "bbox": [0.40, 0.58, 0.60, 0.72], "material_hint": "stone_porch", "parent": "pumpkin_lower", "source": "observed", "confidence": 0.8},
+    {"id": "pillar_left", "kind": "pillar", "tier": "secondary", "bbox": [0.38, 0.64, 0.44, 0.88], "material_hint": "wood_plank", "source": "observed", "confidence": 0.85},
+    {"id": "pillar_right", "kind": "pillar", "tier": "secondary", "bbox": [0.56, 0.64, 0.62, 0.88], "material_hint": "wood_plank", "source": "observed", "confidence": 0.85},
+    {"id": "lantern_left", "kind": "lantern", "tier": "tertiary", "bbox": [0.39, 0.62, 0.43, 0.68], "material_hint": "wood_plank", "parent": "pillar_left", "source": "observed", "confidence": 0.75},
+    {"id": "lantern_right", "kind": "lantern", "tier": "tertiary", "bbox": [0.57, 0.62, 0.61, 0.68], "material_hint": "wood_plank", "parent": "pillar_right", "source": "observed", "confidence": 0.75},
+    {"id": "door", "kind": "door", "tier": "secondary", "bbox": [0.44, 0.68, 0.56, 0.86], "material_hint": "wood_plank", "source": "observed", "confidence": 0.9},
+    {"id": "side_lean_roof", "kind": "roof_gable", "tier": "secondary", "bbox": [0.70, 0.58, 0.86, 0.72], "material_hint": "roof_tile", "source": "observed", "confidence": 0.75},
+    {"id": "round_window", "kind": "window", "tier": "secondary", "bbox": [0.38, 0.32, 0.54, 0.46], "material_hint": "wood_plank", "parent": "pumpkin_upper", "source": "observed", "confidence": 0.85},
+    {"id": "window_awning", "kind": "roof_gable", "tier": "secondary", "bbox": [0.36, 0.28, 0.56, 0.34], "material_hint": "roof_tile", "parent": "round_window", "source": "observed", "confidence": 0.8},
+    {"id": "flower_box", "kind": "planter_box", "tier": "tertiary", "bbox": [0.37, 0.46, 0.55, 0.50], "material_hint": "wood_plank", "parent": "round_window", "source": "observed", "confidence": 0.7},
+    {"id": "balcony", "kind": "beam", "tier": "secondary", "bbox": [0.66, 0.42, 0.84, 0.54], "material_hint": "wood_plank", "parent": "pumpkin_upper", "source": "observed", "confidence": 0.75},
+    {"id": "chimney", "kind": "chimney", "tier": "secondary", "bbox": [0.72, 0.20, 0.82, 0.38], "material_hint": "stone_porch", "source": "observed", "confidence": 0.8},
+    {"id": "fence_front", "kind": "fence", "tier": "secondary", "bbox": [0.14, 0.76, 0.86, 0.86], "material_hint": "fence_wood", "source": "observed", "confidence": 0.8},
+    {"id": "yard_fence", "kind": "fence", "tier": "tertiary", "bbox": [0.78, 0.68, 0.90, 0.86], "material_hint": "fence_wood", "source": "observed", "confidence": 0.7}
+  ],
+  "surfaces": [
+    {
+      "id": "pumpkin_skin",
+      "region": [[0.22, 0.35], [0.78, 0.35], [0.82, 0.78], [0.18, 0.78]],
+      "class": "food",
+      "pattern": "organic",
+      "base_hex": "#D97828",
+      "scale_m": 0.25,
+      "components": ["pumpkin_lower", "pumpkin_upper"],
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "roof_shingle",
+      "region": [[0.36, 0.28], [0.58, 0.28], [0.58, 0.34], [0.36, 0.34]],
+      "class": "roof_tile",
+      "pattern": "brick",
+      "base_hex": "#9D4B2A",
+      "scale_m": 0.12,
+      "components": ["window_awning", "side_lean_roof"],
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "wood_trim",
+      "region": [[0.38, 0.64], [0.62, 0.64], [0.62, 0.88], [0.38, 0.88]],
+      "class": "wood",
+      "pattern": "planks",
+      "base_hex": "#8B5A38",
+      "scale_m": 0.14,
+      "components": ["door", "pillar_left", "pillar_right", "balcony", "porch_frame"],
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "porch_stone",
+      "region": [[0.40, 0.58], [0.60, 0.58], [0.60, 0.66], [0.40, 0.66]],
+      "class": "stone",
+      "pattern": "rock",
+      "base_hex": "#8A8078",
+      "scale_m": 0.2,
+      "components": ["porch_frame"],
+      "source": "observed",
+      "confidence": 0.75
+    }
+  ],
+  "hidden": [
+    {"id": "depth", "assumption": "南瓜屋深度約為正面寬度的 85%（略扁的橢圓截面）", "source": "inferred", "confidence": 0.55},
+    {"id": "back", "assumption": "背面無大開口，煙囪自右後方穿出", "source": "inferred", "confidence": 0.6}
+  ],
+  "excluded": [
+    {"what": "煙囪白煙", "reason": "用貼花或粒子，不做靜態幾何"},
+    {"what": "柱頂南瓜燈臉部發光細節", "reason": "game_default 以 lantern 簡化代表"},
+    {"what": "馬車輪、叉子、乾草捆、側院木桶與小南瓜", "reason": " tertiary 預算留給主體；可之後加 scene prop"},
+    {"what": "地面投影與背景", "reason": "非建築本體"}
+  ]
+}

@@ -1,0 +1,350 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "pumpkin_house",
+  "reference": "pumpkin_house",
+  "notes": "雙層南瓜鄉村小屋。尺寸依 reference 以門高 2.1 m 換算；原點在 footprint 中心地面，正面朝 -Y。",
+  "dimensions": {"w": 11.6, "d": 11.6, "h": 10.7},
+  "detail": {
+    "preset": "game_default",
+    "overrides": {"tertiary_density": 0.55}
+  },
+  "style": {
+    "edge_wobble": 0.022,
+    "palette": "pumpkin_house"
+  },
+  "materials": [
+    {
+      "name": "pumpkin_orange",
+      "hex": "#D97828",
+      "roughness": 0.72,
+      "surface": {"class": "food", "pattern": "crust", "scale_m": 0.22, "palette": ["#A85A18", "#D97828", "#F0A050"], "wear": 0.25, "dirt": 0.15}
+    },
+    {
+      "name": "stem_green",
+      "hex": "#5A8B3C",
+      "roughness": 0.65,
+      "surface": {"class": "vegetation", "tier": "prop", "scale_m": 0.08}
+    },
+    {
+      "name": "roof_tile",
+      "hex": "#9D4B2A",
+      "roughness": 0.78,
+      "surface": {"class": "roof_tile", "pattern": "brick", "scale_m": 0.12, "palette": ["#7A3218", "#B05A32", "#D88850"], "wear": 0.35, "dirt": 0.2}
+    },
+    {
+      "name": "wood_plank",
+      "hex": "#8B5A38",
+      "roughness": 0.82,
+      "surface": {"class": "wood", "pattern": "planks", "scale_m": 0.13, "uv": "along", "wear": 0.4}
+    },
+    {
+      "name": "stone_porch",
+      "hex": "#8A8078",
+      "roughness": 0.92,
+      "surface": {"class": "stone", "pattern": "rock", "palette": ["#6E6860", "#958C84", "#C4BBB0"], "tier": "prop", "dirt": 0.35}
+    },
+    {
+      "name": "fence_wood",
+      "hex": "#7A4E32",
+      "roughness": 0.85,
+      "surface": {"class": "wood", "pattern": "wood_grain", "tier": "prop", "wear": 0.5}
+    },
+    {
+      "name": "ground_grass",
+      "hex": "#6FA84A",
+      "roughness": 0.95,
+      "surface": {"class": "vegetation", "pattern": "ground", "tier": "prop", "scale_m": 0.35}
+    },
+    {
+      "name": "glass",
+      "hex": "#4A6A7A",
+      "roughness": 0.12,
+      "alpha": 0.4
+    },
+    {
+      "name": "lantern_glow",
+      "hex": "#F0D060",
+      "roughness": 0.3,
+      "emissive": true
+    },
+    {
+      "name": "niche_dark",
+      "hex": "#2A2018",
+      "roughness": 0.9
+    }
+  ],
+  "budget": {
+    "max_tris": 9000,
+    "max_primitives": 36,
+    "max_texture_kb": 2200,
+    "max_gpu_texture_mb": 32
+  },
+  "components": [
+    {
+      "id": "ground_patch",
+      "kind": "foundation",
+      "tier": "primary",
+      "method": "custom_mesh",
+      "profile": "terrain",
+      "material": "ground_grass",
+      "bounds": [[-5.75, -2.05, 0.0], [5.75, 2.05, 0.14]],
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "pumpkin_lower",
+      "kind": "pumpkin_body",
+      "tier": "primary",
+      "method": "component",
+      "profile": "organic",
+      "material": "pumpkin_orange",
+      "params": {"flutes": 12, "flute_depth": 0.075, "belly": 0.98, "taper": 0.94},
+      "bounds": [[-5.42, -5.42, 0.0], [5.42, 5.42, 5.37]],
+      "source": "observed",
+      "confidence": 0.9
+    },
+    {
+      "id": "pumpkin_upper",
+      "kind": "pumpkin_body",
+      "tier": "primary",
+      "method": "component",
+      "profile": "organic",
+      "material": "pumpkin_orange",
+      "params": {"flutes": 11, "flute_depth": 0.065, "belly": 0.9, "taper": 0.82},
+      "bounds": [[-4.47, -4.47, 4.67], [4.47, 4.47, 9.33]],
+      "source": "observed",
+      "confidence": 0.88
+    },
+    {
+      "id": "stem",
+      "kind": "pumpkin_stem",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "vegetation",
+      "material": "stem_green",
+      "parent": "pumpkin_upper",
+      "params": {"bend": 0.22},
+      "bounds": [[-0.32, -0.24, 9.77], [0.96, 0.24, 10.97]],
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "porch_frame",
+      "kind": "beam",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "trim",
+      "material": "stone_porch",
+      "parent": "pumpkin_lower",
+      "bounds": [[-1.6, -0.6, 3.03], [1.6, 0.6, 4.67]],
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "pillar_left",
+      "kind": "pillar",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "trim",
+      "material": "wood_plank",
+      "bounds": [[-1.91, -0.18, 1.17], [-0.96, 0.18, 3.97]],
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "pillar_right",
+      "kind": "pillar",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "trim",
+      "material": "wood_plank",
+      "bounds": [[0.96, -0.18, 1.17], [1.91, 0.18, 3.97]],
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "lantern_left",
+      "kind": "lantern",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "lantern_glow",
+      "parent": "pillar_left",
+      "bounds": [[-1.5, -0.14, 3.6], [-1.1, 0.14, 4.25]],
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "lantern_right",
+      "kind": "lantern",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "lantern_glow",
+      "parent": "pillar_right",
+      "bounds": [[1.1, -0.14, 3.6], [1.5, 0.14, 4.25]],
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "porch_wall",
+      "kind": "wall_block",
+      "tier": "primary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "stone_porch",
+      "params": {"openings": ["door"], "reveal": 0.08, "niche_material": "niche_dark"},
+      "bounds": [[-1.15, -0.35, 1.2], [1.15, 0.05, 3.85]],
+      "source": "inferred",
+      "confidence": 0.65,
+      "assumption": "門廊內側石砌 A 框牆，深度較淺，只服務正面入口"
+    },
+    {
+      "id": "door",
+      "kind": "door",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "opening",
+      "material": "wood_plank",
+      "parent": "porch_wall",
+      "params": {"glass_upper": false, "handle": true, "handle_material": "wood_plank"},
+      "bounds": [[-0.96, -0.36, 1.4], [0.96, 0.12, 3.5]],
+      "source": "observed",
+      "confidence": 0.9
+    },
+    {
+      "id": "side_lean_roof",
+      "kind": "roof_gable",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "roof",
+      "material": "roof_tile",
+      "parent": "pumpkin_lower",
+      "params": {"ridge_at": 0.2, "courses": 4, "lip": 0.06, "thickness": 0.16},
+      "bounds": [[3.19, -0.48, 3.03], [5.74, 0.48, 4.67]],
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "round_window",
+      "kind": "window",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "opening",
+      "material": "wood_plank",
+      "parent": "pumpkin_upper",
+      "params": {"panes": [2, 2], "sill": false},
+      "bounds": [[-1.91, -0.48, 6.07], [0.64, 0.48, 7.7]],
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "round_window_glass",
+      "kind": "glass_pane",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "glass",
+      "material": "glass",
+      "parent": "round_window",
+      "bounds": [[-1.35, -0.35, 6.45], [0.2, 0.35, 7.35]],
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "window_awning",
+      "kind": "roof_gable",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "roof",
+      "material": "roof_tile",
+      "parent": "round_window",
+      "params": {"ridge_at": 0.5, "courses": 3, "lip": 0.05, "thickness": 0.12},
+      "bounds": [[-2.23, -0.6, 7.47], [0.96, 0.6, 8.17]],
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "flower_box",
+      "kind": "planter_box",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "wood_plank",
+      "parent": "round_window",
+      "params": {"plant_material": "stem_green"},
+      "bounds": [[-1.55, -0.4, 7.05], [0.55, 0.4, 7.45]],
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "balcony",
+      "kind": "beam",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "trim",
+      "material": "wood_plank",
+      "parent": "pumpkin_upper",
+      "bounds": [[2.55, -0.54, 5.13], [5.42, 0.54, 6.53]],
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "chimney",
+      "kind": "chimney",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "trim",
+      "material": "stone_porch",
+      "parent": "pumpkin_upper",
+      "params": {"bury": 0.15},
+      "bounds": [[3.51, -0.3, 6.5], [5.1, 0.3, 9.2]],
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "chimney_cap",
+      "kind": "pipe",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "trim",
+      "material": "wood_plank",
+      "parent": "chimney",
+      "params": {"hat": true},
+      "bounds": [[3.8, -0.22, 8.9], [4.9, 0.22, 9.6]],
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "fence_front",
+      "kind": "fence",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "trim",
+      "material": "fence_wood",
+      "params": {"posts": 9, "rails": 2},
+      "bounds": [[-5.74, -2.17, 1.4], [5.74, 2.17, 2.57]],
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "steps",
+      "kind": "steps",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "stone_porch",
+      "params": {"count": 3},
+      "bounds": [[-1.2, -0.65, 0.0], [1.2, 0.15, 1.2]],
+      "source": "inferred",
+      "confidence": 0.6,
+      "assumption": "門前土路三階踏進門廊"
+    }
+  ],
+  "export": {
+    "path": "public/models/pumpkin_house/pumpkin_house.glb",
+    "clickable": ["door", "porch_wall"],
+    "anim_groups": {},
+    "instance_groups": {},
+    "compress": true
+  }
+}

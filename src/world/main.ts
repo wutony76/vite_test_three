@@ -24,15 +24,18 @@ import {
   type WorldHouse,
   type WorldPudding,
   type WorldLemonSlice,
+  type WorldFrenchFries,
   type WorldSalmonSteak,
 } from './objects/obj';
 import { whenGltfMountsIdle, whenGltfsReady } from './objects/sharedGltf';
 import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
+import { formatFrenchFriesPlacementsForPaste } from './objects/frenchFries';
 import { formatPuddingPlacementsForPaste } from './objects/pudding';
 import { formatSalmonSteakPlacementsForPaste } from './objects/salmonSteak';
 import { formatFriedEggPlacementsForPaste } from './objects/friedEgg';
 import { formatPigSettingsForPaste } from './objects/pig';
+import { formatPigCloudSettingsForPaste, PIG_CLOUD_STATES } from './objects/pigCloud';
 import type { FriedEggSunLayout } from './objects/friedEggLayout';
 // lil-gui：three.js 內建的小型控制面板，拖拉滑桿就能即時調整數值，不用改程式碼重新整理
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
@@ -223,6 +226,9 @@ const {
   lemonSlices,
   addLemonSlice,
   removeLemonSlice,
+  frenchFries,
+  addFrenchFries,
+  removeFrenchFries,
   pig,
 } = createObjs({ envMap, camera });
 
@@ -231,6 +237,7 @@ const foodVisibility = {
   showCorn: true,
   showLemon: true,
   showSalmon: true,
+  showFrenchFries: true,
 };
 
 scene.add(all);
@@ -1387,6 +1394,31 @@ if (pigFolder && pig) {
   pigFolder.add(pig.settings, 'waddleStrength', 0, 0.35, 0.01).name('搖晃幅度').onChange(apply).onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'sink', -0.15, 0.08, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(logPigSettings);
   pigFolder.add({ log: logPigSettings }, 'log').name('印出設定 (console)');
+
+  // 頭上的烏雲：沒有／下雨／打雷／暴雨 隨機切換；「固定狀態」可以停在某一種方便調整
+  const cloudFolder = pigFolder.addFolder('頭上烏雲');
+  const logCloud = () => console.log(formatPigCloudSettingsForPaste(pig.cloud));
+  const cloudStatus = { state: pig.getCloudState() };
+  cloudFolder.add(pig.cloud, 'enabled').name('啟用').onFinishChange(logCloud);
+  cloudFolder
+    .add(pig.cloud, 'forceState', PIG_CLOUD_STATES)
+    .name('固定狀態')
+    .onFinishChange(logCloud);
+  cloudFolder.add(cloudStatus, 'state').name('目前狀態').disable().listen();
+  // listen() 只會刷新顯示，值要自己更新
+  setInterval(() => {
+    cloudStatus.state = pig.getCloudState();
+  }, 250);
+  cloudFolder.add(pig.cloud, 'height', 0.4, 3, 0.05).name('烏雲高度 (身長倍)').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'size', 0.3, 2.5, 0.05).name('烏雲大小 (身長倍)').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'rotationDegrees', -180, 180, 1).name('烏雲旋轉 (°)').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'spinDegreesPerSecond', -180, 180, 5).name('烏雲自轉 (°/秒)').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'minSeconds', 1, 30, 0.5).name('狀態最短 (秒)').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'maxSeconds', 1, 40, 0.5).name('狀態最長 (秒)').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'weightNone', 0, 10, 0.5).name('權重：沒有').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'weightRain', 0, 10, 0.5).name('權重：下雨').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'weightThunder', 0, 10, 0.5).name('權重：打雷').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'weightStorm', 0, 10, 0.5).name('權重：暴雨').onFinishChange(logCloud);
   pigFolder.open();
 }
 
@@ -1539,10 +1571,173 @@ if (lemonFolder) {
   if (lemonSlices[0]) bindLemonPanel(lemonSlices[0]);
 }
 
+// 薯條（綠球上；拖曳、複製、躺下）
+const friesFolder = gui.addFolder('薯條');
+let selectedFries: WorldFrenchFries | null = null;
+
+function highlightFries(entry: WorldFrenchFries | null) {
+  for (const fries of frenchFries) {
+    fries.applyVisuals();
+    if (fries !== entry) continue;
+    fries.object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        if (!('emissive' in material)) continue;
+        const m = material as THREE.MeshStandardMaterial;
+        m.emissive.copy(m.color);
+        m.emissiveIntensity = 0.32;
+      }
+    });
+  }
+}
+
+const FRIES_PANEL_ACTIONS = new Set(['add', 'remove', 'log', 'layFlat', 'standUp']);
+
+function clearFriesPanelSliders() {
+  if (!friesFolder) return;
+  friesFolder.title('薯條');
+  for (const controller of [...friesFolder.controllers]) {
+    if (FRIES_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+function bindFriesPanel(entry: WorldFrenchFries) {
+  if (!friesFolder) return;
+  const alreadyShowing = entry === selectedFries && friesFolder.controllers.length > FRIES_PANEL_ACTIONS.size;
+  selectedFries = entry;
+  highlightFries(entry);
+  if (alreadyShowing) return;
+
+  clearFriesPanelSliders();
+  friesFolder.title(`薯條 · ${entry.label}`);
+
+  const settings = entry.settings;
+  const apply = () => entry.apply();
+  const applyVisuals = () => {
+    entry.applyVisuals();
+    highlightFries(entry);
+  };
+
+  friesFolder
+    .add(settings, 'angleFromTopDegrees', 0, 90, 1)
+    .name('離頂端 (°)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFriesPlacements);
+  friesFolder
+    .add(settings, 'azimuthDegrees', -180, 180, 1)
+    .name('方位 (°)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFriesPlacements);
+  friesFolder
+    .add(settings, 'spinDegrees', -180, 180, 1)
+    .name('自轉 (°)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFriesPlacements);
+  friesFolder
+    .add(settings, 'tiltXDegrees', -180, 180, 1)
+    .name('前傾 (°)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFriesPlacements);
+  friesFolder
+    .add(settings, 'tiltZDegrees', -180, 180, 1)
+    .name('側傾 (°)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFriesPlacements);
+  friesFolder
+    .add(settings, 'sink', -0.3, 0.12, 0.001)
+    .name('下沉')
+    .onChange(apply)
+    .onFinishChange(logFrenchFriesPlacements);
+  friesFolder
+    .add(settings, 'placementScale', 0.2, 2.5, 0.01)
+    .name('縮放')
+    .onChange(apply)
+    .onFinishChange(logFrenchFriesPlacements);
+  friesFolder
+    .add(settings, 'modelSize', 0.04, 0.35, 0.005)
+    .name('大小 (m)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFriesPlacements);
+  friesFolder
+    .add(settings, 'colorBoost', 0.7, 1.4, 0.01)
+    .name('亮度')
+    .onChange(applyVisuals)
+    .onFinishChange(logFrenchFriesPlacements);
+  friesFolder
+    .addColor(settings, 'tintColor')
+    .name('染色')
+    .onChange(applyVisuals)
+    .onFinishChange(logFrenchFriesPlacements);
+  friesFolder
+    .add(settings, 'tintMix', 0, 1, 0.01)
+    .name('染色強度')
+    .onChange(applyVisuals)
+    .onFinishChange(logFrenchFriesPlacements);
+}
+
+function logFrenchFriesPlacements() {
+  if (frenchFries.length === 0) return;
+  const text = formatFrenchFriesPlacementsForPaste(
+    frenchFries.map((f) => ({ id: f.id, settings: f.settings })),
+  );
+  console.log(text);
+  return text;
+}
+
+if (friesFolder) {
+  const friesControls = {
+    add() {
+      const created = addFrenchFries(selectedFries ? { ...selectedFries.settings } : undefined);
+      if (!created) return;
+      bindFriesPanel(created);
+      applyFoodGroupVisibility();
+    },
+    remove() {
+      if (!selectedFries || frenchFries.length === 0) return;
+      if (!removeFrenchFries(selectedFries)) return;
+      selectedFries = null;
+      clearFriesPanelSliders();
+      const next = frenchFries[frenchFries.length - 1];
+      if (next) bindFriesPanel(next);
+      else highlightFries(null);
+      refreshPuddingDragTargets();
+    },
+    layFlat() {
+      if (!selectedFries) return;
+      selectedFries.settings.tiltXDegrees = 90;
+      selectedFries.settings.tiltZDegrees = 0;
+      selectedFries.apply();
+      friesFolder.controllersRecursive().forEach((c) => c.updateDisplay());
+      logFrenchFriesPlacements();
+    },
+    standUp() {
+      if (!selectedFries) return;
+      selectedFries.settings.tiltXDegrees = 0;
+      selectedFries.settings.tiltZDegrees = 0;
+      selectedFries.apply();
+      friesFolder.controllersRecursive().forEach((c) => c.updateDisplay());
+      logFrenchFriesPlacements();
+    },
+    log() {
+      logFrenchFriesPlacements();
+    },
+  };
+  friesFolder.add(friesControls, 'add').name('複製薯條');
+  friesFolder.add(friesControls, 'remove').name('移除選中薯條');
+  friesFolder.add(friesControls, 'layFlat').name('躺下');
+  friesFolder.add(friesControls, 'standUp').name('立起');
+  friesFolder.add(friesControls, 'log').name('印出全部佈局 (console)');
+  if (frenchFries[0]) bindFriesPanel(frenchFries[0]);
+}
+
 function applyFoodGroupVisibility() {
   for (const corn of grilledCorns) corn.object.visible = foodVisibility.showCorn;
   for (const lemon of lemonSlices) lemon.object.visible = foodVisibility.showLemon;
   for (const steak of salmonSteaks) steak.object.visible = foodVisibility.showSalmon;
+  for (const fries of frenchFries) fries.object.visible = foodVisibility.showFrenchFries;
   refreshPuddingDragTargets();
 }
 
@@ -1550,6 +1745,7 @@ const foodVisibilityFolder = gui.addFolder('食物顯示');
 foodVisibilityFolder.add(foodVisibility, 'showCorn').name('玉米').onChange(applyFoodGroupVisibility);
 foodVisibilityFolder.add(foodVisibility, 'showLemon').name('檸檬片').onChange(applyFoodGroupVisibility);
 foodVisibilityFolder.add(foodVisibility, 'showSalmon').name('魚排').onChange(applyFoodGroupVisibility);
+foodVisibilityFolder.add(foodVisibility, 'showFrenchFries').name('薯條').onChange(applyFoodGroupVisibility);
 
 // 進場時各分組與根面板都收合，需要時再手動展開
 [
@@ -1620,13 +1816,16 @@ const HOUSE_DRAG_ENABLED = true;
 
 const friedEggsOnSphere = () => friedEggs.filter((egg) => egg.settings.mode === 'sphere');
 
-let surfaceDragTargets: Array<WorldHouse | WorldPudding | WorldGrilledCorn | WorldFriedEgg | WorldSalmonSteak | WorldLemonSlice> = [
+let surfaceDragTargets: Array<
+  WorldHouse | WorldPudding | WorldGrilledCorn | WorldFriedEgg | WorldSalmonSteak | WorldLemonSlice | WorldFrenchFries
+> = [
   ...houses,
   ...(PUDDING_SCENE_EDIT ? puddings : []),
   ...(CORN_SCENE_EDIT && foodVisibility.showCorn ? grilledCorns : []),
   ...friedEggsOnSphere(),
   ...salmonSteaks,
   ...lemonSlices,
+  ...(foodVisibility.showFrenchFries ? frenchFries : []),
 ];
 
 function refreshPuddingDragTargets() {
@@ -1636,6 +1835,7 @@ function refreshPuddingDragTargets() {
   if (CORN_SCENE_EDIT && foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
   if (foodVisibility.showSalmon) surfaceDragTargets.push(...salmonSteaks);
   if (foodVisibility.showLemon) surfaceDragTargets.push(...lemonSlices);
+  if (foodVisibility.showFrenchFries) surfaceDragTargets.push(...frenchFries);
 }
 
 if (HOUSE_DRAG_ENABLED) {
@@ -1665,6 +1865,8 @@ if (HOUSE_DRAG_ENABLED) {
       if (salmonEntry) bindSalmonPanel(salmonEntry);
       const lemonEntry = lemonSlices.find((item) => item.object === target.object);
       if (lemonEntry) bindLemonPanel(lemonEntry);
+      const friesEntry = frenchFries.find((item) => item.object === target.object);
+      if (friesEntry) bindFriesPanel(friesEntry);
     },
     onDrag: (normal, target) => {
       target.setNormal(normal);
@@ -1673,6 +1875,7 @@ if (HOUSE_DRAG_ENABLED) {
       cornFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       salmonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       lemonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      friesFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
     onDragEnd: (target) => {
       if (houses.some((house) => house.object === target.object)) logHouse();
@@ -1680,6 +1883,7 @@ if (HOUSE_DRAG_ENABLED) {
       else if (CORN_SCENE_EDIT && grilledCorns.some((item) => item.object === target.object)) logCornPlacements();
       else if (salmonSteaks.some((item) => item.object === target.object)) logSalmonPlacements();
       else if (lemonSlices.some((item) => item.object === target.object)) logLemonPlacements();
+      else if (frenchFries.some((item) => item.object === target.object)) logFrenchFriesPlacements();
     },
     onClick: (target) => {
       if (houses.some((house) => house.object === target.object)) markHouseSelected();
@@ -1695,6 +1899,8 @@ if (HOUSE_DRAG_ENABLED) {
       if (salmonEntry) bindSalmonPanel(salmonEntry);
       const lemonEntry = lemonSlices.find((item) => item.object === target.object);
       if (lemonEntry) bindLemonPanel(lemonEntry);
+      const friesEntry = frenchFries.find((item) => item.object === target.object);
+      if (friesEntry) bindFriesPanel(friesEntry);
     },
     onBackgroundClick: clearHouseSelection,
   });

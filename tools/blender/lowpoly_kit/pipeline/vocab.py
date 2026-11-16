@@ -49,6 +49,7 @@ KINDS = (
     "salmon_steak", "salmon_vertebra",
     "lemon_slice",
     "cartoon_pig",
+    "pumpkin_body", "pumpkin_stem",
     "econoline_camper", "vehicle_wheel", "vehicle_bumper", "vehicle_grille",
     "vehicle_headlight", "side_mirror", "vehicle_antenna", "camper_side_window",
     "vehicle_side_door", "vehicle_side_glass", "vehicle_windshield",

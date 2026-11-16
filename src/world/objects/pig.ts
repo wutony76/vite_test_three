@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { cloneGltfInstance, loadGltfOnce, scheduleGltfMount } from './sharedGltf';
+import { createPigCloud } from './pigCloud';
 
 const PIG_URL = `${import.meta.env.BASE_URL}models/pig/pig.glb`;
 
@@ -170,6 +171,11 @@ export function createPig({
    * 煙不能掛在 anchor 底下：anchor 會跟著小豬移動，煙就會黏在屁股上一起跑。
    * 改掛在 anchor 的父節點（綠球 ground）→ 煙留在原地、小豬跑走，才有「拖尾」感。
    */
+  // 頭上的烏雲掛在 anchor 底下（跟煙相反）：雲要跟著小豬走，而不是留在原地
+  // body 長度用 modelSize：fitModel 會把模型最長邊縮成 modelSize（anchor 的 local 單位）
+  const cloud = createPigCloud({ getBodyLength: () => settings.modelSize });
+  anchor.add(cloud.object);
+
   const smokeGroup = new THREE.Group();
   smokeGroup.name = 'world_pig_smoke';
   const smokePuffs: SmokePuff[] = [];
@@ -689,6 +695,7 @@ export function createPig({
     if (!model) return;
 
     const roaming = introDone && introGrow >= 0.999;
+    cloud.update(deltaTime, roaming);
     if (!roaming) {
       updateSmoke(deltaTime, false);
       model.scale.setScalar(modelBaseScale);
@@ -768,6 +775,7 @@ export function createPig({
   return {
     object: anchor,
     settings,
+    cloud,
     applySettings,
     setIntroGrow,
     update,

@@ -83,6 +83,49 @@ def build_rock_pile(ctx):
     return data
 
 
+@register("pumpkin_body")
+def build_pumpkin_body(ctx):
+    """南瓜殼：肋狀旋轉體，底略寬、頂略收，對應概念圖雙層南瓜屋主體。"""
+    flutes = max(8, int(ctx.param("flutes", 12)))
+    flute_depth = ctx.param("flute_depth", 0.07)
+    belly = ctx.param("belly", 0.96)
+    taper = ctx.param("taper", 0.88)
+    cap_frac = ctx.param("cap_fraction", 0.08)
+    # 正面寬度用 hw；若用 min(hw, hd) 會在淺深度 bounds 裡把南瓜縮成小球
+    r_base = ctx.hw * belly
+    r_top = r_base * taper
+    seg = max(flutes * 2, ctx.segments(1.0, minimum=flutes * 2))
+    return shapes.fluted_frustum(
+        r_base,
+        r_top,
+        ctx.h,
+        ctx.material,
+        ctx.material,
+        flutes=flutes,
+        flute_depth=flute_depth,
+        rings=max(7, int(ctx.param("rings", 9))),
+        segments=seg,
+        cap_fraction=cap_frac,
+        phase=ctx.rng.random() * math.tau / flutes,
+    )
+
+
+@register("pumpkin_stem")
+def build_pumpkin_stem(ctx):
+    """瓜蒂：略彎的綠色短粗圓柱。"""
+    radius = min(ctx.hw, ctx.hd) * 0.85
+    bend = ctx.param("bend", 0.15)
+    profile = [
+        (0.0, 0.0),
+        (radius, 0.0),
+        (radius * 1.08, ctx.h * 0.35),
+        (radius * 0.72, ctx.h * 0.72),
+        (radius * 0.55 * (1.0 + bend), ctx.h),
+        (0.0, ctx.h),
+    ]
+    return shapes.lathe(profile, ctx.segments(0.6, minimum=6), ctx.material, axis="z")
+
+
 @register("bush")
 def build_bush(ctx):
     """灌木：葉團由下往上、由大到小堆成一叢，左右交錯，填滿 bounds 的高度。"""
