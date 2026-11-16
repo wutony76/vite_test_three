@@ -1396,6 +1396,11 @@ if (pigFolder && pig) {
   pigFolder.add(pig.settings, 'pauseMinSeconds', 0.1, 5, 0.1).name('停下最短 (秒)').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'pauseMaxSeconds', 0.1, 6, 0.1).name('停下最長 (秒)').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'pauseNearDegrees', 0, 10, 0.5).name('算「經過」的距離 (°)').onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'visitChance', 0, 1, 0.05).name('跑去看烤雞機率').onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'visitWatchMinSeconds', 0.5, 15, 0.5).name('看烤雞最短 (秒)').onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'visitWatchMaxSeconds', 0.5, 20, 0.5).name('看烤雞最長 (秒)').onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'visitCooldownSeconds', 0, 120, 1).name('看完多久才會再去 (秒)').onFinishChange(logPigSettings);
+  pigFolder.add({ visit: () => { if (!pig.visitNow()) console.warn('[pig] 篝火關閉、沒有烤雞，或位置去不了'); } }, 'visit').name('現在去看烤雞');
   pigFolder.add(pig.settings, 'smokeEnabled').name('走動冒煙').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'smokeRate', 0, 30, 0.5).name('煙量 (團/秒)').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'smokeSize', 0.2, 3, 0.05).name('煙團大小').onFinishChange(logPigSettings);

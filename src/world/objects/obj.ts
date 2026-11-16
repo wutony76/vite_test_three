@@ -665,6 +665,11 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         camera,
         getObstacleRoots: getPigObstacleRoots,
         getRibbonTopColatitude,
+        // 篝火上有烤雞時，小豬偶爾會跑去看
+        getVisitTarget: () =>
+          campfireRuntime?.settings.enabled && campfireRuntime.settings.chickenEnabled
+            ? campfireRuntime.getNormal()
+            : null,
       });
       ground.add(pigRuntime.object);
     } catch (error) {
@@ -679,6 +684,8 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       apply: pigRuntime.applySettings,
       cloud: pigRuntime.cloud.settings,
       getCloudState: pigRuntime.cloud.getState,
+      visitNow: pigRuntime.visitNow,
+      isVisiting: pigRuntime.isVisiting,
     }
   : null;
   const campfire: WorldCampfire | null = campfireRuntime
@@ -1136,6 +1143,9 @@ export type WorldPig = {
   /** 頭上烏雲的設定（面板即時讀取，不用 apply） */
   cloud: PigCloudSettings;
   getCloudState: () => PigCloudState;
+  /** 立刻跑去篝火看烤雞（測試用） */
+  visitNow: () => boolean;
+  isVisiting: () => boolean;
 };
 
 export type WorldCampfire = {

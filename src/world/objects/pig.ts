@@ -13,7 +13,10 @@ const moveDir = new THREE.Vector3();
 const axis = new THREE.Vector3();
 const stepQuat = new THREE.Quaternion();
 const wobbleScale = new THREE.Vector3(1, 1, 1);
-const boxSize = new THREE.Vector3();
+const obstacleCenter = new THREE.Vector3();
+const obstacleCorner = new THREE.Vector3();
+const groundInverse = new THREE.Matrix4();
+const meshToGround = new THREE.Matrix4();
 const basis = new THREE.Matrix4();
 const placeEast = new THREE.Vector3();
 const placeForward = new THREE.Vector3();
@@ -56,6 +59,13 @@ export type PigSettings = {
   pauseMaxSeconds: number;
   /** 離物件避障邊界多近（度）算「經過」 */
   pauseNearDegrees: number;
+  /** 每次隨機換方向時，決定「跑去篝火看烤雞」的機率（0～1） */
+  visitChance: number;
+  /** 走到篝火旁後，停下來看烤雞幾秒（最短～最長） */
+  visitWatchMinSeconds: number;
+  visitWatchMaxSeconds: number;
+  /** 看完之後至少隔幾秒才會再想去 */
+  visitCooldownSeconds: number;
 };
 
 export const PIG_LAYOUT_DEFAULT: PigSettings = {
@@ -70,7 +80,7 @@ export const PIG_LAYOUT_DEFAULT: PigSettings = {
   roamColatitudeMax: 62,
   wanderSeconds: 3.5,
   waddleStrength: 0.11,
-  obstacleMarginDegrees: 3.5,
+  obstacleMarginDegrees: 1,
   stayInViewHemisphere: false,
   viewHemisphereDotMin: 0.1,
   turnDegreesPerSecond: 140,
@@ -85,6 +95,10 @@ export const PIG_LAYOUT_DEFAULT: PigSettings = {
   pauseMinSeconds: 0.8,
   pauseMaxSeconds: 2,
   pauseNearDegrees: 3,
+  visitChance: 0.2,
+  visitWatchMinSeconds: 3,
+  visitWatchMaxSeconds: 6,
+  visitCooldownSeconds: 15,
 };
 
 /**
@@ -120,6 +134,11 @@ type CreatePigOptions = {
    * 每幀重算，所以在畫面上拖動緞帶後，小豬的活動範圍也會跟著變。
    */
   getRibbonTopColatitude?: () => number | null;
+  /**
+   * 小豬偶爾會想去的地方（綠球座標的地表法線，例如篝火）；null = 目前沒有（篝火關掉、沒烤雞）。
+   * 每次要用時才問，所以篝火被拖到別的位置，小豬會跑去新位置。
+   */
+  getVisitTarget?: () => THREE.Vector3 | null;
 };
 
 /**
@@ -134,6 +153,7 @@ export function createPig({
   layout = PIG_LAYOUT_DEFAULT,
   getObstacleRoots,
   getRibbonTopColatitude,
+  getVisitTarget,
 }: CreatePigOptions) {
   const settings: PigSettings = { ...layout };
 
@@ -166,6 +186,14 @@ export function createPig({
   const lookPoint = new THREE.Vector3();
   /** 實際可跑到的最大離頂端角度（度）：取面板上限與「緞帶上緣 − 身長 − 餘量」較小者 */
   let effectiveColatMax = settings.roamColatitudeMax;
+  /** 正在「前往篝火」：遊走亂數暫停，改成每隔一下重新瞄準目標 */
+  let visiting = false;
+  /** 前往途中最多走幾秒，超過就放棄（例如被房子擋住繞不過去），避免永遠卡在半路 */
+  let visitGiveUp = 0;
+  /** 多久重新瞄準一次：每幀都瞄準的話，避障剛轉開又被拉回來，會一直在障礙物前抖 */
+  let visitAimTimer = 0;
+  let visitCooldown = 0;
+  const visitTarget = new THREE.Vector3();
 
   /**
    * 煙不能掛在 anchor 底下：anchor 會跟著小豬移動，煙就會黏在屁股上一起跑。
@@ -235,6 +263,14 @@ export function createPig({
     return (settings.modelSize * settings.placementScale) / Math.max(groundRadius, 0.2) * 1.15;
   }
 
+  /**
+   * 避障用的小豬「半徑」（球面角度）：約半個身長。
+   * 以前直接用整個身長當半徑，等於小豬胖了一倍，房子之間的縫就鑽不過去。
+   */
+  function pigBodyRadiusRad() {
+    return pigFootprintRad() * 0.55;
+  }
+
   function cameraFacingDot(n: THREE.Vector3) {
     if (!camera) return 1;
     probe2.copy(camera.position).normalize();
@@ -270,11 +306,26 @@ export function createPig({
       // 已經在界外（例如剛把緞帶拖高）：允許「往頂端走」的步伐，不然會被困在醬底下動不了
       if (!from || col >= colatitudeFromNormal(from)) return true;
     }
-    const footprint = pigFootprintRad();
+    const footprint = pigBodyRadiusRad();
     for (const obstacle of obstacleScratch) {
+      if (obstacle === ignoredObstacle) continue;
       if (angularDistance(n, obstacle.normal) < footprint + obstacle.clearanceRad) return true;
     }
     return false;
+  }
+
+  /**
+   * 「往前看」時暫時不把某個障礙算進去（例如正要走去的篝火）。
+   * 只用在探路；真正走下一步時不忽略，所以小豬還是不會撞進篝火裡。
+   */
+  let ignoredObstacle: PigObstacle | null = null;
+  function isPathFreeIgnoring(obstacle: PigObstacle | null, bearingRad: number, lookRad: number) {
+    ignoredObstacle = obstacle;
+    try {
+      return isPathFree(bearingRad, lookRad);
+    } finally {
+      ignoredObstacle = null;
+    }
   }
 
   function rotateAlong(n: THREE.Vector3, tangent: THREE.Vector3, stepRad: number, target = probe) {
@@ -308,22 +359,57 @@ export function createPig({
     return bearingTowardDirection(n, up);
   }
 
+  /**
+   * 物件「貼在地上」佔多大：把每個 mesh 包圍盒的 8 個角投影到物件所在的地表切平面，取離中心最遠的距離。
+   * 以前用整個包圍盒最長邊（連房子的「高度」也算進去），高樓會被當成超大圓，房子之間全被堵死。
+   * 投影掉高度後，只剩真正的佔地範圍，小豬就能從房子之間的縫穿過去。
+   */
+  function groundFootprintRadius(root: THREE.Object3D, center: THREE.Vector3, normal: THREE.Vector3) {
+    let maxTangent = 0;
+    root.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.visible || !mesh.geometry) return;
+      const geometry = mesh.geometry;
+      if (!geometry.boundingBox) geometry.computeBoundingBox();
+      const bb = geometry.boundingBox;
+      if (!bb || bb.isEmpty()) return;
+      meshToGround.multiplyMatrices(groundInverse, mesh.matrixWorld);
+      for (let k = 0; k < 8; k++) {
+        obstacleCorner
+          .set(k & 1 ? bb.max.x : bb.min.x, k & 2 ? bb.max.y : bb.min.y, k & 4 ? bb.max.z : bb.min.z)
+          .applyMatrix4(meshToGround)
+          .sub(center);
+        // 去掉沿法線（高度）的分量，只留貼地面的水平距離
+        obstacleCorner.addScaledVector(normal, -obstacleCorner.dot(normal));
+        maxTangent = Math.max(maxTangent, obstacleCorner.length());
+      }
+    });
+    return maxTangent;
+  }
+
   function refreshObstacles() {
     refreshRoamLimit();
     obstacleScratch.length = 0;
     const margin = THREE.MathUtils.degToRad(settings.obstacleMarginDegrees);
     const roots = getObstacleRoots();
+    // 全部換到「綠球座標」算：小豬的 surfaceNormal 就是這個座標系，球如果有位移也不會對不上
+    const ground = anchor.parent;
+    if (ground) {
+      ground.updateMatrixWorld(true);
+      groundInverse.copy(ground.matrixWorld).invert();
+    } else {
+      groundInverse.identity();
+    }
     for (const root of roots) {
       if (!root || root === anchor) continue;
       root.updateMatrixWorld(true);
-      root.getWorldPosition(probe);
-      if (probe.lengthSq() < 0.04) continue;
-      probe.normalize();
-      const box = new THREE.Box3().setFromObject(root);
-      box.getSize(boxSize);
-      const extent = Math.max(boxSize.x, boxSize.y, boxSize.z) * 0.55;
-      const clearance = Math.atan(extent / Math.max(groundRadius, 0.2)) + margin;
-      obstacleScratch.push({ root, normal: probe.clone(), clearanceRad: clearance });
+      root.getWorldPosition(obstacleCenter).applyMatrix4(groundInverse);
+      const centerDist = obstacleCenter.length();
+      if (centerDist < 0.2) continue;
+      const normal = obstacleCenter.clone().divideScalar(centerDist);
+      const radius = groundFootprintRadius(root, obstacleCenter, normal);
+      const clearance = Math.atan(radius / centerDist) + margin;
+      obstacleScratch.push({ root, normal, clearanceRad: clearance });
     }
   }
 
@@ -622,7 +708,9 @@ export function createPig({
       syncBearingFromFacing();
       bearing += pendingTurn;
       // 目前想去的方向前面被擋 → 換一個走得通的方向（只有被擋才換，避免每幀亂抖）
-      if (!isPathFree(bearing, lookRad)) {
+      // 快走到篝火時：前面只被篝火本身擋住不算擋（不然永遠走不到），被其他東西擋住才繞
+      const ignore = isApproachingVisitTarget() ? visitTargetObstacle() : null;
+      if (!isPathFreeIgnoring(ignore, bearing, lookRad)) {
         const free = findFreeBearing(lookRad);
         if (free !== null) bearing = free;
       }
@@ -636,9 +724,99 @@ export function createPig({
     return false;
   }
 
+  /** 障礙清單裡代表篝火的那一個（離目標最近、2° 以內）；沒有就 null */
+  function visitTargetObstacle() {
+    let best: PigObstacle | null = null;
+    let bestDist = THREE.MathUtils.degToRad(2);
+    for (const obstacle of obstacleScratch) {
+      const d = angularDistance(visitTarget, obstacle.normal);
+      if (d < bestDist) {
+        bestDist = d;
+        best = obstacle;
+      }
+    }
+    return best;
+  }
+
+  /** 篝火的避障半徑；找不到對應障礙就給 6° */
+  function visitTargetClearance() {
+    return visitTargetObstacle()?.clearanceRad ?? THREE.MathUtils.degToRad(6);
+  }
+
+  /** 離篝火邊界還有幾度（< 0 代表已經貼在旁邊） */
+  function visitTargetGap() {
+    return angularDistance(surfaceNormal, visitTarget) - pigBodyRadiusRad() - visitTargetClearance();
+  }
+
+  function isApproachingVisitTarget() {
+    if (!visiting) return false;
+    return visitTargetGap() < THREE.MathUtils.degToRad(settings.lookAheadDegrees + 2);
+  }
+
+  /** 換方向的時機到了：擲骰子決定要不要跑去看烤雞 */
+  function maybeStartVisit() {
+    if (visiting || visitCooldown > 0 || Math.random() >= settings.visitChance) return false;
+    return startVisit();
+  }
+
+  function startVisit() {
+    const target = getVisitTarget?.();
+    if (!target) return false;
+    visitTarget.copy(target).normalize();
+    // 篝火被拖到醬底下或頂端禁區：去不了就別去
+    const col = colatitudeFromNormal(visitTarget);
+    if (col < settings.roamColatitudeMin || col > effectiveColatMax + 8) return false;
+    visiting = true;
+    // 依距離給時間：直線距離所需秒數 ×3，留餘裕繞過房子
+    const distanceDeg = THREE.MathUtils.radToDeg(angularDistance(surfaceNormal, visitTarget));
+    visitGiveUp = (distanceDeg / Math.max(settings.roamSpeedDegrees, 0.5)) * 3 + 8;
+    visitAimTimer = 0;
+    pauseRemaining = 0;
+    return true;
+  }
+
+  /** 前往途中：每隔一下重新瞄準；走到旁邊就停下來看 */
+  function updateVisit(deltaTime: number) {
+    const target = getVisitTarget?.();
+    if (!target) {
+      visiting = false;
+      return;
+    }
+    visitTarget.copy(target).normalize();
+    visitGiveUp -= deltaTime;
+    const nearRad = THREE.MathUtils.degToRad(Math.max(settings.pauseNearDegrees, 1.5));
+    if (visitTargetGap() < nearRad) {
+      visiting = false;
+      const min = Math.min(settings.visitWatchMinSeconds, settings.visitWatchMaxSeconds);
+      const max = Math.max(settings.visitWatchMinSeconds, settings.visitWatchMaxSeconds);
+      pauseRemaining = min + Math.random() * (max - min);
+      pauseCooldown = pauseRemaining + 3;
+      visitCooldown = pauseRemaining + settings.visitCooldownSeconds;
+      pauseLookAt.copy(visitTarget);
+      return;
+    }
+    if (visitGiveUp <= 0) {
+      visiting = false;
+      visitCooldown = settings.visitCooldownSeconds * 0.5;
+      return;
+    }
+    visitAimTimer -= deltaTime;
+    // 遠的時候每 0.6 秒瞄一次，讓避障有時間繞開房子；
+    // 接近時只要「直走過去只會碰到篝火」就每幀瞄準，貼得更準
+    const aim = bearingTowardDirection(surfaceNormal, visitTarget);
+    const lookRad = THREE.MathUtils.degToRad(settings.lookAheadDegrees);
+    const directShot =
+      isApproachingVisitTarget() && isPathFreeIgnoring(visitTargetObstacle(), aim, lookRad);
+    if (visitAimTimer <= 0 || directShot) {
+      visitAimTimer = 0.6;
+      bearing = aim;
+    }
+    wanderTimer = settings.wanderSeconds;
+  }
+
   /** 剛走到某個物件旁邊時擲骰子，中了就停下來轉頭看它一下 */
   function maybePauseNearObstacles() {
-    const footprint = pigFootprintRad();
+    const footprint = pigBodyRadiusRad();
     const near = THREE.MathUtils.degToRad(settings.pauseNearDegrees);
     const nowNear = new Set<THREE.Object3D>();
     let entered: PigObstacle | null = null;
@@ -649,7 +827,8 @@ export function createPig({
       }
     }
     nearObstacles = nowNear;
-    if (!entered || pauseCooldown > 0 || Math.random() >= settings.pauseChance) return;
+    // 前往篝火途中不被路邊的東西分心
+    if (!entered || visiting || pauseCooldown > 0 || Math.random() >= settings.pauseChance) return;
     const min = Math.min(settings.pauseMinSeconds, settings.pauseMaxSeconds);
     const max = Math.max(settings.pauseMinSeconds, settings.pauseMaxSeconds);
     pauseRemaining = min + Math.random() * (max - min);
@@ -707,6 +886,7 @@ export function createPig({
 
     refreshObstacles();
     pauseCooldown = Math.max(0, pauseCooldown - deltaTime);
+    visitCooldown = Math.max(0, visitCooldown - deltaTime);
 
     let movedThisFrame = false;
     if (pauseRemaining > 0) {
@@ -721,8 +901,10 @@ export function createPig({
         wanderTimer = settings.wanderSeconds * (0.55 + Math.random() * 0.9);
       }
     } else {
+      if (visiting) updateVisit(deltaTime);
       wanderTimer -= deltaTime;
-      if (wanderTimer <= 0) {
+      if (wanderTimer <= 0 && !visiting && maybeStartVisit()) updateVisit(0);
+      if (wanderTimer <= 0 && !visiting) {
         wanderTimer = settings.wanderSeconds * (0.55 + Math.random() * 0.9);
         bearing = settings.stayInViewHemisphere && camera ?
           bearingTowardCamera(surfaceNormal) + (Math.random() - 0.5) * 1.1 :
@@ -780,6 +962,12 @@ export function createPig({
     setIntroGrow,
     update,
     getNormal: () => surfaceNormal.clone(),
+    /** 立刻出發去篝火（面板測試用）；目標不存在或去不了回傳 false */
+    visitNow: () => {
+      visitCooldown = 0;
+      return startVisit();
+    },
+    isVisiting: () => visiting,
   };
 }
 
@@ -813,6 +1001,10 @@ export function formatPigSettingsForPaste(settings: PigSettings) {
     `  pauseMinSeconds: ${settings.pauseMinSeconds.toFixed(1)},\n` +
     `  pauseMaxSeconds: ${settings.pauseMaxSeconds.toFixed(1)},\n` +
     `  pauseNearDegrees: ${settings.pauseNearDegrees.toFixed(1)},\n` +
+    `  visitChance: ${settings.visitChance.toFixed(2)},\n` +
+    `  visitWatchMinSeconds: ${settings.visitWatchMinSeconds.toFixed(1)},\n` +
+    `  visitWatchMaxSeconds: ${settings.visitWatchMaxSeconds.toFixed(1)},\n` +
+    `  visitCooldownSeconds: ${settings.visitCooldownSeconds.toFixed(1)},\n` +
     `};`
   );
 }
