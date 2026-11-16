@@ -416,9 +416,8 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   // BG
   const bgRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   Object.assign(bgRoom.settings, {
-    // 離頂端拉近一點，才會坐在看得見的坡上，不會滑到地平線外面
-    angleFromTopDegrees: 28,
-    azimuthDegrees: -84,
+    angleFromTopDegrees: 31,
+    azimuthDegrees: -77,
     spinDegrees: 84,
     sink: 0.02,
     scale: 0.14,
