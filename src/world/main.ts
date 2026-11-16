@@ -50,6 +50,8 @@ import { enableCameraPlaneDrag } from './debug/cameraPlaneDrag';
 import { createStyleGrade, formatStyleGradeSettingsForPaste } from './styleGrade';
 import { createSoftLayerPass, formatSoftLayerSettingsForPaste } from './softLayerPass';
 import { FLOATING_ISLAND_LAYER } from './objects/floatingIsland';
+import { GROUND_PATH_MODES, formatGroundDetailSettingsForPaste, formatGroundPathsForPaste } from './objects/groundDetail';
+import { enableGroundPathEditor } from './debug/groundPathEditor';
 import { flyCameraTo, isCameraFlying, type CameraPose } from './cameraFlight';
 import { isHouseTransitionPlaying, playHouseTransition, playSceneLoad, transitionSettings } from './houseTransition';
 
@@ -244,6 +246,7 @@ const {
   pig,
   campfire,
   floatingIsland,
+  groundDetail,
 } = createObjs({ envMap, camera });
 
 /** 一次關掉整類食物（仍保留佈局，取消勾選即再顯示） */
@@ -1467,6 +1470,134 @@ setInterval(() => styleGrade.scan(), 500);
   gradeFolder.add({ log }, 'log').name('印出設定 (console)');
 }
 
+/** 小徑編輯器（編輯中時，點綠球是「加路點」，不應該順便取消房子的選取） */
+let groundPathEditorState: { editing: boolean } | null = null;
+
+// 綠球細節：色彩斑塊、番茄醬陰影帶、草叢、泥土小徑、小道具
+if (groundDetail) {
+  const detailFolder = gui.addFolder('綠球細節');
+  const s = groundDetail.settings;
+  const apply = () => groundDetail.apply();
+  const log = () => console.log(formatGroundDetailSettingsForPaste(s));
+  // 數量、寬度這類會影響「撒在哪」的參數，改完要重新撒
+  const rescatter = () => {
+    groundDetail.rescatter();
+    log();
+  };
+
+  const patch = detailFolder.addFolder('1. 色彩斑塊與漸層');
+  patch.add(s, 'patchEnabled').name('啟用').onChange(apply).onFinishChange(log);
+  patch.add(s, 'patchAmount', 0, 1, 0.01).name('斑塊強度').onChange(apply).onFinishChange(log);
+  patch.add(s, 'patchScale', 0.5, 10, 0.1).name('斑塊細碎度').onChange(apply).onFinishChange(log);
+  patch.addColor(s, 'patchLight').name('亮斑顏色').onChange(apply).onFinishChange(log);
+  patch.addColor(s, 'patchDark').name('暗斑顏色').onChange(apply).onFinishChange(log);
+  patch.add(s, 'gradientAmount', 0, 1, 0.01).name('上下漸層強度').onChange(apply).onFinishChange(log);
+  patch.addColor(s, 'topTint').name('頂端色').onChange(apply).onFinishChange(log);
+  patch.addColor(s, 'bottomTint').name('下緣色').onChange(apply).onFinishChange(log);
+
+  const ao = detailFolder.addFolder('2. 番茄醬陰影帶');
+  ao.add(s, 'aoEnabled').name('啟用').onChange(apply).onFinishChange(log);
+  ao.add(s, 'aoAmount', 0, 1, 0.01).name('深淺').onChange(apply).onFinishChange(log);
+  ao.add(s, 'aoWidth', 0.005, 0.3, 0.005).name('寬度').onChange(apply).onFinishChange(log);
+  ao.addColor(s, 'aoColor').name('陰影色').onChange(apply).onFinishChange(log);
+
+  const tuft = detailFolder.addFolder('3. 草叢');
+  tuft.add(s, 'tuftsEnabled').name('顯示').onChange(apply).onFinishChange(log);
+  tuft.add(s, 'tuftCount', 0, 6000, 50).name('數量').onFinishChange(rescatter);
+  tuft.add(s, 'tuftHeight', 0.3, 2.5, 0.05).name('高度').onChange(apply).onFinishChange(log);
+  tuft.add(s, 'windStrength', 0, 4, 0.05).name('風力').onChange(apply).onFinishChange(log);
+  tuft.add(s, 'windSpeed', 0, 4, 0.05).name('風速').onChange(apply).onFinishChange(log);
+
+  const path = detailFolder.addFolder('4. 泥土小徑');
+  path.add(s, 'pathEnabled').name('顯示').onChange(apply).onFinishChange(log);
+  path.add(s, 'pathWidthDegrees', 0.3, 4, 0.05).name('寬度 (°)').onChange(apply).onFinishChange(rescatter);
+  path.add(s, 'pathCurve', 0, 3, 0.05).name('彎曲程度').onFinishChange(rescatter);
+  path.addColor(s, 'pathColor').name('土色').onChange(apply).onFinishChange(log);
+  path.addColor(s, 'pathEdgeColor').name('路邊色').onChange(apply).onFinishChange(log);
+
+  // 自訂小徑：在綠球上直接點、拖、右鍵刪
+  // 要在 enableSurfaceDrag 之前註冊：都用 capture 監聽按下，先註冊的先收到（拖路點時才不會拖到房子）
+  const logPaths = () =>
+    console.log(formatGroundPathsForPaste(groundDetail.customPaths.map((p) => p.map(groundDetail.anglesFromNormal))));
+  const pathEditor = groundSurface
+    ? enableGroundPathEditor({
+        ground,
+        ballMesh: groundSurface,
+        groundRadius,
+        camera,
+        domElement: renderer.domElement,
+        controls,
+        detail: groundDetail,
+        onChange: logPaths,
+      })
+    : null;
+  groundPathEditorState = pathEditor?.state ?? null;
+  const pathEdit = {
+    editing: false,
+    get active() {
+      if (!pathEditor) return '-';
+      const count = groundDetail.customPaths.length;
+      return count === 0 ? '（還沒有路）' : `第 ${pathEditor.state.activePath + 1} 條／共 ${count} 條`;
+    },
+  };
+  const refreshPathPanel = () => path.controllersRecursive().forEach((c) => c.updateDisplay());
+  path
+    .add(s, 'pathMode', GROUND_PATH_MODES)
+    .name('路線來源 (auto/custom)')
+    .onChange(() => {
+      groundDetail.refreshPaths();
+      groundDetail.rescatter();
+    })
+    .onFinishChange(log);
+  if (pathEditor) {
+    path
+      .add(pathEdit, 'editing')
+      .name('編輯小徑（點綠球加點／拖點／右鍵刪點）')
+      .onChange((on: boolean) => {
+        if (on && s.pathMode !== 'custom') {
+          // 第一次編輯：沒有自訂路線就先從目前的自動路線複製，直接在上面修改
+          if (groundDetail.customPaths.length === 0) groundDetail.copyAutoToCustom();
+          s.pathMode = 'custom';
+          groundDetail.refreshPaths();
+        }
+        groundDetail.forcePathVisible(on);
+        pathEditor.setEditing(on);
+        refreshPathPanel();
+      });
+    path.add(pathEdit, 'active').name('目前編輯').disable().listen();
+    path.add({ add: () => { pathEditor.addPath(); refreshPathPanel(); } }, 'add').name('新增一條路（接著點綠球）');
+    path.add({ del: () => { pathEditor.deleteActivePath(); refreshPathPanel(); } }, 'del').name('刪除目前這條路');
+    path
+      .add(
+        {
+          copy: () => {
+            groundDetail.copyAutoToCustom();
+            s.pathMode = 'custom';
+            groundDetail.refreshPaths();
+            pathEditor.rebuildHandles();
+            groundDetail.rescatter();
+            refreshPathPanel();
+            logPaths();
+          },
+        },
+        'copy',
+      )
+      .name('從自動路線複製（覆蓋自訂）');
+    path.add({ clear: () => { pathEditor.clearAll(); refreshPathPanel(); } }, 'clear').name('清除全部自訂路');
+    path.add({ logPaths }, 'logPaths').name('印出小徑佈局 (console)');
+  }
+
+  const props = detailFolder.addFolder('5. 小道具');
+  props.add(s, 'propsEnabled').name('顯示').onChange(apply).onFinishChange(log);
+  props.add(s, 'rockCount', 0, 200, 1).name('小石頭數量').onFinishChange(rescatter);
+  props.add(s, 'mushroomCount', 0, 200, 1).name('蘑菇數量').onFinishChange(rescatter);
+  props.add(s, 'bushCount', 0, 200, 1).name('小樹叢數量').onFinishChange(rescatter);
+  props.add(s, 'propScale', 0.3, 3, 0.05).name('大小').onFinishChange(rescatter);
+
+  detailFolder.add({ rescatter }, 'rescatter').name('重新撒（房子移動後用）');
+  detailFolder.add({ log }, 'log').name('印出設定 (console)');
+}
+
 // 浮空小星球的柔邊圖層：在天空背景之後、主場景之前畫（見 render()）
 const islandSoftPass = createSoftLayerPass({ renderer, scene, camera, layer: FLOATING_ISLAND_LAYER });
 let lastRenderTime: number | null = null;
@@ -2219,7 +2350,11 @@ if (HOUSE_DRAG_ENABLED) {
       const fryStickEntry = frenchFrySticks.find((item) => item.object === target.object);
       if (fryStickEntry) bindFryStickPanel(fryStickEntry);
     },
-    onBackgroundClick: clearHouseSelection,
+    // 編輯小徑時點綠球是在加路點，不要把「進入」按鈕跟著藏起來
+    onBackgroundClick: () => {
+      if (groundPathEditorState?.editing) return;
+      clearHouseSelection();
+    },
   });
 }
 

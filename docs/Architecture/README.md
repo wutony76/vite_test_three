@@ -112,8 +112,8 @@ vite_test_three/
 │     ├─ main.ts              綠球場景進入點：renderer、鏡頭、燈光、lil-gui 面板、拖曳、每 0.5 秒 styleGrade.scan()
 │     ├─ styleGrade.ts        畫面風格統一：onBeforeCompile 注入全場色調（陰影偏淡紫、整體往粉色）＋寫實貼圖降對比，共用 uniform 即時調整
 │     ├─ softLayerPass.ts     柔邊圖層：浮空小星球（layer 2）單獨畫到 RenderTarget → 兩趟高斯模糊 → 輪廓用模糊版合成回畫面（天空背景之後、主場景之前）
-│     ├─ debug/               surfaceDrag（貼球面拖曳）、cameraPlaneDrag（鏡頭座標拖曳）
-│     └─ objects/             obj.ts 組裝；ketchup、house、pig／pigCloud、campfire、floatingIsland、各種食物
+│     ├─ debug/               surfaceDrag（貼球面拖曳）、cameraPlaneDrag（鏡頭座標拖曳）、groundPathEditor（在綠球上編輯小徑路點）
+│     └─ objects/             obj.ts 組裝；ketchup、house、pig／pigCloud、campfire、floatingIsland、groundDetail（綠球斑塊／陰影帶／草叢／小徑／小道具；自訂小徑存在 groundPathsLayout.ts）、各種食物
 ├─ openspec/
 │  ├─ project.md              專案規範（改程式前必讀）
 │  ├─ config.yaml             OpenSpec CLI 設定（schema: spec-driven）

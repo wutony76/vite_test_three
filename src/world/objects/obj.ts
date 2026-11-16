@@ -49,6 +49,7 @@ import { createPig, type PigSettings } from './pig';
 import type { PigCloudSettings, PigCloudState } from './pigCloud';
 import { createCampfire, type CampfireSettings } from './campfire';
 import { createFloatingIsland } from './floatingIsland';
+import { createGroundDetail, type GroundObstacle } from './groundDetail';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -682,6 +683,88 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       console.error('[pig] 建立失敗，已略過（world 其餘場景照常）', error);
     }
   }
+  // 綠球表面細節：色彩斑塊、番茄醬陰影帶、草叢、泥土小徑、小道具
+  const groundInverseScratch = new THREE.Matrix4();
+  const footprintCenter = new THREE.Vector3();
+  const footprintCorner = new THREE.Vector3();
+  const footprintMatrix = new THREE.Matrix4();
+  /** 物件「貼在地上」的投影半徑（球面角度）：把每個 mesh 包圍盒的角投影到地表切平面（同小豬避障的算法） */
+  function measureGroundFootprint(root: THREE.Object3D): GroundObstacle | null {
+    root.updateMatrixWorld(true);
+    root.getWorldPosition(footprintCenter).applyMatrix4(groundInverseScratch);
+    const centerDist = footprintCenter.length();
+    if (centerDist < 0.2) return null;
+    const normal = footprintCenter.clone().divideScalar(centerDist);
+    let maxTangent = 0;
+    root.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      const bb = mesh.geometry.boundingBox;
+      if (!bb || bb.isEmpty()) return;
+      footprintMatrix.multiplyMatrices(groundInverseScratch, mesh.matrixWorld);
+      for (let k = 0; k < 8; k++) {
+        footprintCorner
+          .set(k & 1 ? bb.max.x : bb.min.x, k & 2 ? bb.max.y : bb.min.y, k & 4 ? bb.max.z : bb.min.z)
+          .applyMatrix4(footprintMatrix)
+          .sub(footprintCenter);
+        footprintCorner.addScaledVector(normal, -footprintCorner.dot(normal));
+        maxTangent = Math.max(maxTangent, footprintCorner.length());
+      }
+    });
+    return { normal, radiusRad: Math.atan(maxTangent / centerDist) };
+  }
+  const groundToRingScratch = new THREE.Matrix4();
+  const groundDetail =
+    groundSurface && puddingAxes
+      ? createGroundDetail({
+          ballMesh: groundSurface,
+          groundRadius: GROUND_RADIUS,
+          up: puddingAxes.up,
+          front: puddingAxes.front,
+          // 小路串起五棟房子＋篝火
+          getPathNodes: () => {
+            ground.updateMatrixWorld(true);
+            groundInverseScratch.copy(ground.matrixWorld).invert();
+            const nodes = introHouses.map((house) =>
+              house.object.getWorldPosition(new THREE.Vector3()).applyMatrix4(groundInverseScratch).normalize(),
+            );
+            if (campfireRuntime?.settings.enabled) nodes.push(campfireRuntime.getNormal());
+            return nodes;
+          },
+          // 撒草、道具要避開的：小豬的障礙清單（房子、食物、篝火）；篝火再加上烤架的範圍
+          getObstacles: () => {
+            ground.updateMatrixWorld(true);
+            groundInverseScratch.copy(ground.matrixWorld).invert();
+            const list: GroundObstacle[] = [];
+            for (const root of getPigObstacleRoots()) {
+              const footprint = measureGroundFootprint(root);
+              if (footprint) list.push(footprint);
+            }
+            if (campfireRuntime?.settings.enabled) {
+              const s = campfireRuntime.settings;
+              list.push({
+                normal: campfireRuntime.getNormal(),
+                radiusRad: Math.atan(s.size * (Math.max(s.rackHalfWidth, 0.5) + 0.2)),
+              });
+            }
+            return list;
+          },
+          getRibbon: () => {
+            ground.updateMatrixWorld(true);
+            ketchup.ringObject.updateMatrixWorld(true);
+            groundToRingScratch.copy(ketchup.ringObject.matrixWorld).invert().multiply(ground.matrixWorld);
+            return {
+              groundToRing: groundToRingScratch,
+              radius: ketchup.ringSettings.radius,
+              tube: KETCHUP_TUBE_OUTER_RADIUS,
+            };
+          },
+          getRibbonTopColatitude,
+        })
+      : null;
+  if (groundDetail) ground.add(groundDetail.object);
+
   const pig: WorldPig | null = pigRuntime ?
     {
       label: '小豬',
@@ -899,6 +982,8 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     const lastHouseIndex = Math.max(0, introHouses.length - 1);
     const housesIntroEnd =
       houseStart + lastHouseIndex * introSettings.houseStagger + introSettings.houseSeconds;
+    // 綠球細節：房子都長完才撒草、道具，並讓它們長出來
+    groundDetail?.update(deltaTime, introDone || introElapsed >= housesIntroEnd);
 
     grilledCornEntries.forEach(({ runtime }, index) => {
       const cornStart = housesIntroEnd + index * 0.1;
@@ -1087,6 +1172,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     removeFrenchFryStick,
     pig,
     campfire,
+    groundDetail,
     floatingIsland: { object: floatingIsland.object, settings: floatingIsland.settings, apply: floatingIsland.applySettings },
     houses: [
       exposeHouse('mainHall', mainHall),
