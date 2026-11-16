@@ -47,6 +47,9 @@ import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { enableViewPlaneDrag } from './debug/viewPlaneDrag';
 import { enableSurfaceDrag } from './debug/surfaceDrag';
 import { enableCameraPlaneDrag } from './debug/cameraPlaneDrag';
+import { createStyleGrade, formatStyleGradeSettingsForPaste } from './styleGrade';
+import { createSoftLayerPass, formatSoftLayerSettingsForPaste } from './softLayerPass';
+import { FLOATING_ISLAND_LAYER } from './objects/floatingIsland';
 import { flyCameraTo, isCameraFlying, type CameraPose } from './cameraFlight';
 import { isHouseTransitionPlaying, playHouseTransition, playSceneLoad, transitionSettings } from './houseTransition';
 
@@ -1439,6 +1442,35 @@ if (pigFolder && pig) {
   pigFolder.open();
 }
 
+// 畫面風格統一：全場色調統一（陰影偏淡紫、整體往粉色靠）＋寫實貼圖降對比
+// 模型是陸續載入的，每 0.5 秒掃一次新材質；已處理過的不會重複處理
+const styleGrade = createStyleGrade({ root: scene });
+setInterval(() => styleGrade.scan(), 500);
+{
+  const gradeFolder = gui.addFolder('畫面風格統一');
+  const s = styleGrade.settings;
+  const apply = () => styleGrade.apply();
+  const log = () => console.log(formatStyleGradeSettingsForPaste(s));
+  const status = { text: '' };
+  gradeFolder.add(s, 'enabled').name('啟用（取消 = 看原貌）').onChange(apply).onFinishChange(log);
+  gradeFolder.add(s, 'tintAmount', 0, 0.5, 0.005).name('整體色調強度').onChange(apply).onFinishChange(log);
+  gradeFolder.addColor(s, 'tintColor').name('整體色調顏色').onChange(apply).onFinishChange(log);
+  gradeFolder.add(s, 'shadowLift', 0, 0.6, 0.005).name('陰影抬亮').onChange(apply).onFinishChange(log);
+  gradeFolder.addColor(s, 'shadowColor').name('陰影顏色').onChange(apply).onFinishChange(log);
+  gradeFolder.add(s, 'textureSaturation', 0, 1.5, 0.01).name('寫實貼圖飽和度').onChange(apply).onFinishChange(log);
+  gradeFolder.add(s, 'textureContrast', 0, 1.5, 0.01).name('寫實貼圖對比').onChange(apply).onFinishChange(log);
+  gradeFolder.add(s, 'texturePivot', 0, 1, 0.01).name('降對比中間亮度').onChange(apply).onFinishChange(log);
+  gradeFolder.add(status, 'text').name('已調色材質').disable().listen();
+  setInterval(() => {
+    status.text = `${styleGrade.stats.graded}（寫實貼圖 ${styleGrade.stats.softened}）`;
+  }, 1000);
+  gradeFolder.add({ log }, 'log').name('印出設定 (console)');
+}
+
+// 浮空小星球的柔邊圖層：在天空背景之後、主場景之前畫（見 render()）
+const islandSoftPass = createSoftLayerPass({ renderer, scene, camera, layer: FLOATING_ISLAND_LAYER });
+let lastRenderTime: number | null = null;
+
 // 浮空小星球（右後方天空，位置跟著鏡頭）
 {
   const islandFolder = gui.addFolder('浮空小星球');
@@ -1461,6 +1493,14 @@ if (pigFolder && pig) {
   islandFolder.add(s, 'mistSize', 0.2, 3, 0.05).name('霧氣大小').onFinishChange(log);
   islandFolder.add(s, 'mistSpeed', 0, 4, 0.05).name('霧氣飄動速度').onFinishChange(log);
   islandFolder.add({ log }, 'log').name('印出設定 (console)');
+
+  // 邊緣高斯模糊：島單獨畫成一張圖層、模糊輪廓後再貼回畫面
+  const blurFolder = islandFolder.addFolder('邊緣高斯模糊');
+  const b = islandSoftPass.settings;
+  const logBlur = () => console.log(formatSoftLayerSettingsForPaste(b));
+  blurFolder.add(b, 'enabled').name('啟用').onFinishChange(logBlur);
+  blurFolder.add(b, 'blurRadius', 0, 8, 0.1).name('模糊半徑').onFinishChange(logBlur);
+  blurFolder.add(b, 'wholeBlur', 0, 1, 0.01).name('整體也模糊（0 = 只糊邊緣）').onFinishChange(logBlur);
 
   // 直接在畫面上按住小星球拖曳，就能移動它的位置（面板的左右／上下會同步更新）
   // 要在 enableSurfaceDrag 之前註冊：兩個都用 capture 監聽按下，先註冊的先收到
@@ -2268,6 +2308,10 @@ function render(time: number) {
   // autoClear 關掉後要自己在每幀開頭清一次，否則上一幀的殘影會疊上來
   renderer.clear();
   renderer.render(backgroundScene, backgroundCamera);
+  // 浮空小星球：單獨畫、邊緣高斯模糊後貼上，當作天空背景的一部分（綠球、房子會蓋在它前面）
+  const renderDelta = lastRenderTime === null ? 0 : (time - lastRenderTime) * 0.001;
+  lastRenderTime = time;
+  islandSoftPass.render(renderDelta);
   // 背景不寫深度，但仍清一次深度緩衝，確保主場景物件不會被背景擋住
   renderer.clearDepth();
   renderer.render(scene, camera);
@@ -2276,13 +2320,17 @@ renderer.setAnimationLoop(render);
 // 蓋板後先等 glb、分幀掛載、著色器預熱，再旋開，避免重整時畫面頓一下
 async function warmSceneShaders() {
   const compileMs = 10_000;
+  // 浮空小星球在自己的 layer（主鏡頭平常看不到），預熱時要把那一層也打開，
+  // 不然它的 shader 會拖到第一次畫的時候才編譯，畫面會卡一下
+  islandSoftPass.prepareForCompile();
+  camera.layers.enable(FLOATING_ISLAND_LAYER);
   const work = (async () => {
     if (typeof renderer.compileAsync === 'function') {
       await renderer.compileAsync(scene, camera);
       return;
     }
     renderer.compile(scene, camera);
-  })();
+  })().finally(() => camera.layers.disable(FLOATING_ISLAND_LAYER));
   await Promise.race([
     work,
     new Promise<void>((_, reject) => {

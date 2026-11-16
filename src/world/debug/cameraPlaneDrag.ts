@@ -28,6 +28,8 @@ export function enableCameraPlaneDrag({
   onDragEnd,
 }: CameraPlaneDragOptions) {
   const raycaster = new THREE.Raycaster();
+  // 物件可能放在別的 layer（例如浮空小星球在 layer 2）；射線預設只打 layer 0，全部打開才點得到
+  raycaster.layers.enableAll();
   const pointer = new THREE.Vector2();
   let active = false;
   let lastX = 0;

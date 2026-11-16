@@ -79,6 +79,11 @@ const COLOR = {
   lamp: 0xffd36b,
 };
 
+/**
+ * 浮空小星球單獨放在這一層：主畫面（layer 0）不畫它，改由 softLayerPass 另外畫、做邊緣高斯模糊後再貼回畫面。
+ */
+export const FLOATING_ISLAND_LAYER = 2;
+
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 const scratchMatrix = new THREE.Matrix4();
@@ -713,6 +718,8 @@ export function createFloatingIsland({ camera, settings: initial = FLOATING_ISLA
   applyHaze();
   applyPlacement();
   updateMist(0);
+  // 整座島（含霧）搬到自己的 layer；主鏡頭只看 layer 0，所以主畫面不會再畫一次銳利版
+  anchor.traverse((child) => child.layers.set(FLOATING_ISLAND_LAYER));
 
   return {
     object: anchor,

@@ -97,17 +97,23 @@ vite_test_three/
 │  │  ├─ main.ts              段落設定（光源權重、主燈、偏移、Bloom）、捲動混合、指標、點擊換色
 │  │  ├─ LightStage.ts        雕塑、五種光源與可見燈具（燈泡、光束 Shader、發光面板、霓虹環、追逐燈）
 │  │  └─ style.scss           沿用 web 版型，主色改暖色
-│  └─ market/
-│     ├─ main.ts              狀態、燈光控制台、情境預設、點擊攤位
-│     ├─ Stage.ts             renderer、Bloom、controls；RectAreaLightUniformsLib.init()
-│     ├─ Stall.ts / stalls.ts 攤位建模與資料（霓虹、燈箱、燈條、工作燈、道具）
-│     ├─ neon.ts / neonIcons.ts  霓虹燈管（核心 + 外暈）、點亮閃爍 PowerSwitch、圖示筆畫
-│     ├─ LedStrip.ts          燈條 Shader（5 種模式、LED 顆粒）+ RectAreaLight
-│     ├─ StringLights.ts      街道串燈（InstancedMesh + instanceColor）
-│     ├─ Gate.ts              牌樓跑馬燈（貼圖 offset 捲動）+ 追逐燈泡
-│     ├─ Crowd.ts             人潮（InstancedMesh）
-│     ├─ Street.ts            水泥地面、大樓、熱氣
-│     └─ textures.ts / ambience.ts / style.scss
+│  ├─ market/
+│  │  ├─ main.ts              狀態、燈光控制台、情境預設、點擊攤位
+│  │  ├─ Stage.ts             renderer、Bloom、controls；RectAreaLightUniformsLib.init()
+│  │  ├─ Stall.ts / stalls.ts 攤位建模與資料（霓虹、燈箱、燈條、工作燈、道具）
+│  │  ├─ neon.ts / neonIcons.ts  霓虹燈管（核心 + 外暈）、點亮閃爍 PowerSwitch、圖示筆畫
+│  │  ├─ LedStrip.ts          燈條 Shader（5 種模式、LED 顆粒）+ RectAreaLight
+│  │  ├─ StringLights.ts      街道串燈（InstancedMesh + instanceColor）
+│  │  ├─ Gate.ts              牌樓跑馬燈（貼圖 offset 捲動）+ 追逐燈泡
+│  │  ├─ Crowd.ts             人潮（InstancedMesh）
+│  │  ├─ Street.ts            水泥地面、大樓、熱氣
+│  │  └─ textures.ts / ambience.ts / style.scss
+│  └─ world/
+│     ├─ main.ts              綠球場景進入點：renderer、鏡頭、燈光、lil-gui 面板、拖曳、每 0.5 秒 styleGrade.scan()
+│     ├─ styleGrade.ts        畫面風格統一：onBeforeCompile 注入全場色調（陰影偏淡紫、整體往粉色）＋寫實貼圖降對比，共用 uniform 即時調整
+│     ├─ softLayerPass.ts     柔邊圖層：浮空小星球（layer 2）單獨畫到 RenderTarget → 兩趟高斯模糊 → 輪廓用模糊版合成回畫面（天空背景之後、主場景之前）
+│     ├─ debug/               surfaceDrag（貼球面拖曳）、cameraPlaneDrag（鏡頭座標拖曳）
+│     └─ objects/             obj.ts 組裝；ketchup、house、pig／pigCloud、campfire、floatingIsland、各種食物
 ├─ openspec/
 │  ├─ project.md              專案規範（改程式前必讀）
 │  ├─ config.yaml             OpenSpec CLI 設定（schema: spec-driven）
