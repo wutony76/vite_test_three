@@ -24,13 +24,17 @@ import {
   type WorldHouse,
   type WorldPudding,
   type WorldLemonSlice,
+  type WorldCampfire,
   type WorldFrenchFries,
+  type WorldFrenchFryStick,
   type WorldSalmonSteak,
 } from './objects/obj';
 import { whenGltfMountsIdle, whenGltfsReady } from './objects/sharedGltf';
 import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
+import { CAMPFIRE_CHICKEN_SPIN_AXES, formatCampfireSettingsForPaste } from './objects/campfire';
 import { formatFrenchFriesPlacementsForPaste } from './objects/frenchFries';
+import { formatFrenchFryStickPlacementsForPaste } from './objects/frenchFryStick';
 import { formatPuddingPlacementsForPaste } from './objects/pudding';
 import { formatSalmonSteakPlacementsForPaste } from './objects/salmonSteak';
 import { formatFriedEggPlacementsForPaste } from './objects/friedEgg';
@@ -229,7 +233,11 @@ const {
   frenchFries,
   addFrenchFries,
   removeFrenchFries,
+  frenchFrySticks,
+  addFrenchFryStick,
+  removeFrenchFryStick,
   pig,
+  campfire,
 } = createObjs({ envMap, camera });
 
 /** 一次關掉整類食物（仍保留佈局，取消勾選即再顯示） */
@@ -238,6 +246,7 @@ const foodVisibility = {
   showLemon: true,
   showSalmon: true,
   showFrenchFries: true,
+  showFrenchFryStick: true,
 };
 
 scene.add(all);
@@ -1422,6 +1431,42 @@ if (pigFolder && pig) {
   pigFolder.open();
 }
 
+// 篝火（綠球上；可直接拖曳換位置）
+const campfireFolder = campfire ? gui.addFolder('篝火') : null;
+function logCampfire() {
+  if (!campfire) return;
+  console.log(formatCampfireSettingsForPaste(campfire.settings));
+}
+if (campfireFolder && campfire) {
+  const apply = () => campfire.apply();
+  campfireFolder.add(campfire.settings, 'enabled').name('顯示').onChange(apply).onFinishChange(logCampfire);
+  campfireFolder.add(campfire.settings, 'angleFromTopDegrees', 0, 88, 1).name('離頂端 (°)').onChange(apply).onFinishChange(logCampfire);
+  campfireFolder.add(campfire.settings, 'azimuthDegrees', -180, 180, 1).name('方位 (°)').onChange(apply).onFinishChange(logCampfire);
+  campfireFolder.add(campfire.settings, 'spinDegrees', -180, 180, 1).name('自身旋轉 (°)').onChange(apply).onFinishChange(logCampfire);
+  campfireFolder.add(campfire.settings, 'size', 0.03, 0.3, 0.005).name('大小 (直徑)').onChange(apply).onFinishChange(logCampfire);
+  campfireFolder.add(campfire.settings, 'sink', -0.05, 0.05, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(logCampfire);
+  campfireFolder.add(campfire.settings, 'flameHeight', 0.2, 2.5, 0.05).name('火焰高度').onFinishChange(logCampfire);
+  campfireFolder.add(campfire.settings, 'flameSpeed', 0, 3, 0.05).name('火焰跳動速度').onFinishChange(logCampfire);
+  campfireFolder.add(campfire.settings, 'sparkRate', 0, 30, 0.5).name('火星量 (顆/秒)').onFinishChange(logCampfire);
+  campfireFolder.add(campfire.settings, 'smokeEnabled').name('冒煙').onFinishChange(logCampfire);
+  campfireFolder.add(campfire.settings, 'lightIntensity', 0, 0.5, 0.005).name('火光亮度').onFinishChange(logCampfire);
+  campfireFolder.add(campfire.settings, 'lightRange', 1, 15, 0.5).name('火光範圍 (直徑倍)').onChange(apply).onFinishChange(logCampfire);
+  campfireFolder.addColor(campfire.settings, 'lightColor').name('火光顏色').onChange(apply).onFinishChange(logCampfire);
+  const chickenFolder = campfireFolder.addFolder('火上烤雞');
+  chickenFolder.add(campfire.settings, 'chickenEnabled').name('顯示').onChange(apply).onFinishChange(logCampfire);
+  chickenFolder.add(campfire.settings, 'chickenSpinAxis', CAMPFIRE_CHICKEN_SPIN_AXES).name('轉法 (spit=烤肉架)').onChange(apply).onFinishChange(logCampfire);
+  chickenFolder.add(campfire.settings, 'chickenSpinDegreesPerSecond', -180, 180, 1).name('轉速 (°/秒)').onFinishChange(logCampfire);
+  chickenFolder.add(campfire.settings, 'chickenSize', 0.1, 1.5, 0.01).name('大小 (直徑倍)').onChange(apply).onFinishChange(logCampfire);
+  chickenFolder.add(campfire.settings, 'chickenHeight', 0.3, 2, 0.01).name('高度 (直徑倍)').onChange(apply).onFinishChange(logCampfire);
+  chickenFolder.add(campfire.settings, 'rackOffsetX', -1, 1, 0.01).name('烤架位置：左右').onChange(apply).onFinishChange(logCampfire);
+  chickenFolder.add(campfire.settings, 'rackOffsetZ', -1, 1, 0.01).name('烤架位置：前後').onChange(apply).onFinishChange(logCampfire);
+  chickenFolder.add(campfire.settings, 'rackYawDegrees', -180, 180, 1).name('烤架方向 (°)').onChange(apply).onFinishChange(logCampfire);
+  chickenFolder.add(campfire.settings, 'rackHalfWidth', 0.15, 1.2, 0.01).name('烤架寬度 (半寬)').onChange(apply).onFinishChange(logCampfire);
+  chickenFolder.add(campfire.settings, 'chickenYawDegrees', -180, 180, 1).name('模型擺正：水平 (°)').onChange(apply).onFinishChange(logCampfire);
+  chickenFolder.add(campfire.settings, 'chickenPitchDegrees', -180, 180, 1).name('模型擺正：俯仰 (°)').onChange(apply).onFinishChange(logCampfire);
+  campfireFolder.add({ log: logCampfire }, 'log').name('印出設定 (console)');
+}
+
 // 檸檬片（綠球上；拖曳選取後調整，可複製）
 const lemonFolder = gui.addFolder('檸檬片');
 let selectedLemon: WorldLemonSlice | null = null;
@@ -1733,11 +1778,175 @@ if (friesFolder) {
   if (frenchFries[0]) bindFriesPanel(frenchFries[0]);
 }
 
+// 單根薯條（綠球上；拖曳、複製、躺下）
+const fryStickFolder = gui.addFolder('單根薯條');
+let selectedFryStick: WorldFrenchFryStick | null = null;
+
+const FRY_STICK_PANEL_ACTIONS = new Set(['add', 'remove', 'log', 'layFlat', 'standUp']);
+
+function highlightFryStick(entry: WorldFrenchFryStick | null) {
+  for (const stick of frenchFrySticks) {
+    stick.applyVisuals();
+    if (stick !== entry) continue;
+    stick.object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        if (!('emissive' in material)) continue;
+        const m = material as THREE.MeshStandardMaterial;
+        m.emissive.copy(m.color);
+        m.emissiveIntensity = 0.35;
+      }
+    });
+  }
+}
+
+function clearFryStickPanelSliders() {
+  if (!fryStickFolder) return;
+  fryStickFolder.title('單根薯條');
+  for (const controller of [...fryStickFolder.controllers]) {
+    if (FRY_STICK_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+function bindFryStickPanel(entry: WorldFrenchFryStick) {
+  if (!fryStickFolder) return;
+  const alreadyShowing =
+    entry === selectedFryStick && fryStickFolder.controllers.length > FRY_STICK_PANEL_ACTIONS.size;
+  selectedFryStick = entry;
+  highlightFryStick(entry);
+  if (alreadyShowing) return;
+
+  clearFryStickPanelSliders();
+  fryStickFolder.title(`單根薯條 · ${entry.label}`);
+
+  const settings = entry.settings;
+  const apply = () => entry.apply();
+  const applyVisuals = () => {
+    entry.applyVisuals();
+    highlightFryStick(entry);
+  };
+
+  fryStickFolder
+    .add(settings, 'angleFromTopDegrees', 0, 90, 1)
+    .name('離頂端 (°)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFryStickPlacements);
+  fryStickFolder
+    .add(settings, 'azimuthDegrees', -180, 180, 1)
+    .name('方位 (°)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFryStickPlacements);
+  fryStickFolder
+    .add(settings, 'spinDegrees', -180, 180, 1)
+    .name('自轉 (°)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFryStickPlacements);
+  fryStickFolder
+    .add(settings, 'tiltXDegrees', -180, 180, 1)
+    .name('前傾 (°)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFryStickPlacements);
+  fryStickFolder
+    .add(settings, 'tiltZDegrees', -180, 180, 1)
+    .name('側傾 (°)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFryStickPlacements);
+  fryStickFolder
+    .add(settings, 'sink', -0.3, 0.12, 0.001)
+    .name('下沉')
+    .onChange(apply)
+    .onFinishChange(logFrenchFryStickPlacements);
+  fryStickFolder
+    .add(settings, 'placementScale', 0.2, 2.5, 0.01)
+    .name('縮放')
+    .onChange(apply)
+    .onFinishChange(logFrenchFryStickPlacements);
+  fryStickFolder
+    .add(settings, 'modelSize', 0.02, 0.2, 0.005)
+    .name('大小 (m)')
+    .onChange(apply)
+    .onFinishChange(logFrenchFryStickPlacements);
+  fryStickFolder
+    .add(settings, 'colorBoost', 0.7, 1.4, 0.01)
+    .name('亮度')
+    .onChange(applyVisuals)
+    .onFinishChange(logFrenchFryStickPlacements);
+  fryStickFolder
+    .addColor(settings, 'tintColor')
+    .name('染色')
+    .onChange(applyVisuals)
+    .onFinishChange(logFrenchFryStickPlacements);
+  fryStickFolder
+    .add(settings, 'tintMix', 0, 1, 0.01)
+    .name('染色強度')
+    .onChange(applyVisuals)
+    .onFinishChange(logFrenchFryStickPlacements);
+}
+
+function logFrenchFryStickPlacements() {
+  if (frenchFrySticks.length === 0) return;
+  const text = formatFrenchFryStickPlacementsForPaste(
+    frenchFrySticks.map((f) => ({ id: f.id, settings: f.settings })),
+  );
+  console.log(text);
+  return text;
+}
+
+if (fryStickFolder) {
+  const fryStickControls = {
+    add() {
+      const created = addFrenchFryStick(selectedFryStick ? { ...selectedFryStick.settings } : undefined);
+      if (!created) return;
+      bindFryStickPanel(created);
+      applyFoodGroupVisibility();
+    },
+    remove() {
+      if (!selectedFryStick || frenchFrySticks.length === 0) return;
+      if (!removeFrenchFryStick(selectedFryStick)) return;
+      selectedFryStick = null;
+      clearFryStickPanelSliders();
+      const next = frenchFrySticks[frenchFrySticks.length - 1];
+      if (next) bindFryStickPanel(next);
+      else highlightFryStick(null);
+      refreshPuddingDragTargets();
+    },
+    layFlat() {
+      if (!selectedFryStick) return;
+      selectedFryStick.settings.tiltXDegrees = 90;
+      selectedFryStick.settings.tiltZDegrees = 0;
+      selectedFryStick.apply();
+      fryStickFolder.controllersRecursive().forEach((c) => c.updateDisplay());
+      logFrenchFryStickPlacements();
+    },
+    standUp() {
+      if (!selectedFryStick) return;
+      selectedFryStick.settings.tiltXDegrees = 12;
+      selectedFryStick.settings.tiltZDegrees = 0;
+      selectedFryStick.apply();
+      fryStickFolder.controllersRecursive().forEach((c) => c.updateDisplay());
+      logFrenchFryStickPlacements();
+    },
+    log() {
+      logFrenchFryStickPlacements();
+    },
+  };
+  fryStickFolder.add(fryStickControls, 'add').name('複製薯條');
+  fryStickFolder.add(fryStickControls, 'remove').name('移除選中');
+  fryStickFolder.add(fryStickControls, 'layFlat').name('躺下');
+  fryStickFolder.add(fryStickControls, 'standUp').name('立起');
+  fryStickFolder.add(fryStickControls, 'log').name('印出全部佈局 (console)');
+  if (frenchFrySticks[0]) bindFryStickPanel(frenchFrySticks[0]);
+}
+
 function applyFoodGroupVisibility() {
   for (const corn of grilledCorns) corn.object.visible = foodVisibility.showCorn;
   for (const lemon of lemonSlices) lemon.object.visible = foodVisibility.showLemon;
   for (const steak of salmonSteaks) steak.object.visible = foodVisibility.showSalmon;
   for (const fries of frenchFries) fries.object.visible = foodVisibility.showFrenchFries;
+  for (const stick of frenchFrySticks) stick.object.visible = foodVisibility.showFrenchFryStick;
   refreshPuddingDragTargets();
 }
 
@@ -1745,7 +1954,8 @@ const foodVisibilityFolder = gui.addFolder('食物顯示');
 foodVisibilityFolder.add(foodVisibility, 'showCorn').name('玉米').onChange(applyFoodGroupVisibility);
 foodVisibilityFolder.add(foodVisibility, 'showLemon').name('檸檬片').onChange(applyFoodGroupVisibility);
 foodVisibilityFolder.add(foodVisibility, 'showSalmon').name('魚排').onChange(applyFoodGroupVisibility);
-foodVisibilityFolder.add(foodVisibility, 'showFrenchFries').name('薯條').onChange(applyFoodGroupVisibility);
+foodVisibilityFolder.add(foodVisibility, 'showFrenchFries').name('薯條（盒）').onChange(applyFoodGroupVisibility);
+foodVisibilityFolder.add(foodVisibility, 'showFrenchFryStick').name('單根薯條').onChange(applyFoodGroupVisibility);
 
 // 進場時各分組與根面板都收合，需要時再手動展開
 [
@@ -1817,25 +2027,37 @@ const HOUSE_DRAG_ENABLED = true;
 const friedEggsOnSphere = () => friedEggs.filter((egg) => egg.settings.mode === 'sphere');
 
 let surfaceDragTargets: Array<
-  WorldHouse | WorldPudding | WorldGrilledCorn | WorldFriedEgg | WorldSalmonSteak | WorldLemonSlice | WorldFrenchFries
+  | WorldHouse
+  | WorldPudding
+  | WorldGrilledCorn
+  | WorldFriedEgg
+  | WorldSalmonSteak
+  | WorldLemonSlice
+  | WorldFrenchFries
+  | WorldFrenchFryStick
+  | WorldCampfire
 > = [
   ...houses,
+  ...(campfire ? [campfire] : []),
   ...(PUDDING_SCENE_EDIT ? puddings : []),
   ...(CORN_SCENE_EDIT && foodVisibility.showCorn ? grilledCorns : []),
   ...friedEggsOnSphere(),
   ...salmonSteaks,
   ...lemonSlices,
   ...(foodVisibility.showFrenchFries ? frenchFries : []),
+  ...(foodVisibility.showFrenchFryStick ? frenchFrySticks : []),
 ];
 
 function refreshPuddingDragTargets() {
   surfaceDragTargets.length = 0;
   surfaceDragTargets.push(...houses, ...friedEggsOnSphere());
+  if (campfire) surfaceDragTargets.push(campfire);
   if (PUDDING_SCENE_EDIT) surfaceDragTargets.push(...puddings);
   if (CORN_SCENE_EDIT && foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
   if (foodVisibility.showSalmon) surfaceDragTargets.push(...salmonSteaks);
   if (foodVisibility.showLemon) surfaceDragTargets.push(...lemonSlices);
   if (foodVisibility.showFrenchFries) surfaceDragTargets.push(...frenchFries);
+  if (foodVisibility.showFrenchFryStick) surfaceDragTargets.push(...frenchFrySticks);
 }
 
 if (HOUSE_DRAG_ENABLED) {
@@ -1867,6 +2089,8 @@ if (HOUSE_DRAG_ENABLED) {
       if (lemonEntry) bindLemonPanel(lemonEntry);
       const friesEntry = frenchFries.find((item) => item.object === target.object);
       if (friesEntry) bindFriesPanel(friesEntry);
+      const fryStickEntry = frenchFrySticks.find((item) => item.object === target.object);
+      if (fryStickEntry) bindFryStickPanel(fryStickEntry);
     },
     onDrag: (normal, target) => {
       target.setNormal(normal);
@@ -1876,14 +2100,18 @@ if (HOUSE_DRAG_ENABLED) {
       salmonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       lemonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       friesFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      fryStickFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      campfireFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
     onDragEnd: (target) => {
-      if (houses.some((house) => house.object === target.object)) logHouse();
+      if (campfire && target.object === campfire.object) logCampfire();
+      else if (houses.some((house) => house.object === target.object)) logHouse();
       else if (PUDDING_SCENE_EDIT && puddings.some((item) => item.object === target.object)) logPuddingPlacements();
       else if (CORN_SCENE_EDIT && grilledCorns.some((item) => item.object === target.object)) logCornPlacements();
       else if (salmonSteaks.some((item) => item.object === target.object)) logSalmonPlacements();
       else if (lemonSlices.some((item) => item.object === target.object)) logLemonPlacements();
       else if (frenchFries.some((item) => item.object === target.object)) logFrenchFriesPlacements();
+      else if (frenchFrySticks.some((item) => item.object === target.object)) logFrenchFryStickPlacements();
     },
     onClick: (target) => {
       if (houses.some((house) => house.object === target.object)) markHouseSelected();
@@ -1901,6 +2129,8 @@ if (HOUSE_DRAG_ENABLED) {
       if (lemonEntry) bindLemonPanel(lemonEntry);
       const friesEntry = frenchFries.find((item) => item.object === target.object);
       if (friesEntry) bindFriesPanel(friesEntry);
+      const fryStickEntry = frenchFrySticks.find((item) => item.object === target.object);
+      if (fryStickEntry) bindFryStickPanel(fryStickEntry);
     },
     onBackgroundClick: clearHouseSelection,
   });

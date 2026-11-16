@@ -201,3 +201,44 @@ def build(*, export: bool = True, validate_export: bool = True):
         "export": export_result,
         "glb": GLB_PATH if export else None,
     }
+
+
+SINGLE_GLB_PATH = os.path.join(REPO, "public/models/french_fry/french_fry.glb")
+
+
+def build_single(*, export: bool = True, validate_export: bool = True):
+    """單根薯條（無紙盒），給 world 綠球佈局用。"""
+    _remove_previous()
+    col = _ensure_collection()
+    root = mesh_builder.create_empty("FrenchFry", collection=col)
+
+    length = 0.2
+    fv, ff = _fry_verts_faces(length=length, w=0.019)
+    _check(
+        api.create_connected_mesh(
+            "Fry_01",
+            fv,
+            ff,
+            collection=col,
+            profile="decoration",
+            materials=[MAT_FRY],
+            parent=root,
+        ),
+        "Fry_01",
+    )
+    _check(api.optimize_lowpoly_mesh("Fry_01", shade_flat=True), "optimize Fry_01")
+    r = api.validate_mesh_topology("Fry_01", profile="decoration")
+    _check(r, "validate Fry_01")
+
+    export_result = None
+    if export:
+        os.makedirs(os.path.dirname(SINGLE_GLB_PATH), exist_ok=True)
+        export_result = api.prepare_for_gltf(root, SINGLE_GLB_PATH, validate=validate_export)
+        _check(export_result, "export GLB")
+
+    return {
+        "root": root.name,
+        "reports": [("Fry_01", "decoration", r)],
+        "export": export_result,
+        "glb": SINGLE_GLB_PATH if export else None,
+    }

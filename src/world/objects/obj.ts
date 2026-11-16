@@ -39,8 +39,15 @@ import {
   FRENCH_FRIES_PLACEMENTS,
   type FrenchFriesLayout,
 } from './frenchFriesLayout';
+import { createFrenchFryStick, type FrenchFryStickSettings } from './frenchFryStick';
+import {
+  FRENCH_FRY_STICK_LAYOUT_DEFAULT,
+  FRENCH_FRY_STICK_PLACEMENTS,
+  type FrenchFryStickLayout,
+} from './frenchFryStickLayout';
 import { createPig, type PigSettings } from './pig';
 import type { PigCloudSettings, PigCloudState } from './pigCloud';
+import { createCampfire, type CampfireSettings } from './campfire';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -65,6 +72,7 @@ export const WORLD_GLTF_URLS = [
   `${import.meta.env.BASE_URL}models/salmon_steak/salmon_steak.glb`,
   `${import.meta.env.BASE_URL}models/lemon_slice/lemon_slice.glb`,
   `${import.meta.env.BASE_URL}models/french_fries/french_fries.glb`,
+  `${import.meta.env.BASE_URL}models/french_fry/french_fry.glb`,
   `${import.meta.env.BASE_URL}models/fried_egg/fried_egg.glb`,
   `${import.meta.env.BASE_URL}models/roast_chicken/roast_chicken.glb`,
   `${import.meta.env.BASE_URL}models/pig/pig.glb`,
@@ -311,6 +319,57 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     return true;
   }
 
+  type FrenchFryStickRuntime = ReturnType<typeof createFrenchFryStick>;
+  const frenchFryStickEntries: Array<{ world: WorldFrenchFryStick; runtime: FrenchFryStickRuntime }> = [];
+  const frenchFrySticks: WorldFrenchFryStick[] = [];
+
+  function spawnFrenchFryStick(id: string, layout: FrenchFryStickLayout, grown = false) {
+    if (!puddingAxes) return null;
+    const runtime = createFrenchFryStick({ ...puddingAxes, layout: { ...layout } });
+    ground.add(runtime.object);
+    const world = exposeFrenchFryStick(id, runtime);
+    frenchFryStickEntries.push({ world, runtime });
+    frenchFrySticks.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  if (puddingAxes) {
+    for (const placement of FRENCH_FRY_STICK_PLACEMENTS) {
+      const { id, ...layout } = placement;
+      spawnFrenchFryStick(id, layout);
+    }
+  }
+
+  function nextFrenchFryStickId() {
+    let n = frenchFryStickEntries.length + 1;
+    let id = `french_fry_${n}`;
+    while (frenchFrySticks.some((item) => item.id === id)) {
+      n += 1;
+      id = `french_fry_${n}`;
+    }
+    return id;
+  }
+
+  function addFrenchFryStick(seed?: Partial<FrenchFryStickLayout>): WorldFrenchFryStick | null {
+    if (!puddingAxes) return null;
+    const base: FrenchFryStickLayout = { ...FRENCH_FRY_STICK_LAYOUT_DEFAULT, ...seed };
+    const azimuth = seed?.azimuthDegrees ?? FRENCH_FRY_STICK_LAYOUT_DEFAULT.azimuthDegrees;
+    base.azimuthDegrees = wrapDegrees(azimuth + 12);
+    return spawnFrenchFryStick(nextFrenchFryStickId(), base, introDone);
+  }
+
+  function removeFrenchFryStick(entry: WorldFrenchFryStick) {
+    const index = frenchFryStickEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    const { runtime, world } = frenchFryStickEntries[index];
+    runtime.dispose();
+    frenchFryStickEntries.splice(index, 1);
+    const stickIndex = frenchFrySticks.indexOf(world);
+    if (stickIndex >= 0) frenchFrySticks.splice(stickIndex, 1);
+    return true;
+  }
+
   function nextLemonSliceId() {
     let n = lemonSliceEntries.length + 1;
     let id = `lemon_slice_${n}`;
@@ -544,13 +603,25 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   const introHouses = [mainHall, projectRoom, bgRoom, twRoom, Gamehall];
   const gameHallIntroIndex = introHouses.length - 1;
 
+  // 篝火：程式產生的 low-poly 火堆，種在綠球上；房子都長完才點火
+  const campfireRuntime = puddingAxes
+    ? createCampfire({ groundRadius: GROUND_RADIUS, up: puddingAxes.up, front: puddingAxes.front })
+    : null;
+  if (campfireRuntime) {
+    ground.add(campfireRuntime.object);
+    campfireRuntime.setIntroGrow(0);
+  }
+
   function getPigObstacleRoots(): THREE.Object3D[] {
     const roots: THREE.Object3D[] = introHouses.map((house) => house.object);
+    // 只給石圈＋木柴（footprint），火星和煙飛很高，算進去會讓避障範圍變超大
+    if (campfireRuntime?.settings.enabled) roots.push(campfireRuntime.footprint);
     for (const { world } of puddingEntries) roots.push(world.object);
     for (const { world } of grilledCornEntries) roots.push(world.object);
     for (const { world } of salmonSteakEntries) roots.push(world.object);
     for (const { world } of lemonSliceEntries) roots.push(world.object);
     for (const { world } of frenchFriesEntries) roots.push(world.object);
+    for (const { world } of frenchFryStickEntries) roots.push(world.object);
     for (const { world } of friedEggEntries) {
       if (world.settings.mode === 'sphere') roots.push(world.object);
     }
@@ -610,6 +681,17 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       getCloudState: pigRuntime.cloud.getState,
     }
   : null;
+  const campfire: WorldCampfire | null = campfireRuntime
+    ? {
+        id: 'campfire',
+        label: '篝火',
+        object: campfireRuntime.object,
+        settings: campfireRuntime.settings,
+        apply: campfireRuntime.applySettings,
+        getNormal: campfireRuntime.getNormal,
+        setNormal: campfireRuntime.setNormal,
+      }
+    : null;
   // 鏡頭看的方向。小球的起點會落在這個方向和畫面上方之間
   const approachDir = new THREE.Vector3();
   if (camera.position.lengthSq() > 1e-8) approachDir.copy(camera.position).normalize();
@@ -727,6 +809,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
   for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
   for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(0);
+  for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(0);
   pigRuntime?.setIntroGrow(0);
   groundFlowers?.resetIntro(introHouses.length);
   placeFlowers(0);
@@ -783,7 +866,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(1);
         for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(1);
         for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(1);
         pigRuntime?.setIntroGrow(1);
+        campfireRuntime?.setIntroGrow(1);
       }
     }
 
@@ -833,6 +918,20 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       runtime.setIntroGrow(easeOutBack(friesT, 2.0));
       runtime.update();
     });
+    frenchFryStickEntries.forEach(({ runtime }, index) => {
+      const stickStart = housesIntroEnd + index * 0.08;
+      const stickT = introDone
+        ? 1
+        : THREE.MathUtils.clamp((introElapsed - stickStart) / 0.85, 0, 1);
+      runtime.setIntroGrow(easeOutBack(stickT, 2.0));
+      runtime.update();
+    });
+    if (campfireRuntime) {
+      const fireStart = housesIntroEnd + 0.15;
+      const fireT = introDone ? 1 : THREE.MathUtils.clamp((introElapsed - fireStart) / 0.8, 0, 1);
+      campfireRuntime.setIntroGrow(easeOutBack(fireT, 2.0));
+      campfireRuntime.update(deltaTime);
+    }
     if (pigRuntime) {
       const pigStart = introSettings.emptyHold + introSettings.ballSeconds * 0.55;
       const pigT = introDone ? 1 : THREE.MathUtils.clamp((introElapsed - pigStart) / 0.9, 0, 1);
@@ -911,7 +1010,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
     for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
     for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(0);
     pigRuntime?.setIntroGrow(0);
+    campfireRuntime?.setIntroGrow(0);
   }
 
   // 緞帶擺放參數也往外交出去，讓 main.ts 的控制面板可以調整
@@ -959,7 +1060,11 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     frenchFries,
     addFrenchFries,
     removeFrenchFries,
+    frenchFrySticks,
+    addFrenchFryStick,
+    removeFrenchFryStick,
     pig,
+    campfire,
     houses: [
       exposeHouse('mainHall', mainHall),
       exposeHouse('projectRoom', projectRoom),
@@ -1012,6 +1117,17 @@ export type WorldFrenchFries = {
   setNormal: (normal: THREE.Vector3) => void;
 };
 
+export type WorldFrenchFryStick = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: FrenchFryStickSettings;
+  apply: () => void;
+  applyVisuals: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
 export type WorldPig = {
   label: string;
   object: THREE.Object3D;
@@ -1020,6 +1136,16 @@ export type WorldPig = {
   /** 頭上烏雲的設定（面板即時讀取，不用 apply） */
   cloud: PigCloudSettings;
   getCloudState: () => PigCloudState;
+};
+
+export type WorldCampfire = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: CampfireSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
 };
 
 export type WorldPudding = {
@@ -1105,6 +1231,22 @@ function exposeFrenchFries(id: string, fries: ReturnType<typeof createFrenchFrie
     applyVisuals: fries.applyVisuals,
     getNormal: fries.getNormal,
     setNormal: fries.setNormal,
+  };
+}
+
+function exposeFrenchFryStick(
+  id: string,
+  stick: ReturnType<typeof createFrenchFryStick>,
+): WorldFrenchFryStick {
+  return {
+    id,
+    label: id,
+    object: stick.object,
+    settings: stick.settings,
+    apply: stick.applySettings,
+    applyVisuals: stick.applyVisuals,
+    getNormal: stick.getNormal,
+    setNormal: stick.setNormal,
   };
 }
 
