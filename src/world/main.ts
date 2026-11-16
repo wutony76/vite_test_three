@@ -1375,6 +1375,11 @@ if (pigFolder && pig) {
     .add(pig.settings, 'ribbonMarginDegrees', 0, 15, 0.5)
     .name('離番茄醬餘量 (°)')
     .onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'lookAheadDegrees', 1, 20, 0.5).name('提前轉彎距離 (°)').onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'pauseChance', 0, 1, 0.05).name('經過物件停下機率').onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'pauseMinSeconds', 0.1, 5, 0.1).name('停下最短 (秒)').onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'pauseMaxSeconds', 0.1, 6, 0.1).name('停下最長 (秒)').onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'pauseNearDegrees', 0, 10, 0.5).name('算「經過」的距離 (°)').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'smokeEnabled').name('走動冒煙').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'smokeRate', 0, 30, 0.5).name('煙量 (團/秒)').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'smokeSize', 0.2, 3, 0.05).name('煙團大小').onFinishChange(logPigSettings);

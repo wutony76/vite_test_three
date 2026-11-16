@@ -47,6 +47,14 @@ export type PigSettings = {
   smokeSize: number;
   /** 每團煙存活秒數 */
   smokeLifeSeconds: number;
+  /** 往前「看」多遠（度）：前方會撞到東西／醬就提早邊走邊轉，不用停下來原地轉 */
+  lookAheadDegrees: number;
+  /** 經過物件時停下來的機率（0～1），每經過一個物件擲一次 */
+  pauseChance: number;
+  pauseMinSeconds: number;
+  pauseMaxSeconds: number;
+  /** 離物件避障邊界多近（度）算「經過」 */
+  pauseNearDegrees: number;
 };
 
 export const PIG_LAYOUT_DEFAULT: PigSettings = {
@@ -62,7 +70,7 @@ export const PIG_LAYOUT_DEFAULT: PigSettings = {
   wanderSeconds: 3.5,
   waddleStrength: 0.11,
   obstacleMarginDegrees: 3.5,
-  stayInViewHemisphere: true,
+  stayInViewHemisphere: false,
   viewHemisphereDotMin: 0.1,
   turnDegreesPerSecond: 140,
   modelYawOffsetDegrees: 0,
@@ -71,6 +79,11 @@ export const PIG_LAYOUT_DEFAULT: PigSettings = {
   smokeRate: 4,
   smokeSize: 0.85,
   smokeLifeSeconds: 0.6,
+  lookAheadDegrees: 7,
+  pauseChance: 0.35,
+  pauseMinSeconds: 0.8,
+  pauseMaxSeconds: 2,
+  pauseNearDegrees: 3,
 };
 
 /**
@@ -91,7 +104,7 @@ type SmokePuff = {
   spin: THREE.Vector3;
 };
 
-type PigObstacle = { normal: THREE.Vector3; clearanceRad: number };
+type PigObstacle = { root: THREE.Object3D; normal: THREE.Vector3; clearanceRad: number };
 
 type CreatePigOptions = {
   groundRadius: number;
@@ -136,6 +149,20 @@ export function createPig({
   let surfaceNormal = new THREE.Vector3();
   let stuckSeconds = 0;
   let smokeTimer = 0;
+  /** 停下來看東西還剩幾秒；> 0 時不走、不冒煙、不搖晃 */
+  let pauseRemaining = 0;
+  /** 停完之後至少要走幾秒才能再停，避免一直停停走走 */
+  let pauseCooldown = 0;
+  /** 停下時要看的物件方向（球面法線） */
+  const pauseLookAt = new THREE.Vector3();
+  /** 上一幀「在旁邊」的物件：只有剛靠近的那一刻擲骰子，不然每幀擲一次幾乎必停 */
+  let nearObstacles = new Set<THREE.Object3D>();
+  /** 搖晃幅度（0～1）：停下時漸漸收掉，起步再漸漸回來，不會突然定格 */
+  let waddleAmount = 1;
+  /** 原地轉不過去時暫時加快轉身（倍率），走路中轉彎維持 1 */
+  let turnBoost = 1;
+  const lookTangent = new THREE.Vector3();
+  const lookPoint = new THREE.Vector3();
   /** 實際可跑到的最大離頂端角度（度）：取面板上限與「緞帶上緣 − 身長 − 餘量」較小者 */
   let effectiveColatMax = settings.roamColatitudeMax;
 
@@ -262,13 +289,17 @@ export function createPig({
     effectiveColatMax = Math.min(effectiveColatMax, Math.max(settings.roamColatitudeMin + 1, limit));
   }
 
-  /** 沿球面切線朝向頂端（up）的 bearing */
-  function bearingTowardTop(n: THREE.Vector3) {
+  /** 沿球面切線朝向某個方向（例如頂端、某個物件）的 bearing */
+  function bearingTowardDirection(n: THREE.Vector3, dir: THREE.Vector3) {
     tangentBasis(n); // 先算座標系（會借用 probe），再算方向
-    probe.copy(up).addScaledVector(n, -up.dot(n));
+    probe.copy(dir).addScaledVector(n, -dir.dot(n));
     if (probe.lengthSq() < 1e-8) return bearing;
     probe.normalize();
     return Math.atan2(probe.dot(north), probe.dot(east));
+  }
+
+  function bearingTowardTop(n: THREE.Vector3) {
+    return bearingTowardDirection(n, up);
   }
 
   function refreshObstacles() {
@@ -286,7 +317,7 @@ export function createPig({
       box.getSize(boxSize);
       const extent = Math.max(boxSize.x, boxSize.y, boxSize.z) * 0.55;
       const clearance = Math.atan(extent / Math.max(groundRadius, 0.2)) + margin;
-      obstacleScratch.push({ normal: probe.clone(), clearanceRad: clearance });
+      obstacleScratch.push({ root, normal: probe.clone(), clearanceRad: clearance });
     }
   }
 
@@ -345,7 +376,7 @@ export function createPig({
       return;
     }
     faceTurnAxis.normalize();
-    const maxStep = THREE.MathUtils.degToRad(settings.turnDegreesPerSecond) * deltaTime;
+    const maxStep = THREE.MathUtils.degToRad(settings.turnDegreesPerSecond * turnBoost) * deltaTime;
     facingForward.applyAxisAngle(faceTurnAxis, Math.min(angle, maxStep));
     facingForward.addScaledVector(surfaceNormal, -facingForward.dot(surfaceNormal)).normalize();
   }
@@ -531,8 +562,44 @@ export function createPig({
     }
   }
 
-  /** 只沿目前鼻頭方向在球面上走一步 */
+  /** 從目前位置往 bearingRad 方向看 lookRad 遠，路上（中點＋終點）有沒有被擋 */
+  function isPathFree(bearingRad: number, lookRad: number) {
+    tangentFromBearing(surfaceNormal, bearingRad, lookTangent);
+    for (const k of [0.5, 1]) {
+      rotateAlong(surfaceNormal, lookTangent, lookRad * k, lookPoint);
+      if (isBlocked(lookPoint, false, surfaceNormal)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * 挑一個「前方走得通」的方向：從鼻頭目前方向開始，左右交替越轉越大，
+   * 先試哪一邊每次隨機，不然小豬永遠只往同一邊繞。找不到就回傳 null。
+   */
+  function findFreeBearing(lookRad: number) {
+    const base = facingBearing();
+    const col = colatitudeFromNormal(surfaceNormal);
+    // 靠近醬邊界時，優先往頂端轉（往上一定走得回來）
+    if (col >= effectiveColatMax - 3) {
+      const top = bearingTowardTop(surfaceNormal) + (Math.random() - 0.5) * 0.9;
+      if (isPathFree(top, lookRad)) return top;
+    }
+    const side = Math.random() < 0.5 ? 1 : -1;
+    for (const delta of [0.35, 0.7, 1.05, 1.4, 1.8, 2.3, 2.8]) {
+      for (const sign of [side, -side]) {
+        const candidate = base + delta * sign;
+        if (isPathFree(candidate, lookRad)) return candidate;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 只沿目前鼻頭方向在球面上走一步。
+   * 走得動時順便往前看：前方快撞到就先把目標轉開 → 邊走邊轉彎，不用停下來原地轉。
+   */
   function tryAdvance(stepRad: number) {
+    turnBoost = 1;
     if (facingForward.lengthSq() < 1e-8) return false;
     // 記住「還沒轉完的角度」：bearing 是相對當地 east/north 的角度，移動後座標系會變，
     // 只能以鼻頭為基準重算；若直接 bearing = 鼻向，轉向目標每幀都被清掉，小豬就只會直走。
@@ -542,31 +609,46 @@ export function createPig({
     tangentFromFacing(probe2);
     if (probe2.lengthSq() < 1e-8) return false;
 
+    const lookRad = THREE.MathUtils.degToRad(settings.lookAheadDegrees);
     const next = rotateAlong(surfaceNormal, probe2, stepRad);
     if (!isBlocked(next, false, surfaceNormal)) {
       surfaceNormal.copy(next);
       syncBearingFromFacing();
       bearing += pendingTurn;
+      // 目前想去的方向前面被擋 → 換一個走得通的方向（只有被擋才換，避免每幀亂抖）
+      if (!isPathFree(bearing, lookRad)) {
+        const free = findFreeBearing(lookRad);
+        if (free !== null) bearing = free;
+      }
       return true;
     }
 
-    const col = colatitudeFromNormal(surfaceNormal);
-    if (col >= effectiveColatMax - 2) {
-      // 碰到緞帶邊界：直接把目標轉向頂端，身體會照轉向速度掉頭往上走
-      bearing = bearingTowardTop(surfaceNormal) + (Math.random() - 0.5) * 1.2;
-      return false;
-    }
-    const steerAngles = [0.5, -0.5, 0.95, -0.95, 1.45, -1.45];
-    for (const delta of steerAngles) {
-      tangentFromBearing(surfaceNormal, bearing + delta, probe2);
-      const probeNext = rotateAlong(surfaceNormal, probe2, stepRad);
-      if (!isBlocked(probeNext, false, surfaceNormal)) {
-        bearing += delta;
-        return false;
+    // 連下一步都走不動（已經貼著障礙）：挑方向後加快轉身，盡快轉開繼續走
+    const free = findFreeBearing(Math.max(stepRad * 2, lookRad * 0.5));
+    bearing = free ?? facingBearing() + Math.PI + (Math.random() - 0.5) * 0.8;
+    turnBoost = 2.5;
+    return false;
+  }
+
+  /** 剛走到某個物件旁邊時擲骰子，中了就停下來轉頭看它一下 */
+  function maybePauseNearObstacles() {
+    const footprint = pigFootprintRad();
+    const near = THREE.MathUtils.degToRad(settings.pauseNearDegrees);
+    const nowNear = new Set<THREE.Object3D>();
+    let entered: PigObstacle | null = null;
+    for (const obstacle of obstacleScratch) {
+      if (angularDistance(surfaceNormal, obstacle.normal) < footprint + obstacle.clearanceRad + near) {
+        nowNear.add(obstacle.root);
+        if (!nearObstacles.has(obstacle.root)) entered = obstacle;
       }
     }
-    bearing += (Math.random() - 0.5) * 1.4;
-    return false;
+    nearObstacles = nowNear;
+    if (!entered || pauseCooldown > 0 || Math.random() >= settings.pauseChance) return;
+    const min = Math.min(settings.pauseMinSeconds, settings.pauseMaxSeconds);
+    const max = Math.max(settings.pauseMinSeconds, settings.pauseMaxSeconds);
+    pauseRemaining = min + Math.random() * (max - min);
+    pauseCooldown = pauseRemaining + 3;
+    pauseLookAt.copy(entered.normal);
   }
 
   resetSurfaceFromSettings();
@@ -617,47 +699,64 @@ export function createPig({
     }
 
     refreshObstacles();
+    pauseCooldown = Math.max(0, pauseCooldown - deltaTime);
 
-    wanderTimer -= deltaTime;
-    if (wanderTimer <= 0) {
-      wanderTimer = settings.wanderSeconds * (0.55 + Math.random() * 0.9);
-      bearing = settings.stayInViewHemisphere && camera ?
-        bearingTowardCamera(surfaceNormal) + (Math.random() - 0.5) * 1.1 :
-        bearing + (Math.random() - 0.5) * 2.4;
-    }
-
-    // 人在界外（醬底下）時，遊走亂數先暫停，一律朝頂端走回來
-    if (colatitudeFromNormal(surfaceNormal) > effectiveColatMax) {
-      bearing = bearingTowardTop(surfaceNormal);
-    }
-
-    blendFacingForward(deltaTime);
-
-    const stepRad = THREE.MathUtils.degToRad(settings.roamSpeedDegrees) * deltaTime;
     let movedThisFrame = false;
-    if (stepRad > 0) {
-      const moved = tryAdvance(stepRad);
-      movedThisFrame = moved;
-      if (!moved) {
-        stuckSeconds += deltaTime;
-        wanderTimer = Math.min(wanderTimer, 0.2);
-        if (stuckSeconds > 2.2) {
-          // 卡太久就原地掉頭（身體會照轉向速度慢慢轉），不再瞬移
-          bearing = facingBearing() + Math.PI + (Math.random() - 0.5) * 0.8;
-          wanderTimer = settings.wanderSeconds;
+    if (pauseRemaining > 0) {
+      // 停下來看東西：轉頭面向物件，不走、不冒煙
+      pauseRemaining -= deltaTime;
+      bearing = bearingTowardDirection(surfaceNormal, pauseLookAt);
+      turnBoost = 1;
+      blendFacingForward(deltaTime);
+      if (pauseRemaining <= 0) {
+        // 看完了：轉向側邊離開（正前方就是物件，直走會撞）
+        bearing = facingBearing() + (Math.random() < 0.5 ? 1 : -1) * (1.3 + Math.random() * 0.7);
+        wanderTimer = settings.wanderSeconds * (0.55 + Math.random() * 0.9);
+      }
+    } else {
+      wanderTimer -= deltaTime;
+      if (wanderTimer <= 0) {
+        wanderTimer = settings.wanderSeconds * (0.55 + Math.random() * 0.9);
+        bearing = settings.stayInViewHemisphere && camera ?
+          bearingTowardCamera(surfaceNormal) + (Math.random() - 0.5) * 1.1 :
+          facingBearing() + (Math.random() - 0.5) * 2.4;
+      }
+
+      // 人在界外（醬底下）時，遊走亂數先暫停，一律朝頂端走回來
+      if (colatitudeFromNormal(surfaceNormal) > effectiveColatMax) {
+        bearing = bearingTowardTop(surfaceNormal);
+      }
+
+      blendFacingForward(deltaTime);
+
+      const stepRad = THREE.MathUtils.degToRad(settings.roamSpeedDegrees) * deltaTime;
+      if (stepRad > 0) {
+        movedThisFrame = tryAdvance(stepRad);
+        if (!movedThisFrame) {
+          stuckSeconds += deltaTime;
+          if (stuckSeconds > 2.2) {
+            // 卡太久就原地掉頭（身體會照轉向速度慢慢轉），不再瞬移
+            bearing = facingBearing() + Math.PI + (Math.random() - 0.5) * 0.8;
+            wanderTimer = settings.wanderSeconds;
+            stuckSeconds = 0;
+          }
+        } else {
           stuckSeconds = 0;
+          maybePauseNearObstacles();
         }
-      } else {
-        stuckSeconds = 0;
       }
     }
 
     applyPlacement();
     updateSmoke(deltaTime, movedThisFrame);
 
-    waddlePhase += deltaTime * 11.5;
-    const wobble = settings.waddleStrength * Math.sin(waddlePhase);
-    const sway = settings.waddleStrength * 0.65 * Math.sin(waddlePhase * 0.5 + 0.8);
+    // 停下時搖晃慢慢收掉（約 0.2 秒），起步再慢慢回來
+    const waddleTarget = pauseRemaining > 0 ? 0 : 1;
+    waddleAmount += (waddleTarget - waddleAmount) * Math.min(1, deltaTime * 8);
+    waddlePhase += deltaTime * 11.5 * waddleAmount;
+    const strength = settings.waddleStrength * waddleAmount;
+    const wobble = strength * Math.sin(waddlePhase);
+    const sway = strength * 0.65 * Math.sin(waddlePhase * 0.5 + 0.8);
     wobbleScale.set(1 + sway * 0.35, 1 + wobble, 1 - sway * 0.25);
     model.scale.set(
       modelBaseScale * wobbleScale.x,
@@ -701,6 +800,11 @@ export function formatPigSettingsForPaste(settings: PigSettings) {
     `  smokeRate: ${settings.smokeRate.toFixed(1)},\n` +
     `  smokeSize: ${settings.smokeSize.toFixed(2)},\n` +
     `  smokeLifeSeconds: ${settings.smokeLifeSeconds.toFixed(2)},\n` +
+    `  lookAheadDegrees: ${settings.lookAheadDegrees.toFixed(1)},\n` +
+    `  pauseChance: ${settings.pauseChance.toFixed(2)},\n` +
+    `  pauseMinSeconds: ${settings.pauseMinSeconds.toFixed(1)},\n` +
+    `  pauseMaxSeconds: ${settings.pauseMaxSeconds.toFixed(1)},\n` +
+    `  pauseNearDegrees: ${settings.pauseNearDegrees.toFixed(1)},\n` +
     `};`
   );
 }
