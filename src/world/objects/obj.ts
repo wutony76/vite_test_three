@@ -59,6 +59,9 @@ const MODEL_URL = `${import.meta.env.BASE_URL}models/chicken_leg/chicken_leg.glb
 // projectRoom 的外觀：用 Blender 做的 low poly 房子（匯出時已拿掉底下那塊平的地面，才能種在球面上）
 const PROJECT_ROOM_MODEL_URL = `${import.meta.env.BASE_URL}models/project_room/project_room.glb`;
 const GAME_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/game_hall/gameHall.glb`;
+// 電波町霓虹小店（頂樓「電・波・町」霓虹招牌，plan 在 tools/blender/plans/neon_shop.plan.json）
+// 想換到 Gamehall：把上一行改成下面這個網址，並把 Gamehall 的 spinDegrees 改成 189（招牌面才會朝向鏡頭）
+// `${import.meta.env.BASE_URL}models/neon_shop/neon_shop.glb`
 const TW_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/twhall/twhall.glb`;
 // bgRoom 的外觀：日式街角三層小樓（一樓投幣洗衣店＋外側樓梯、二樓麻雀館），plan 在 tools/blender/plans/laundry.plan.json
 const LAUNDRY_MODEL_URL = `${import.meta.env.BASE_URL}models/laundry/laundry.glb`;
@@ -588,6 +591,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
 
   attachHouseModel(Gamehall, GAME_HALL_MODEL_URL, (model) => {
     gameHallLights.bind(model);
+    lightUpGlowDecals(model);
   });
 
   if (puddingAxes) {
@@ -1512,6 +1516,28 @@ function loadModel(all: THREE.Object3D) {
     .catch((error) => {
       console.error(`[obj] 模型載入失敗，請確認檔案存在：${MODEL_URL}`, error);
     });
+}
+
+/**
+ * 招牌字 decal 自發光：Blender 匯出的 decal 只有一般貼圖（不會亮），
+ * 名稱以 _glow 結尾的就把貼圖同時當成自發光貼圖，夜裡的霓虹字、燈箱才會亮。
+ * toneMapped = false：亮色不被色調映射壓暗，畫面風格統一（styleGrade）也會跳過它，霓虹維持鮮豔。
+ */
+function lightUpGlowDecals(model: THREE.Object3D) {
+  model.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh || !/_glow(?:\.\d+)?$|_glow_\d+$/.test(mesh.name)) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      const m = material as THREE.MeshStandardMaterial;
+      if (!m.map) continue;
+      m.emissive.set(0xffffff);
+      m.emissiveMap = m.map;
+      m.emissiveIntensity = 0.9;
+      m.toneMapped = false;
+      m.needsUpdate = true;
+    }
+  });
 }
 
 /**

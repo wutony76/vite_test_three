@@ -1,0 +1,971 @@
+{
+ "schema": "lowpoly.asset/1",
+ "id": "neon_shop",
+ "reference": "neon_shop",
+ "notes": "電波町霓虹小店（取代 Gamehall）：兩層街角店。參考圖右面（店面大窗、雨遮、二樓窗、冷氣、三個圓招牌、長凳）當正面 -Y；參考圖左面（頂樓「電・波・町」霓虹招牌、二樓大燈箱、入口門、直立小招牌、洋紅立牌）在 -X 側。尺寸以入口門高 2.1 m 換算。霓虹燈條、招牌用 emissive 材質；招牌字用 image decal（id 以 _glow 結尾，Three.js 載入時改成自發光）。入口門轉 -90° 朝 -X，需 layout 支援旋轉後寬深對調。",
+ "dimensions": {
+  "w": 6.6,
+  "d": 7.2,
+  "h": 8.0
+ },
+ "detail": {
+  "preset": "game_default",
+  "overrides": {}
+ },
+ "style": {
+  "edge_wobble": 0.012,
+  "palette": "neon_shop"
+ },
+ "budget": {
+  "max_tris": 8000,
+  "max_primitives": 48,
+  "max_texture_kb": 1500,
+  "max_gpu_texture_mb": 24
+ },
+ "materials": [
+  {
+   "name": "wall_mauve",
+   "hex": "#6B4E6E",
+   "roughness": 0.9,
+   "surface": {
+    "class": "plaster",
+    "pattern": "plaster",
+    "scale_m": 0.3,
+    "palette": [
+     "#4E3752",
+     "#6B4E6E",
+     "#8A6A8C"
+    ],
+    "tier": "prop",
+    "wear": 0.3,
+    "dirt": 0.35
+   }
+  },
+  {
+   "name": "roof_dark",
+   "hex": "#2F2838",
+   "roughness": 0.85,
+   "surface": {
+    "class": "metal",
+    "pattern": "stripes",
+    "scale_m": 0.12,
+    "palette": [
+     "#211C28",
+     "#2F2838",
+     "#463D52"
+    ],
+    "tier": "prop",
+    "wear": 0.25
+   }
+  },
+  {
+   "name": "base_dark",
+   "hex": "#4A2E4C",
+   "roughness": 0.95,
+   "surface": {
+    "class": "stone",
+    "pattern": "cobble",
+    "scale_m": 0.35,
+    "palette": [
+     "#341F36",
+     "#4A2E4C",
+     "#62425F"
+    ],
+    "tier": "prop",
+    "dirt": 0.35
+   }
+  },
+  {
+   "name": "fabric_teal",
+   "hex": "#1E4A57",
+   "roughness": 0.85,
+   "surface": {
+    "class": "fabric",
+    "pattern": "weave",
+    "scale_m": 0.05,
+    "tier": "prop",
+    "wear": 0.2,
+    "dirt": 0.15
+   }
+  },
+  {
+   "name": "frame_dark",
+   "hex": "#2A2230",
+   "roughness": 0.7
+  },
+  {
+   "name": "niche_dark",
+   "hex": "#1E1624",
+   "roughness": 0.9
+  },
+  {
+   "name": "window_glow",
+   "hex": "#F6C35A",
+   "roughness": 0.5,
+   "emissive": true,
+   "emission_strength": 1.2
+  },
+  {
+   "name": "neon_cyan",
+   "hex": "#40F0FF",
+   "roughness": 0.3,
+   "emissive": true,
+   "emission_strength": 2.2
+  },
+  {
+   "name": "sign_white",
+   "hex": "#F4F1E8",
+   "roughness": 0.6,
+   "emissive": true,
+   "emission_strength": 0.9
+  },
+  {
+   "name": "sign_yellow",
+   "hex": "#FFD21E",
+   "roughness": 0.5,
+   "emissive": true,
+   "emission_strength": 1.4
+  },
+  {
+   "name": "sign_magenta",
+   "hex": "#FF2BD6",
+   "roughness": 0.5,
+   "emissive": true,
+   "emission_strength": 1.4
+  },
+  {
+   "name": "sign_backer",
+   "hex": "#1A1024",
+   "roughness": 0.8
+  },
+  {
+   "name": "metal_light",
+   "hex": "#C9C3D0",
+   "roughness": 0.5,
+   "metallic": 0.3
+  },
+  {
+   "name": "metal_dark",
+   "hex": "#3A3442",
+   "roughness": 0.6,
+   "metallic": 0.4
+  },
+  {
+   "name": "wood_dark",
+   "hex": "#4A3328",
+   "roughness": 0.85
+  },
+  {
+   "name": "cardboard",
+   "hex": "#B08A63",
+   "roughness": 0.95
+  }
+ ],
+ "components": [
+  {
+   "id": "platform",
+   "kind": "foundation",
+   "tier": "primary",
+   "method": "custom_mesh",
+   "profile": "terrain",
+   "material": "base_dark",
+   "bounds": [
+    [
+     -3.3,
+     -3.6,
+     0.0
+    ],
+    [
+     2.95,
+     2.9,
+     0.12
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.85
+  },
+  {
+   "id": "gf_shell",
+   "kind": "wall_block",
+   "tier": "primary",
+   "method": "component",
+   "profile": "building_shell",
+   "material": "wall_mauve",
+   "bounds": [
+    [
+     -2.4,
+     -2.2,
+     0.12
+    ],
+    [
+     2.4,
+     2.2,
+     3.1
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.8,
+   "params": {
+    "openings": [
+     "shop_window"
+    ],
+    "reveal": 0.12,
+    "niche_material": "niche_dark"
+   }
+  },
+  {
+   "id": "upper_shell",
+   "kind": "wall_block",
+   "tier": "primary",
+   "method": "component",
+   "profile": "building_shell",
+   "material": "wall_mauve",
+   "bounds": [
+    [
+     -2.4,
+     -2.2,
+     3.5
+    ],
+    [
+     2.4,
+     2.2,
+     6.0
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.8,
+   "params": {
+    "openings": [
+     "upper_window"
+    ],
+    "reveal": 0.12,
+    "niche_material": "niche_dark"
+   }
+  },
+  {
+   "id": "cornice",
+   "kind": "beam",
+   "tier": "secondary",
+   "method": "component",
+   "profile": "trim",
+   "material": "roof_dark",
+   "bounds": [
+    [
+     -2.6,
+     -2.45,
+     3.1
+    ],
+    [
+     2.6,
+     2.45,
+     3.5
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "roof_slab",
+   "kind": "beam",
+   "tier": "secondary",
+   "method": "component",
+   "profile": "building_shell",
+   "material": "roof_dark",
+   "bounds": [
+    [
+     -2.75,
+     -2.6,
+     6.0
+    ],
+    [
+     2.75,
+     2.6,
+     6.4
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "shop_window",
+   "kind": "shop_window",
+   "tier": "secondary",
+   "method": "component",
+   "profile": "opening",
+   "material": "frame_dark",
+   "bounds": [
+    [
+     0.2,
+     -2.26,
+     0.3
+    ],
+    [
+     2.2,
+     -2.14,
+     2.8
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.85
+  },
+  {
+   "id": "shop_glass",
+   "kind": "glass_pane",
+   "tier": "secondary",
+   "method": "component",
+   "profile": "glass",
+   "material": "window_glow",
+   "bounds": [
+    [
+     0.27,
+     -2.2,
+     0.37
+    ],
+    [
+     2.13,
+     -2.18,
+     2.73
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.85
+  },
+  {
+   "id": "awning",
+   "kind": "awning",
+   "tier": "secondary",
+   "method": "component",
+   "profile": "building_shell",
+   "material": "fabric_teal",
+   "bounds": [
+    [
+     0.0,
+     -3.2,
+     2.45
+    ],
+    [
+     2.5,
+     -2.2,
+     3.05
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.85,
+   "params": {
+    "corrugated": false,
+    "slope_deg": 20
+   }
+  },
+  {
+   "id": "upper_window",
+   "kind": "window",
+   "tier": "secondary",
+   "method": "component",
+   "profile": "opening",
+   "material": "frame_dark",
+   "bounds": [
+    [
+     0.4,
+     -2.26,
+     4.1
+    ],
+    [
+     1.9,
+     -2.14,
+     5.6
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.85,
+   "params": {
+    "panes": [
+     2,
+     2
+    ]
+   }
+  },
+  {
+   "id": "upper_glass",
+   "kind": "glass_pane",
+   "tier": "secondary",
+   "method": "component",
+   "profile": "glass",
+   "material": "window_glow",
+   "bounds": [
+    [
+     0.47,
+     -2.2,
+     4.17
+    ],
+    [
+     1.83,
+     -2.18,
+     5.53
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.85
+  },
+  {
+   "id": "entry_door",
+   "kind": "door",
+   "tier": "secondary",
+   "method": "component",
+   "profile": "opening",
+   "material": "frame_dark",
+   "bounds": [
+    [
+     -2.52,
+     -1.3,
+     0.12
+    ],
+    [
+     -2.38,
+     0.0,
+     2.4
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.75,
+   "transform": {
+    "rotation_deg": [
+     0,
+     0,
+     -90
+    ]
+   }
+  },
+  {
+   "id": "lightbox_sign",
+   "kind": "beam",
+   "tier": "secondary",
+   "method": "component",
+   "profile": "trim",
+   "material": "sign_white",
+   "bounds": [
+    [
+     -2.7,
+     -1.9,
+     3.6
+    ],
+    [
+     -2.4,
+     0.6,
+     5.3
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "top_sign",
+   "kind": "beam",
+   "tier": "secondary",
+   "method": "component",
+   "profile": "trim",
+   "material": "sign_backer",
+   "bounds": [
+    [
+     -2.92,
+     -1.9,
+     6.15
+    ],
+    [
+     -2.75,
+     1.7,
+     7.35
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.75
+  },
+  {
+   "id": "antenna",
+   "kind": "pipe",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "metal_dark",
+   "bounds": [
+    [
+     -1.05,
+     0.75,
+     6.4
+    ],
+    [
+     -0.95,
+     0.85,
+     7.9
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.6
+  },
+  {
+   "id": "neon_cornice_front",
+   "kind": "beam",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "neon_cyan",
+   "bounds": [
+    [
+     -2.6,
+     -2.48,
+     3.07
+    ],
+    [
+     2.6,
+     -2.44,
+     3.12
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "neon_cornice_side",
+   "kind": "beam",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "neon_cyan",
+   "bounds": [
+    [
+     -2.63,
+     -2.45,
+     3.07
+    ],
+    [
+     -2.59,
+     2.45,
+     3.12
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "neon_roof_front",
+   "kind": "beam",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "neon_cyan",
+   "bounds": [
+    [
+     -2.75,
+     -2.63,
+     5.97
+    ],
+    [
+     2.75,
+     -2.59,
+     6.02
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.75
+  },
+  {
+   "id": "neon_wall_line",
+   "kind": "beam",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "neon_cyan",
+   "bounds": [
+    [
+     -0.7,
+     -2.24,
+     3.55
+    ],
+    [
+     -0.65,
+     -2.2,
+     5.9
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.7
+  },
+  {
+   "id": "neon_platform_front",
+   "kind": "beam",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "neon_cyan",
+   "bounds": [
+    [
+     -3.3,
+     -3.62,
+     0.08
+    ],
+    [
+     2.95,
+     -3.58,
+     0.13
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.75
+  },
+  {
+   "id": "neon_platform_side",
+   "kind": "beam",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "neon_cyan",
+   "bounds": [
+    [
+     -3.32,
+     -3.6,
+     0.08
+    ],
+    [
+     -3.28,
+     2.9,
+     0.13
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.75
+  },
+  {
+   "id": "yellow_sign",
+   "kind": "beam",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "sign_yellow",
+   "bounds": [
+    [
+     -0.45,
+     -2.5,
+     3.6
+    ],
+    [
+     -0.15,
+     -2.2,
+     5.2
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "round_sign_1",
+   "kind": "sign_disc",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "sign_yellow",
+   "bounds": [
+    [
+     2.3,
+     -2.32,
+     5.0
+    ],
+    [
+     2.7,
+     -2.2,
+     5.4
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.75
+  },
+  {
+   "id": "round_sign_2",
+   "kind": "sign_disc",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "sign_yellow",
+   "bounds": [
+    [
+     2.3,
+     -2.32,
+     4.55
+    ],
+    [
+     2.7,
+     -2.2,
+     4.95
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.75
+  },
+  {
+   "id": "round_sign_3",
+   "kind": "sign_disc",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "sign_yellow",
+   "bounds": [
+    [
+     2.3,
+     -2.32,
+     4.1
+    ],
+    [
+     2.7,
+     -2.2,
+     4.5
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.75
+  },
+  {
+   "id": "ac_unit",
+   "kind": "crate",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "metal_light",
+   "bounds": [
+    [
+     0.55,
+     -2.6,
+     3.6
+    ],
+    [
+     1.75,
+     -2.2,
+     4.05
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "drainpipe",
+   "kind": "pipe",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "trim",
+   "material": "metal_dark",
+   "bounds": [
+    [
+     -2.52,
+     -2.32,
+     0.12
+    ],
+    [
+     -2.42,
+     -2.22,
+     6.0
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.7
+  },
+  {
+   "id": "bench",
+   "kind": "beam",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "wood_dark",
+   "bounds": [
+    [
+     0.4,
+     -3.5,
+     0.12
+    ],
+    [
+     1.9,
+     -3.1,
+     0.55
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.75
+  },
+  {
+   "id": "crates",
+   "kind": "crate",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "cardboard",
+   "bounds": [
+    [
+     2.0,
+     -3.3,
+     0.12
+    ],
+    [
+     2.5,
+     -2.9,
+     0.5
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.7
+  },
+  {
+   "id": "magenta_board",
+   "kind": "beam",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "sign_magenta",
+   "bounds": [
+    [
+     -3.05,
+     -2.0,
+     0.12
+    ],
+    [
+     -2.95,
+     -1.4,
+     1.3
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.75
+  },
+  {
+   "id": "vert_sign",
+   "kind": "beam",
+   "tier": "tertiary",
+   "method": "component",
+   "profile": "decoration",
+   "material": "sign_white",
+   "bounds": [
+    [
+     -2.57,
+     -2.05,
+     1.5
+    ],
+    [
+     -2.4,
+     -1.75,
+     2.9
+    ]
+   ],
+   "source": "observed",
+   "confidence": 0.75
+  }
+ ],
+ "decals": [
+  {
+   "id": "top_sign_glow",
+   "target": "top_sign",
+   "face": "left",
+   "rect": [
+    [
+     -1.82,
+     6.2
+    ],
+    [
+     1.62,
+     7.3
+    ]
+   ],
+   "content": {
+    "type": "image",
+    "path": "../textures/manual/neon_shop/decals/top_sign.png"
+   }
+  },
+  {
+   "id": "lightbox_glow",
+   "target": "lightbox_sign",
+   "face": "left",
+   "rect": [
+    [
+     -1.82,
+     3.68
+    ],
+    [
+     0.52,
+     5.22
+    ]
+   ],
+   "content": {
+    "type": "image",
+    "path": "../textures/manual/neon_shop/decals/lightbox.png"
+   }
+  },
+  {
+   "id": "shop_glow",
+   "target": "shop_glass",
+   "face": "front",
+   "rect": [
+    [
+     0.3,
+     0.4
+    ],
+    [
+     2.1,
+     2.7
+    ]
+   ],
+   "content": {
+    "type": "image",
+    "path": "../textures/manual/neon_shop/decals/shop_window.png"
+   }
+  },
+  {
+   "id": "awning_glow",
+   "target": "awning",
+   "face": "front",
+   "rect": [
+    [
+     0.1,
+     2.5
+    ],
+    [
+     2.4,
+     2.95
+    ]
+   ],
+   "content": {
+    "type": "image",
+    "path": "../textures/manual/neon_shop/decals/awning_script.png"
+   }
+  },
+  {
+   "id": "vert_sign_glow",
+   "target": "vert_sign",
+   "face": "left",
+   "rect": [
+    [
+     -2.02,
+     1.55
+    ],
+    [
+     -1.78,
+     2.85
+    ]
+   ],
+   "content": {
+    "type": "image",
+    "path": "../textures/manual/neon_shop/decals/vert_sign.png"
+   }
+  }
+ ],
+ "export": {
+  "path": "public/models/neon_shop/neon_shop.glb",
+  "clickable": [
+   "shop_window",
+   "entry_door",
+   "top_sign"
+  ],
+  "anim_groups": {},
+  "instance_groups": {
+   "round_signs": [
+    "round_sign_1",
+    "round_sign_2",
+    "round_sign_3"
+   ]
+  },
+  "compress": true
+ }
+}

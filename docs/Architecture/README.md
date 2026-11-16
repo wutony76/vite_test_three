@@ -38,6 +38,7 @@ vite_test_three/
 │     ├─ test02_cottage/      Test B 第二種建築（童話石屋），依 plans/test02_cottage.plan.json 產生
 │     ├─ sample_town/         Test B 小鎮場景，依 plans/sample_town.scene.json 組裝（build_scene.py）
 │     ├─ lamp_post/、crate_pile/  小鎮的裝飾物（街燈、木箱堆）
+│     ├─ neon_shop/           world 的 Gamehall 外觀：電波町霓虹小店（plans/neon_shop.plan.json，招牌 decal 由 scripts/make_neon_shop_decals.py 產生）
 │     │  （每個模型旁都有 <name>.manifest.json；GLB 以 meshopt 壓縮）
 │     └─ tree_round/          小鎮用樹（organic + Voxel Remesh 示範）
 ├─ tools/

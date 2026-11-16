@@ -1,0 +1,614 @@
+{
+ "schema": "lowpoly.reference/1",
+ "id": "neon_shop",
+ "image": {
+  "path": "tools/img/neon_shop.jpg",
+  "width": 853,
+  "height": 856
+ },
+ "medium": "賽博霓虹風兩層街角小店（夜景），等角 3/4 視角草圖",
+ "view": {
+  "type": "three_quarter",
+  "source": "observed",
+  "confidence": 0.85
+ },
+ "scale_anchor": {
+  "component": "entry_door",
+  "axis": "height",
+  "meters": 2.1
+ },
+ "silhouette": {
+  "outline": [
+   [
+    0.12,
+    0.06
+   ],
+   [
+    0.83,
+    0.04
+   ],
+   [
+    0.88,
+    0.4
+   ],
+   [
+    0.93,
+    0.9
+   ],
+   [
+    0.55,
+    0.97
+   ],
+   [
+    0.08,
+    0.75
+   ],
+   [
+    0.12,
+    0.06
+   ]
+  ],
+  "source": "observed",
+  "confidence": 0.75
+ },
+ "palette": [
+  {
+   "name": "wall_mauve",
+   "hex": "#6B4E6E",
+   "usage": "外牆（暗紫灰泥）",
+   "sample": [
+    0.42,
+    0.22,
+    0.48,
+    0.3
+   ]
+  },
+  {
+   "name": "roof_dark",
+   "hex": "#2F2838",
+   "usage": "屋頂板",
+   "sample": [
+    0.55,
+    0.06,
+    0.65,
+    0.1
+   ]
+  },
+  {
+   "name": "base_dark",
+   "hex": "#4A2E4C",
+   "usage": "底座平台（紫色陰影地面）",
+   "sample": [
+    0.6,
+    0.85,
+    0.75,
+    0.9
+   ]
+  },
+  {
+   "name": "neon_cyan",
+   "hex": "#40F0FF",
+   "usage": "霓虹燈條、頂樓招牌字",
+   "sample": [
+    0.2,
+    0.12,
+    0.3,
+    0.16
+   ]
+  },
+  {
+   "name": "window_glow",
+   "hex": "#F6C35A",
+   "usage": "店內與窗內暖光",
+   "sample": [
+    0.6,
+    0.62,
+    0.7,
+    0.72
+   ]
+  },
+  {
+   "name": "sign_yellow",
+   "hex": "#FFD21E",
+   "usage": "直立黃色燈箱、圓形招牌",
+   "sample": [
+    0.575,
+    0.38,
+    0.6,
+    0.48
+   ]
+  },
+  {
+   "name": "sign_magenta",
+   "hex": "#FF2BD6",
+   "usage": "洋紅立牌、店內霓虹笑臉",
+   "sample": [
+    0.09,
+    0.63,
+    0.13,
+    0.7
+   ]
+  },
+  {
+   "name": "sign_white",
+   "hex": "#F4F1E8",
+   "usage": "大燈箱、直立小招牌",
+   "sample": [
+    0.17,
+    0.36,
+    0.33,
+    0.48
+   ]
+  },
+  {
+   "name": "fabric_teal",
+   "hex": "#1E4A57",
+   "usage": "店面雨遮",
+   "sample": [
+    0.62,
+    0.56,
+    0.75,
+    0.6
+   ]
+  },
+  {
+   "name": "metal_light",
+   "hex": "#C9C3D0",
+   "usage": "冷氣室外機",
+   "sample": [
+    0.67,
+    0.39,
+    0.75,
+    0.44
+   ]
+  },
+  {
+   "name": "metal_dark",
+   "hex": "#3A3442",
+   "usage": "排水管、天線",
+   "sample": [
+    0.505,
+    0.3,
+    0.52,
+    0.4
+   ]
+  },
+  {
+   "name": "wood_dark",
+   "hex": "#4A3328",
+   "usage": "店門口長凳",
+   "sample": [
+    0.58,
+    0.78,
+    0.7,
+    0.82
+   ]
+  }
+ ],
+ "components": [
+  {
+   "id": "platform",
+   "kind": "foundation",
+   "tier": "primary",
+   "bbox": [
+    0.08,
+    0.62,
+    0.95,
+    0.97
+   ],
+   "material_hint": "base_dark",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "gf_shell",
+   "kind": "wall_block",
+   "tier": "primary",
+   "bbox": [
+    0.12,
+    0.5,
+    0.82,
+    0.86
+   ],
+   "material_hint": "wall_mauve",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "upper_shell",
+   "kind": "wall_block",
+   "tier": "primary",
+   "bbox": [
+    0.13,
+    0.15,
+    0.83,
+    0.42
+   ],
+   "material_hint": "wall_mauve",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "cornice",
+   "kind": "beam",
+   "tier": "secondary",
+   "bbox": [
+    0.08,
+    0.38,
+    0.88,
+    0.52
+   ],
+   "material_hint": "roof_dark",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "roof_slab",
+   "kind": "beam",
+   "tier": "secondary",
+   "bbox": [
+    0.12,
+    0.04,
+    0.85,
+    0.25
+   ],
+   "material_hint": "roof_dark",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "top_sign",
+   "kind": "beam",
+   "tier": "secondary",
+   "bbox": [
+    0.13,
+    0.08,
+    0.52,
+    0.2
+   ],
+   "material_hint": "neon_cyan",
+   "source": "observed",
+   "confidence": 0.8,
+   "note": "使用者指定改成「電 • 波 • 町」"
+  },
+  {
+   "id": "lightbox_sign",
+   "kind": "beam",
+   "tier": "secondary",
+   "bbox": [
+    0.14,
+    0.33,
+    0.38,
+    0.53
+   ],
+   "material_hint": "sign_white",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "upper_window",
+   "kind": "window",
+   "tier": "secondary",
+   "bbox": [
+    0.63,
+    0.17,
+    0.77,
+    0.37
+   ],
+   "material_hint": "window_glow",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "ac_unit",
+   "kind": "crate",
+   "tier": "tertiary",
+   "bbox": [
+    0.66,
+    0.38,
+    0.77,
+    0.45
+   ],
+   "material_hint": "metal_light",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "yellow_sign",
+   "kind": "beam",
+   "tier": "tertiary",
+   "bbox": [
+    0.57,
+    0.35,
+    0.61,
+    0.51
+   ],
+   "material_hint": "sign_yellow",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "round_signs",
+   "kind": "sign_disc",
+   "tier": "tertiary",
+   "bbox": [
+    0.81,
+    0.22,
+    0.87,
+    0.4
+   ],
+   "material_hint": "sign_yellow",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "entry_door",
+   "kind": "door",
+   "tier": "secondary",
+   "bbox": [
+    0.24,
+    0.55,
+    0.35,
+    0.8
+   ],
+   "material_hint": "window_glow",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "vert_sign",
+   "kind": "beam",
+   "tier": "tertiary",
+   "bbox": [
+    0.17,
+    0.53,
+    0.2,
+    0.65
+   ],
+   "material_hint": "sign_white",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "magenta_board",
+   "kind": "beam",
+   "tier": "tertiary",
+   "bbox": [
+    0.08,
+    0.61,
+    0.15,
+    0.74
+   ],
+   "material_hint": "sign_magenta",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "shop_window",
+   "kind": "shop_window",
+   "tier": "secondary",
+   "bbox": [
+    0.55,
+    0.57,
+    0.76,
+    0.8
+   ],
+   "material_hint": "window_glow",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "awning",
+   "kind": "awning",
+   "tier": "secondary",
+   "bbox": [
+    0.57,
+    0.55,
+    0.88,
+    0.66
+   ],
+   "material_hint": "fabric_teal",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "bench",
+   "kind": "beam",
+   "tier": "tertiary",
+   "bbox": [
+    0.55,
+    0.75,
+    0.73,
+    0.88
+   ],
+   "material_hint": "wood_dark",
+   "source": "observed",
+   "confidence": 0.8
+  },
+  {
+   "id": "drainpipe",
+   "kind": "pipe",
+   "tier": "tertiary",
+   "bbox": [
+    0.5,
+    0.25,
+    0.53,
+    0.75
+   ],
+   "material_hint": "metal_dark",
+   "source": "observed",
+   "confidence": 0.6
+  },
+  {
+   "id": "antenna",
+   "kind": "pipe",
+   "tier": "tertiary",
+   "bbox": [
+    0.45,
+    0.0,
+    0.47,
+    0.1
+   ],
+   "material_hint": "metal_dark",
+   "source": "observed",
+   "confidence": 0.6
+  }
+ ],
+ "surfaces": [
+  {
+   "id": "plaster_wall",
+   "region": [
+    [
+     0.42,
+     0.18
+    ],
+    [
+     0.6,
+     0.18
+    ],
+    [
+     0.6,
+     0.32
+    ],
+    [
+     0.42,
+     0.32
+    ]
+   ],
+   "class": "plaster",
+   "pattern": "plaster",
+   "base_hex": "#6B4E6E",
+   "scale_m": 0.3,
+   "components": [
+    "gf_shell",
+    "upper_shell"
+   ],
+   "source": "observed",
+   "confidence": 0.75
+  },
+  {
+   "id": "roof_metal",
+   "region": [
+    [
+     0.5,
+     0.05
+    ],
+    [
+     0.7,
+     0.05
+    ],
+    [
+     0.7,
+     0.1
+    ],
+    [
+     0.5,
+     0.1
+    ]
+   ],
+   "class": "metal",
+   "pattern": "stripes",
+   "base_hex": "#2F2838",
+   "scale_m": 0.12,
+   "components": [
+    "roof_slab"
+   ],
+   "source": "inferred",
+   "confidence": 0.5,
+   "assumption": "屋頂板在圖中只看到暗色上緣，推測為深色金屬浪板"
+  },
+  {
+   "id": "ground_slab",
+   "region": [
+    [
+     0.6,
+     0.85
+    ],
+    [
+     0.8,
+     0.85
+    ],
+    [
+     0.8,
+     0.92
+    ],
+    [
+     0.6,
+     0.92
+    ]
+   ],
+   "class": "stone",
+   "pattern": "cobble",
+   "base_hex": "#4A2E4C",
+   "scale_m": 0.35,
+   "components": [
+    "platform"
+   ],
+   "source": "inferred",
+   "confidence": 0.5,
+   "assumption": "地面平台被紫色陰影覆蓋，推測為深色石板"
+  },
+  {
+   "id": "awning_fabric",
+   "region": [
+    [
+     0.62,
+     0.56
+    ],
+    [
+     0.75,
+     0.56
+    ],
+    [
+     0.75,
+     0.6
+    ],
+    [
+     0.62,
+     0.6
+    ]
+   ],
+   "class": "fabric",
+   "pattern": "weave",
+   "base_hex": "#1E4A57",
+   "scale_m": 0.05,
+   "components": [
+    "awning"
+   ],
+   "source": "observed",
+   "confidence": 0.7
+  }
+ ],
+ "hidden": [
+  {
+   "id": "back_walls",
+   "assumption": "背面與右側（+X）牆面無開口，材質同暗紫灰泥",
+   "source": "inferred",
+   "confidence": 0.6
+  },
+  {
+   "id": "interior",
+   "assumption": "店內與窗內以暖色自發光面＋decal 表現",
+   "source": "inferred",
+   "confidence": 0.6
+  }
+ ],
+ "excluded": [
+  {
+   "reason": "左後方的鐵絲網圍牆屬於背景",
+   "what": "fence"
+  },
+  {
+   "reason": "電線",
+   "what": "wires"
+  },
+  {
+   "reason": "信箱、地上小燈、紙箱細節、窗台盆栽",
+   "what": "small_props"
+  },
+  {
+   "reason": "原圖招牌字是潦草示意，改用 decal（頂樓招牌依使用者指定為「電 • 波 • 町」）",
+   "what": "sign_text"
+  }
+ ]
+}

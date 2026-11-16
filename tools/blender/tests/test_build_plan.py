@@ -131,3 +131,36 @@ def test_cottage_builds_with_chimney_merged_and_flue_kept():
     assert flue in bpy.data.objects["test02_cottage_Root"].children_recursive
     assert result["changes"]["triangles"] <= 6000 and result["changes"]["primitives"] <= 32
     assert not [i for i in result["report"]["geometry"]["issues"] if i["level"] == "fail"]
+
+
+def test_quarter_turn_component_fills_world_bounds():
+    """繞 Z 轉 ±90° 的元件（例如側牆上的門）：builder 用對調的寬深建模，轉完要剛好落在 plan 的 bounds 內。"""
+    plan = copy.deepcopy(_load(SHOP))
+    door = next(c for c in plan["components"] if c["kind"] == "door")
+    # 門改放到 -X 側牆外：世界座標上是「薄（x）× 寬（y）」
+    door["bounds"] = [[-3.2, -0.6, 0.12], [-3.06, 0.6, 2.3]]
+    door["transform"] = {"rotation_deg": [0, 0, -90]}
+    for comp in plan["components"]:
+        openings = comp.get("params", {}).get("openings")
+        if openings and door["id"] in openings:
+            openings.remove(door["id"])
+    # 已知限制：轉向元件底下的子元件（例如門玻璃）位置不會跟著換算，這裡只驗證元件本身
+    children = {c["id"] for c in plan["components"] if c.get("parent") == door["id"]}
+    plan["components"] = [c for c in plan["components"] if c["id"] not in children]
+    for decal in list(plan.get("decals", [])):
+        if decal["target"] in children:
+            plan["decals"].remove(decal)
+    for group in plan.get("export", {}).get("instance_groups", {}).values():
+        group[:] = [m for m in group if m not in children]
+    plan["export"]["clickable"] = [m for m in plan["export"].get("clickable", []) if m not in children]
+    plan["dimensions"]["w"] = max(plan["dimensions"]["w"], 6.6)
+    result = api.build_asset_from_plan(plan)
+    geometry = result["report"]["geometry"]
+    door_issues = [i for i in geometry["issues"] if door["id"] in i["object"] and i["code"] == "OUT_OF_BOUNDS"]
+    assert not door_issues, door_issues
+    obj = next(o for o in bpy.data.objects if o.get("lpk_component") == door["id"])
+    corners = [obj.matrix_world @ v.co for v in obj.data.vertices]
+    span_x = max(c.x for c in corners) - min(c.x for c in corners)
+    span_y = max(c.y for c in corners) - min(c.y for c in corners)
+    # 轉完應該是「y 方向寬、x 方向薄」
+    assert span_y > span_x * 3, (span_x, span_y)

@@ -1,0 +1,102 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "neon_shop",
+  "glb": "neon_shop.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_materials_emissive_strength"
+  ],
+  "root": "neon_shop_Root",
+  "clickable": [
+    "neon_shop_entry_door",
+    "neon_shop_shop_window",
+    "neon_shop_top_sign"
+  ],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 2374,
+    "primitives": 35,
+    "meshes": 33,
+    "materials": 7,
+    "file_bytes": 304980
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "pass",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "wall_mauve": {
+        "class": "plaster",
+        "pattern": "plaster",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.3,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "plaster",
+          "seed": 742008183,
+          "hash": "2c3a2577b79a"
+        }
+      },
+      "roof_dark": {
+        "class": "metal",
+        "pattern": "stripes",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.72,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "stripes",
+          "seed": 120168867,
+          "hash": "0729a1a31123"
+        }
+      },
+      "base_dark": {
+        "class": "stone",
+        "pattern": "cobble",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 1.4,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "cobble",
+          "seed": 1912462178,
+          "hash": "71fddb623012"
+        }
+      },
+      "fabric_teal": {
+        "class": "fabric",
+        "pattern": "weave",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.8,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "weave",
+          "seed": 3609101083,
+          "hash": "d71e831b1574"
+        }
+      }
+    },
+    "bake": {
+      "mode": "ao",
+      "size": 128,
+      "seconds": 0.27
+    },
+    "decals": 5,
+    "gpu_texture_mb": 8.79,
+    "flat_ratio": 0.113,
+    "texture_count": 14,
+    "texture_kb": 116.6,
+    "images": 14,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 297.8
+  }
+}

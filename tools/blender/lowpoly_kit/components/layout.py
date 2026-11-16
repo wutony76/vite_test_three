@@ -100,7 +100,8 @@ def layout_plan(doc, detail, seed):
             for child in edits:
                 if comps[child].get("parent") == cid and comps[child].get("params", {}).get("face") == "front":
                     regions.append(_front_rect(child, "edit", comps[child], origins[cid]))
-        contexts[cid] = BuildContext(comp, detail, [m["name"] for m in doc["materials"]], seed, children, regions)
+        contexts[cid] = BuildContext(_builder_comp(comp), detail, [m["name"] for m in doc["materials"]], seed, children,
+                                     regions)
 
     unknown_edits = [cid for cid in edits if comps[cid]["kind"] not in EDIT_KINDS]
     return {
@@ -116,6 +117,33 @@ def layout_plan(doc, detail, seed):
         "unknown_edits": unknown_edits,
         "instance_rejected": rejected,
     }
+
+
+def quarter_turns_z(comp):
+    """transform.rotation_deg 只繞 Z 轉 90° 的奇數倍時回傳 True（寬、深會對調）。"""
+    rotation = comp.get("transform", {}).get("rotation_deg")
+    if not rotation:
+        return False
+    rx, ry, rz = rotation
+    if abs(rx) > 1e-6 or abs(ry) > 1e-6:
+        return False
+    turns = rz / 90.0
+    return abs(turns - round(turns)) < 1e-6 and int(round(turns)) % 2 != 0
+
+
+def _builder_comp(comp):
+    """builder 看到的元件：bounds 是「資產座標」的外框；元件繞 Z 轉 ±90° 時，
+    builder 要在自己的座標裡用對調過的寬深建模，轉完才會剛好填滿 bounds。
+    （例如側面的門：plan 寫 0.14 寬 × 1.3 深，builder 要建 1.3 寬 × 0.14 深的門，再轉 -90° 貼到側牆上）
+    """
+    if not quarter_turns_z(comp):
+        return comp
+    (x0, y0, z0), (x1, y1, z1) = comp["bounds"]
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    hw, hd = (x1 - x0) / 2, (y1 - y0) / 2
+    swapped = dict(comp)
+    swapped["bounds"] = [[cx - hd, cy - hw, z0], [cx + hd, cy + hw, z1]]
+    return swapped
 
 
 def _similar(a, b, tolerance=0.3):
