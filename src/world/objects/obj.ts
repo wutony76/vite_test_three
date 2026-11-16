@@ -33,6 +33,7 @@ import {
   LEMON_SLICE_PLACEMENTS,
   type LemonSliceLayout,
 } from './lemonSliceLayout';
+import { createPig, type PigSettings } from './pig';
 
 // 模型放在 public/ 底下，Vite 會原封不動地提供，網址從 BASE_URL 開始算
 // 想換模型只要改這裡：雞塊檔案還沒下載，先用雞腿看效果
@@ -42,17 +43,23 @@ const MODEL_URL = `${import.meta.env.BASE_URL}models/chicken_leg/chicken_leg.glb
 // projectRoom 的外觀：用 Blender 做的 low poly 房子（匯出時已拿掉底下那塊平的地面，才能種在球面上）
 const PROJECT_ROOM_MODEL_URL = `${import.meta.env.BASE_URL}models/project_room/project_room.glb`;
 const GAME_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/game_hall/gameHall.glb`;
+const TW_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/twhall/twhall.glb`;
+// bgRoom 的外觀：日式街角三層小樓（一樓投幣洗衣店＋外側樓梯、二樓麻雀館），plan 在 tools/blender/plans/laundry.plan.json
+const LAUNDRY_MODEL_URL = `${import.meta.env.BASE_URL}models/laundry/laundry.glb`;
 
 export const WORLD_GLTF_URLS = [
   MODEL_URL,
   PROJECT_ROOM_MODEL_URL,
   GAME_HALL_MODEL_URL,
+  TW_HALL_MODEL_URL,
+  LAUNDRY_MODEL_URL,
   `${import.meta.env.BASE_URL}models/pudding/pudding.glb`,
   `${import.meta.env.BASE_URL}models/grilled_corn/grilled_corn.glb`,
   `${import.meta.env.BASE_URL}models/salmon_steak/salmon_steak.glb`,
   `${import.meta.env.BASE_URL}models/lemon_slice/lemon_slice.glb`,
   `${import.meta.env.BASE_URL}models/fried_egg/fried_egg.glb`,
   `${import.meta.env.BASE_URL}models/roast_chicken/roast_chicken.glb`,
+  `${import.meta.env.BASE_URL}models/pig/pig.glb`,
 ] as const;
 
 // true = 載入網路下載的模型；false = 顯示原本的綠色球
@@ -415,31 +422,34 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     spinDegrees: 84,
     sink: 0.02,
     scale: 0.14,
-    width: 1.2,
-    height: 0.9,
-    depth: 1.05,
+    // 洗衣店模型約 5.4×7.6×5.0 m（寬×高×深），盒子比例跟著改成瘦高；
+    // 少了這步，fitIntoHouseBox 等比例縮放時會被「高度」卡住，整棟變很小
+    width: 1.0,
+    height: 1.4,
+    depth: 0.93,
     color: '#1cab5a',
   });
   bgRoom.applySettings();
   ground.add(bgRoom.object);
+  attachHouseModel(bgRoom, LAUNDRY_MODEL_URL);
 
   // TW
   const twRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   Object.assign(twRoom.settings, {
     angleFromTopDegrees: 22,
     azimuthDegrees: -80,
-    spinDegrees: 29,
+    spinDegrees: 135,
     sink: 0.03,
     scale: 0.15,
-    // 不要正方體：正方體種在斜坡上會像骰子倒著，拉高一點才像一棟小房子
-    width: 0.75,
-    height: 1.15,
-    depth: 0.75,
+    // twhall 立面偏高（約 8.6×7.5 m），盒子略拉高避免 fit 時壓扁
+    width: 1.25,
+    height: 1.12,
+    depth: 0.92,
     color: '#8280ea',
   });
   twRoom.applySettings();
   ground.add(twRoom.object);
-
+  attachHouseModel(twRoom, TW_HALL_MODEL_URL);
 
   const Gamehall = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   Object.assign(Gamehall.settings, {
@@ -475,6 +485,36 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
 
   const introHouses = [mainHall, projectRoom, bgRoom, twRoom, Gamehall];
   const gameHallIntroIndex = introHouses.length - 1;
+
+  function getPigObstacleRoots(): THREE.Object3D[] {
+    const roots: THREE.Object3D[] = introHouses.map((house) => house.object);
+    for (const { world } of puddingEntries) roots.push(world.object);
+    for (const { world } of grilledCornEntries) roots.push(world.object);
+    for (const { world } of salmonSteakEntries) roots.push(world.object);
+    for (const { world } of lemonSliceEntries) roots.push(world.object);
+    for (const { world } of friedEggEntries) {
+      if (world.settings.mode === 'sphere') roots.push(world.object);
+    }
+    return roots;
+  }
+
+  let pigRuntime: ReturnType<typeof createPig> | null = null;
+  if (puddingAxes) {
+    try {
+      pigRuntime = createPig({ ...puddingAxes, camera, getObstacleRoots: getPigObstacleRoots });
+      ground.add(pigRuntime.object);
+    } catch (error) {
+      console.error('[pig] 建立失敗，已略過（world 其餘場景照常）', error);
+    }
+  }
+  const pig: WorldPig | null = pigRuntime ?
+    {
+      label: '小豬',
+      object: pigRuntime.object,
+      settings: pigRuntime.settings,
+      apply: pigRuntime.applySettings,
+    }
+  : null;
   // 鏡頭看的方向。小球的起點會落在這個方向和畫面上方之間
   const approachDir = new THREE.Vector3();
   if (camera.position.lengthSq() > 1e-8) approachDir.copy(camera.position).normalize();
@@ -591,6 +631,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
   for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
   for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
+  pigRuntime?.setIntroGrow(0);
   groundFlowers?.resetIntro(introHouses.length);
   placeFlowers(0);
   if (ground !== all) ground.visible = false;
@@ -645,6 +686,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(1);
         for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(1);
         for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(1);
+        pigRuntime?.setIntroGrow(1);
       }
     }
 
@@ -686,6 +728,17 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       runtime.setIntroGrow(easeOutBack(lemonT, 2.0));
       runtime.update();
     });
+    if (pigRuntime) {
+      const pigStart = introSettings.emptyHold + introSettings.ballSeconds * 0.55;
+      const pigT = introDone ? 1 : THREE.MathUtils.clamp((introElapsed - pigStart) / 0.9, 0, 1);
+      pigRuntime.setIntroGrow(easeOutBack(pigT, 1.9));
+      try {
+        pigRuntime.update(deltaTime, introDone);
+      } catch (error) {
+        console.error('[pig] update 失敗', error);
+      }
+    }
+
     friedEggEntries.forEach(({ runtime }, index) => {
       if (introDone) {
         runtime.setIntroGrow(1);
@@ -752,6 +805,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
     for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
     for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
+    pigRuntime?.setIntroGrow(0);
   }
 
   // 緞帶擺放參數也往外交出去，讓 main.ts 的控制面板可以調整
@@ -796,6 +850,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     lemonSlices,
     addLemonSlice,
     removeLemonSlice,
+    pig,
     houses: [
       exposeHouse('mainHall', mainHall),
       exposeHouse('projectRoom', projectRoom),
@@ -835,6 +890,13 @@ export type WorldLemonSlice = {
   applyVisuals: () => void;
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldPig = {
+  label: string;
+  object: THREE.Object3D;
+  settings: PigSettings;
+  apply: () => void;
 };
 
 export type WorldPudding = {

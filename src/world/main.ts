@@ -1,5 +1,13 @@
 console.log('world');
 
+/** 模組載入階段若拋錯，否則 #scene-cover 會一直擋住畫面 */
+function dismissSceneCoverOnFatalError() {
+  const removeCover = () => document.getElementById('scene-cover')?.remove();
+  window.addEventListener('error', removeCover);
+  window.addEventListener('unhandledrejection', removeCover);
+}
+dismissSceneCoverOnFatalError();
+
 import * as THREE from 'three';
 import gradientVertexShader from './shader/gradient.vert.glsl?raw';
 import gradientFragmentShader from './shader/gradient.frag.glsl?raw';
@@ -24,6 +32,7 @@ import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
 import { formatPuddingPlacementsForPaste } from './objects/pudding';
 import { formatSalmonSteakPlacementsForPaste } from './objects/salmonSteak';
 import { formatFriedEggPlacementsForPaste } from './objects/friedEgg';
+import { formatPigSettingsForPaste } from './objects/pig';
 import type { FriedEggSunLayout } from './objects/friedEggLayout';
 // lil-gui：three.js 內建的小型控制面板，拖拉滑桿就能即時調整數值，不用改程式碼重新整理
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
@@ -43,7 +52,8 @@ const renderer = new THREE.WebGLRenderer();
 renderer.debug.checkShaderErrors = false;
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// r186 起移除 PCFSoftShadowMap；柔邊改調各光源 shadow.radius
+renderer.shadowMap.type = THREE.PCFShadowMap;
 // 關掉自動清畫面：一幀要畫兩個場景（背景 + 主場景），
 // 少了這行，第二次 render 前會把畫面清空，背景漸層就被擦成黑色
 renderer.autoClear = false;
@@ -148,6 +158,7 @@ directionalLight.shadow.camera.top = sunShadowSpan;
 directionalLight.shadow.camera.bottom = -sunShadowSpan;
 directionalLight.shadow.bias = -0.00012;
 directionalLight.shadow.normalBias = 0.022;
+directionalLight.shadow.radius = 4;
 directionalLight.shadow.camera.updateProjectionMatrix();
 scene.add(directionalLight);
 scene.add(directionalLight.target);
@@ -168,6 +179,7 @@ flashlight.shadow.camera.near = 0.4;
 flashlight.shadow.camera.far = 40;
 flashlight.shadow.bias = -0.00015;
 flashlight.shadow.normalBias = 0.025;
+flashlight.shadow.radius = 5;
 scene.add(flashlight);
 scene.add(flashlight.target);
 
@@ -211,6 +223,7 @@ const {
   lemonSlices,
   addLemonSlice,
   removeLemonSlice,
+  pig,
 } = createObjs({ envMap, camera });
 
 /** 一次關掉整類食物（仍保留佈局，取消勾選即再顯示） */
@@ -712,7 +725,7 @@ transitionFolder.addColor(transitionSettings, 'color').name('黑幕顏色').onFi
 // 點到哪一棟，這個分組（番茄醬緞帶的下方）就改顯示那一棟的滑桿
 const houseFolder = gui.addFolder('房子');
 // 一開始先顯示第一棟，還沒點過房子時面板也有東西可調
-let selectedHouse = houses[0];
+let selectedHouse: WorldHouse | null = houses[0];
 
 function bindHousePanel(entry: WorldHouse) {
   // 已經是這一棟就不要拆掉滑桿重建：拖曳中每一格都會碰面板，重建會讓數字閃一下
@@ -770,11 +783,21 @@ function logGameHallLights() {
   );
 }
 
+function clearHouseSelection() {
+  selectedHouse = null;
+  highlightHouse(null);
+  houseEnterReady = false;
+  houseLabel.style.visibility = 'hidden';
+  houseFolder.title('房子');
+  for (const controller of [...houseFolder.controllers]) controller.destroy();
+  syncWorldActionButtons();
+}
+
 /** 選中的那一棟自己發光，才分得出面板上的數字是哪一棟的 */
-function highlightHouse(entry: WorldHouse) {
+function highlightHouse(entry: WorldHouse | null) {
   for (const house of houses) {
     const material = house.object.material;
-    const active = house === entry;
+    const active = entry !== null && house === entry;
     material.emissive.set(active ? house.settings.color : 0x000000);
     // 只要能認出選中的是哪一棟；太亮會把那一棟洗白，其他棟看起來更暗
     material.emissiveIntensity = active ? 0.16 : 1;
@@ -783,8 +806,13 @@ function highlightHouse(entry: WorldHouse) {
 
 bindHousePanel(houses[0]);
 
+/** false = 場景上不可點選、拖曳，也不顯示調整面板 */
+const PUDDING_SCENE_EDIT = false;
+const CORN_SCENE_EDIT = false;
+
 // DEBUG...布丁（綠球上，可多顆）
-const puddingFolder = puddings.length > 0 ? gui.addFolder('布丁') : null;
+const puddingFolder =
+  PUDDING_SCENE_EDIT && puddings.length > 0 ? gui.addFolder('布丁') : null;
 let selectedPudding: WorldPudding | null = null;
 
 function highlightPudding(entry: WorldPudding | null) {
@@ -989,7 +1017,7 @@ if (puddingFolder) {
 }
 
 // 烤玉米（綠球上；拖曳選取後調整）
-const cornFolder = gui.addFolder('烤玉米');
+const cornFolder = CORN_SCENE_EDIT ? gui.addFolder('烤玉米') : null;
 let selectedCorn: WorldGrilledCorn | null = null;
 
 function highlightCorn(entry: WorldGrilledCorn | null) {
@@ -1300,6 +1328,55 @@ if (salmonFolder) {
   if (salmonSteaks[0]) bindSalmonPanel(salmonSteaks[0]);
 }
 
+// 小豬（綠球上亂跑）
+const pigFolder = pig ? gui.addFolder('小豬') : null;
+
+function logPigSettings() {
+  if (!pig) return;
+  console.log(formatPigSettingsForPaste(pig.settings));
+}
+
+if (pigFolder && pig) {
+  const apply = () => pig.apply();
+  pigFolder.add(pig.settings, 'modelSize', 0.05, 0.45, 0.005).name('大小 (m)').onChange(apply).onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'placementScale', 0.1, 2.5, 0.01).name('整體縮放').onChange(apply).onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'angleFromTopDegrees', 8, 88, 1).name('重生離頂端 (°)').onChange(apply).onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'azimuthDegrees', -180, 180, 1).name('重生方位 (°)').onChange(apply).onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'roamColatitudeMin', 5, 88, 1).name('跑動上界 (離頂端 °)').onChange(apply).onFinishChange(logPigSettings);
+  pigFolder
+    .add(pig.settings, 'roamColatitudeMax', 25, 75, 1)
+    .name('跑動下界 (勿進醬汁區)')
+    .onChange(apply)
+    .onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'stayInViewHemisphere').name('偏好走向鏡頭').onChange(apply).onFinishChange(logPigSettings);
+  pigFolder
+    .add(pig.settings, 'viewHemisphereDotMin', 0, 0.45, 0.02)
+    .name('重生可見餘量 (dot)')
+    .onChange(apply)
+    .onFinishChange(logPigSettings);
+  pigFolder.add({ respawn: () => pig.apply() }, 'respawn').name('重生到鏡頭前');
+  pigFolder.add(pig.settings, 'roamSpeedDegrees', 0.5, 60, 0.5).name('跑速 (°/s)').onChange(apply).onFinishChange(logPigSettings);
+  pigFolder
+    .add(pig.settings, 'turnDegreesPerSecond', 20, 360, 5)
+    .name('轉向速度 (°/s)')
+    .onFinishChange(logPigSettings);
+  pigFolder
+    .add(pig.settings, 'modelYawOffsetDegrees', -180, 180, 5)
+    .name('鼻向校正 (°)')
+    .onChange(apply)
+    .onFinishChange(logPigSettings);
+  pigFolder
+    .add(pig.settings, 'obstacleMarginDegrees', 0.5, 12, 0.25)
+    .name('避障加寬 (°)')
+    .onChange(apply)
+    .onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'wanderSeconds', 0.5, 12, 0.1).name('轉向間隔 (秒)').onChange(apply).onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'waddleStrength', 0, 0.35, 0.01).name('搖晃幅度').onChange(apply).onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'sink', -0.15, 0.08, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(logPigSettings);
+  pigFolder.add({ log: logPigSettings }, 'log').name('印出設定 (console)');
+  pigFolder.open();
+}
+
 // 檸檬片（綠球上；拖曳選取後調整，可複製）
 const lemonFolder = gui.addFolder('檸檬片');
 let selectedLemon: WorldLemonSlice | null = null;
@@ -1493,6 +1570,10 @@ const labelAnchor = new THREE.Vector3();
 
 /** 把選中房子的屋頂中心投影到螢幕，名字就浮在它正上方 */
 function updateHouseLabel() {
+  if (!selectedHouse) {
+    houseLabel.style.visibility = 'hidden';
+    return;
+  }
   // 房子還埋在地裡時，名字會貼在球面上跟著跑。等它長出來再顯示
   if (!isHouseGrown(selectedHouse.object)) {
     houseLabel.style.visibility = 'hidden';
@@ -1528,8 +1609,8 @@ const friedEggsOnSphere = () => friedEggs.filter((egg) => egg.settings.mode === 
 
 let surfaceDragTargets: Array<WorldHouse | WorldPudding | WorldGrilledCorn | WorldFriedEgg | WorldSalmonSteak | WorldLemonSlice> = [
   ...houses,
-  ...puddings,
-  ...grilledCorns,
+  ...(PUDDING_SCENE_EDIT ? puddings : []),
+  ...(CORN_SCENE_EDIT && foodVisibility.showCorn ? grilledCorns : []),
   ...friedEggsOnSphere(),
   ...salmonSteaks,
   ...lemonSlices,
@@ -1537,8 +1618,9 @@ let surfaceDragTargets: Array<WorldHouse | WorldPudding | WorldGrilledCorn | Wor
 
 function refreshPuddingDragTargets() {
   surfaceDragTargets.length = 0;
-  surfaceDragTargets.push(...houses, ...puddings, ...friedEggsOnSphere());
-  if (foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
+  surfaceDragTargets.push(...houses, ...friedEggsOnSphere());
+  if (PUDDING_SCENE_EDIT) surfaceDragTargets.push(...puddings);
+  if (CORN_SCENE_EDIT && foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
   if (foodVisibility.showSalmon) surfaceDragTargets.push(...salmonSteaks);
   if (foodVisibility.showLemon) surfaceDragTargets.push(...lemonSlices);
 }
@@ -1558,10 +1640,14 @@ if (HOUSE_DRAG_ENABLED) {
         markHouseSelected();
         return;
       }
-      const puddingEntry = puddings.find((item) => item.object === target.object);
-      if (puddingEntry) bindPuddingPanel(puddingEntry);
-      const cornEntry = grilledCorns.find((item) => item.object === target.object);
-      if (cornEntry) bindCornPanel(cornEntry);
+      if (PUDDING_SCENE_EDIT) {
+        const puddingEntry = puddings.find((item) => item.object === target.object);
+        if (puddingEntry) bindPuddingPanel(puddingEntry);
+      }
+      if (CORN_SCENE_EDIT) {
+        const cornEntry = grilledCorns.find((item) => item.object === target.object);
+        if (cornEntry) bindCornPanel(cornEntry);
+      }
       const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
       if (salmonEntry) bindSalmonPanel(salmonEntry);
       const lemonEntry = lemonSlices.find((item) => item.object === target.object);
@@ -1577,26 +1663,32 @@ if (HOUSE_DRAG_ENABLED) {
     },
     onDragEnd: (target) => {
       if (houses.some((house) => house.object === target.object)) logHouse();
-      else if (puddings.some((item) => item.object === target.object)) logPuddingPlacements();
-      else if (grilledCorns.some((item) => item.object === target.object)) logCornPlacements();
+      else if (PUDDING_SCENE_EDIT && puddings.some((item) => item.object === target.object)) logPuddingPlacements();
+      else if (CORN_SCENE_EDIT && grilledCorns.some((item) => item.object === target.object)) logCornPlacements();
       else if (salmonSteaks.some((item) => item.object === target.object)) logSalmonPlacements();
       else if (lemonSlices.some((item) => item.object === target.object)) logLemonPlacements();
     },
     onClick: (target) => {
       if (houses.some((house) => house.object === target.object)) markHouseSelected();
-      const puddingEntry = puddings.find((item) => item.object === target.object);
-      if (puddingEntry) bindPuddingPanel(puddingEntry);
-      const cornEntry = grilledCorns.find((item) => item.object === target.object);
-      if (cornEntry) bindCornPanel(cornEntry);
+      if (PUDDING_SCENE_EDIT) {
+        const puddingEntry = puddings.find((item) => item.object === target.object);
+        if (puddingEntry) bindPuddingPanel(puddingEntry);
+      }
+      if (CORN_SCENE_EDIT) {
+        const cornEntry = grilledCorns.find((item) => item.object === target.object);
+        if (cornEntry) bindCornPanel(cornEntry);
+      }
       const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
       if (salmonEntry) bindSalmonPanel(salmonEntry);
       const lemonEntry = lemonSlices.find((item) => item.object === target.object);
       if (lemonEntry) bindLemonPanel(lemonEntry);
     },
+    onBackgroundClick: clearHouseSelection,
   });
 }
 
 function logHouse() {
+  if (!selectedHouse) return;
   const houseSettings = selectedHouse.settings;
   console.log(
     `// ${selectedHouse.label}\n` +
@@ -1706,10 +1798,18 @@ async function warmSceneShaders() {
 }
 
 void playSceneLoad(async () => {
-  await whenGltfsReady(WORLD_GLTF_URLS);
-  await whenGltfMountsIdle();
-  all.updateMatrixWorld(true);
-  await warmSceneShaders();
+  await Promise.race([
+    (async () => {
+      await whenGltfsReady(WORLD_GLTF_URLS);
+      await Promise.race([
+        whenGltfMountsIdle(),
+        new Promise<void>((resolve) => setTimeout(resolve, 12_000)),
+      ]);
+      all.updateMatrixWorld(true);
+      await warmSceneShaders();
+    })(),
+    new Promise<void>((_, reject) => setTimeout(() => reject(new Error('world load timeout')), 22_000)),
+  ]);
 })
   .then(() => {
     worldUiActions?.removeAttribute('hidden');

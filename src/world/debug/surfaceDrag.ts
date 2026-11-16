@@ -35,12 +35,26 @@ type SurfaceDragOptions = {
   onDragEnd?: (target: SurfaceDragTarget) => void;
   // 只是點一下、幾乎沒移動時通知。拖著房子走不要算點擊，不然每拖一次都播整段轉場
   onClick?: (target: SurfaceDragTarget) => void;
+  /** 點在空白處（沒有點到 targets）且幾乎沒拖移 */
+  onBackgroundClick?: () => void;
 };
 
 // 超過這個距離就當成在拖房子，不播轉場。單位是像素
 const CLICK_DISTANCE = 6;
 
-export function enableSurfaceDrag({ targets, ground, groundRadius, camera, domElement, controls, onDragStart, onDrag, onDragEnd, onClick }: SurfaceDragOptions) {
+export function enableSurfaceDrag({
+  targets,
+  ground,
+  groundRadius,
+  camera,
+  domElement,
+  controls,
+  onDragStart,
+  onDrag,
+  onDragEnd,
+  onClick,
+  onBackgroundClick,
+}: SurfaceDragOptions) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   // 射線換到 ground 的座標系：球心就是原點，算球面交點比較單純
@@ -57,6 +71,7 @@ export function enableSurfaceDrag({ targets, ground, groundRadius, camera, domEl
   let downX = 0;
   let downY = 0;
   let dragged = false;
+  let backgroundClickPending = false;
 
   /** 把滑鼠的像素座標換成 -1 ~ 1 的標準化座標，射線要用這種座標 */
   function updatePointer(event: PointerEvent) {
@@ -95,7 +110,14 @@ export function enableSurfaceDrag({ targets, ground, groundRadius, camera, domEl
     if (event.button !== 0) return;
     updatePointer(event);
     const target = findTarget();
-    if (!target) return;
+    if (!target) {
+      backgroundClickPending = true;
+      downX = event.clientX;
+      downY = event.clientY;
+      dragged = false;
+      return;
+    }
+    backgroundClickPending = false;
 
     getPointerNormal(pointerNormal);
     grabOffset.setFromUnitVectors(pointerNormal, target.getNormal());
@@ -128,9 +150,21 @@ export function enableSurfaceDrag({ targets, ground, groundRadius, camera, domEl
   }
 
   function onPointerUp(event: PointerEvent) {
-    if (!active) return;
+    if (!active) {
+      if (backgroundClickPending) {
+        backgroundClickPending = false;
+        const dx = event.clientX - downX;
+        const dy = event.clientY - downY;
+        if (dx * dx + dy * dy <= CLICK_DISTANCE * CLICK_DISTANCE) {
+          updatePointer(event);
+          if (!findTarget()) onBackgroundClick?.();
+        }
+      }
+      return;
+    }
     const target = active;
     active = null;
+    backgroundClickPending = false;
     controls.enabled = true;
     domElement.releasePointerCapture(event.pointerId);
     domElement.style.cursor = '';
