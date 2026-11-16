@@ -81,6 +81,8 @@ const FLOW_SPEED = 0.5;
 // 兩個加起來不要超過管子半徑的一半，不然最細處會凹到快斷掉
 const BLOB_AMOUNT = 0.03;
 const WOBBLE_AMOUNT = 0.012;
+/** 醬汁管子最粗時的半徑（管子 + 鼓包 + 蠕動），給綠球上的小東西判斷「會不會被醬蓋到」 */
+export const KETCHUP_TUBE_OUTER_RADIUS = TUBE_RADIUS + BLOB_AMOUNT + WOBBLE_AMOUNT;
 // 環境反射強度（見材質的 envMapIntensity）
 const ENV_INTENSITY = 0.4;
 // 緞帶整圈的擺放角度：

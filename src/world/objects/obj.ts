@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { cloneGltfInstance, loadGltfOnce, preloadGltfs, scheduleGltfMount } from './sharedGltf';
-import { createKetchup } from './ketchup';
+import { createKetchup, KETCHUP_TUBE_OUTER_RADIUS } from './ketchup';
 import { createHouse, type HouseSettings } from './house';
 import { createCartoonRainbow } from './rainbow';
 import { createGameHallLights } from './gameHallLights';
@@ -497,10 +497,44 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     return roots;
   }
 
+  const ribbonSample = new THREE.Vector3();
+  const groundWorldScale = new THREE.Vector3();
+  /**
+   * 番茄醬緞帶「上緣」離綠球頂端（up）幾度。
+   * 緞帶的圓心不在球心上（RING_OFFSET），所以不能用固定角度；
+   * 沿整圈取樣：每個點換算到綠球座標 → 算它離頂端幾度，再扣掉管子半徑佔的角度，取最靠頂端的那個。
+   */
+  function getRibbonTopColatitude(): number | null {
+    if (!puddingAxes) return null;
+    const pivot = ketchup.ringObject;
+    pivot.updateMatrixWorld(true);
+    ground.updateMatrixWorld(true);
+    ground.getWorldScale(groundWorldScale);
+    const tubeLocal = KETCHUP_TUBE_OUTER_RADIUS / Math.max(groundWorldScale.x, 1e-4);
+    const radius = ketchup.ringSettings.radius;
+    let top = Infinity;
+    for (let i = 0; i < 72; i++) {
+      const angle = (i / 72) * Math.PI * 2;
+      ribbonSample.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      pivot.localToWorld(ribbonSample);
+      ground.worldToLocal(ribbonSample);
+      const dist = ribbonSample.length();
+      if (dist < 1e-4) continue;
+      const colat = Math.acos(THREE.MathUtils.clamp(ribbonSample.dot(puddingAxes.up) / dist, -1, 1));
+      top = Math.min(top, colat - Math.atan(tubeLocal / dist));
+    }
+    return Number.isFinite(top) ? THREE.MathUtils.radToDeg(top) : null;
+  }
+
   let pigRuntime: ReturnType<typeof createPig> | null = null;
   if (puddingAxes) {
     try {
-      pigRuntime = createPig({ ...puddingAxes, camera, getObstacleRoots: getPigObstacleRoots });
+      pigRuntime = createPig({
+        ...puddingAxes,
+        camera,
+        getObstacleRoots: getPigObstacleRoots,
+        getRibbonTopColatitude,
+      });
       ground.add(pigRuntime.object);
     } catch (error) {
       console.error('[pig] 建立失敗，已略過（world 其餘場景照常）', error);

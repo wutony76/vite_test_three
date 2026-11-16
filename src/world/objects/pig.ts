@@ -37,6 +37,16 @@ export type PigSettings = {
   turnDegreesPerSecond: number;
   /** 模型鼻向與行進切線的固定偏差 */
   modelYawOffsetDegrees: number;
+  /** 和番茄醬緞帶上緣保持的距離（度）；緞帶以下會被醬擋住、甚至看不到綠球 */
+  ribbonMarginDegrees: number;
+  /** 走動時屁股後面冒煙 */
+  smokeEnabled: boolean;
+  /** 每秒冒幾團煙 */
+  smokeRate: number;
+  /** 煙團大小倍率（以小豬身長為基準） */
+  smokeSize: number;
+  /** 每團煙存活秒數 */
+  smokeLifeSeconds: number;
 };
 
 export const PIG_LAYOUT_DEFAULT: PigSettings = {
@@ -56,6 +66,29 @@ export const PIG_LAYOUT_DEFAULT: PigSettings = {
   viewHemisphereDotMin: 0.1,
   turnDegreesPerSecond: 140,
   modelYawOffsetDegrees: 0,
+  ribbonMarginDegrees: 2,
+  smokeEnabled: true,
+  smokeRate: 4,
+  smokeSize: 0.85,
+  smokeLifeSeconds: 0.6,
+};
+
+/**
+ * 煙團共用一份幾何（20 面體、無細分 = low poly 小石頭感），
+ * 每團各自一份材質，因為要各自淡出（opacity 是材質屬性，共用的話會一起變透明）。
+ */
+const SMOKE_POOL_SIZE = 24;
+const smokeGeometry = new THREE.IcosahedronGeometry(1, 0);
+const smokeSpawn = new THREE.Vector3();
+const smokeDrift = new THREE.Vector3();
+
+type SmokePuff = {
+  mesh: THREE.Mesh<THREE.IcosahedronGeometry, THREE.MeshStandardMaterial>;
+  age: number;
+  life: number;
+  baseSize: number;
+  velocity: THREE.Vector3;
+  spin: THREE.Vector3;
 };
 
 type PigObstacle = { normal: THREE.Vector3; clearanceRad: number };
@@ -68,6 +101,11 @@ type CreatePigOptions = {
   envMap?: THREE.Texture;
   layout?: PigSettings;
   getObstacleRoots: () => readonly THREE.Object3D[];
+  /**
+   * 番茄醬緞帶「上緣」離頂端（up）幾度；null = 沒有緞帶。
+   * 每幀重算，所以在畫面上拖動緞帶後，小豬的活動範圍也會跟著變。
+   */
+  getRibbonTopColatitude?: () => number | null;
 };
 
 /**
@@ -81,6 +119,7 @@ export function createPig({
   envMap,
   layout = PIG_LAYOUT_DEFAULT,
   getObstacleRoots,
+  getRibbonTopColatitude,
 }: CreatePigOptions) {
   const settings: PigSettings = { ...layout };
 
@@ -96,6 +135,35 @@ export function createPig({
   let bearing = Math.random() * Math.PI * 2;
   let surfaceNormal = new THREE.Vector3();
   let stuckSeconds = 0;
+  let smokeTimer = 0;
+  /** 實際可跑到的最大離頂端角度（度）：取面板上限與「緞帶上緣 − 身長 − 餘量」較小者 */
+  let effectiveColatMax = settings.roamColatitudeMax;
+
+  /**
+   * 煙不能掛在 anchor 底下：anchor 會跟著小豬移動，煙就會黏在屁股上一起跑。
+   * 改掛在 anchor 的父節點（綠球 ground）→ 煙留在原地、小豬跑走，才有「拖尾」感。
+   */
+  const smokeGroup = new THREE.Group();
+  smokeGroup.name = 'world_pig_smoke';
+  const smokePuffs: SmokePuff[] = [];
+  for (let i = 0; i < SMOKE_POOL_SIZE; i++) {
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xf4ece4,
+      emissiveIntensity: 0.35,
+      roughness: 1,
+      metalness: 0,
+      flatShading: true,
+      transparent: true,
+      // 半透明物體不寫深度，避免煙團互相「挖洞」
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(smokeGeometry, material);
+    mesh.visible = false;
+    mesh.renderOrder = 7;
+    smokeGroup.add(mesh);
+    smokePuffs.push({ mesh, age: 0, life: 1, baseSize: 0, velocity: new THREE.Vector3(), spin: new THREE.Vector3() });
+  }
   const facingForward = new THREE.Vector3();
   const faceTarget = new THREE.Vector3();
   const faceTurnAxis = new THREE.Vector3();
@@ -148,11 +216,12 @@ export function createPig({
   /** 沿球面切線朝向鏡頭的那一側 */
   function bearingTowardCamera(n: THREE.Vector3) {
     if (!camera) return bearing;
+    // tangentBasis 內部會借用 probe 暫存，一定要先呼叫，再算 probe；順序反了 probe 會被蓋掉、方向亂掉
+    tangentBasis(n);
     probe2.copy(camera.position).normalize();
     probe.copy(probe2).addScaledVector(n, -probe2.dot(n));
     if (probe.lengthSq() < 1e-8) return bearing;
     probe.normalize();
-    tangentBasis(n);
     return Math.atan2(probe.dot(north), probe.dot(east));
   }
 
@@ -160,10 +229,14 @@ export function createPig({
    * checkView 只在挑出生點時開：跑動中若把「鏡頭背面」也當障礙，
    * 一轉動場景小豬就會整片被擋住 → 卡住 → 觸發重生，看起來就是一直閃現回畫面。
    */
-  function isBlocked(n: THREE.Vector3, checkView = false) {
+  function isBlocked(n: THREE.Vector3, checkView = false, from?: THREE.Vector3) {
     if (checkView && !isVisibleHemisphere(n)) return true;
     const col = colatitudeFromNormal(n);
-    if (col < settings.roamColatitudeMin || col > settings.roamColatitudeMax) return true;
+    if (col < settings.roamColatitudeMin) return true;
+    if (col > effectiveColatMax) {
+      // 已經在界外（例如剛把緞帶拖高）：允許「往頂端走」的步伐，不然會被困在醬底下動不了
+      if (!from || col >= colatitudeFromNormal(from)) return true;
+    }
     const footprint = pigFootprintRad();
     for (const obstacle of obstacleScratch) {
       if (angularDistance(n, obstacle.normal) < footprint + obstacle.clearanceRad) return true;
@@ -179,7 +252,27 @@ export function createPig({
     return target.copy(n).applyQuaternion(stepQuat).normalize();
   }
 
+  function refreshRoamLimit() {
+    effectiveColatMax = settings.roamColatitudeMax;
+    const ribbonTop = getRibbonTopColatitude?.();
+    if (ribbonTop == null || !Number.isFinite(ribbonTop)) return;
+    // 小豬的中心要再往上退「半個身長」，屁股／鼻子才不會伸進醬裡
+    const halfBodyDeg = THREE.MathUtils.radToDeg(pigFootprintRad()) * 0.5;
+    const limit = ribbonTop - halfBodyDeg - settings.ribbonMarginDegrees;
+    effectiveColatMax = Math.min(effectiveColatMax, Math.max(settings.roamColatitudeMin + 1, limit));
+  }
+
+  /** 沿球面切線朝向頂端（up）的 bearing */
+  function bearingTowardTop(n: THREE.Vector3) {
+    tangentBasis(n); // 先算座標系（會借用 probe），再算方向
+    probe.copy(up).addScaledVector(n, -up.dot(n));
+    if (probe.lengthSq() < 1e-8) return bearing;
+    probe.normalize();
+    return Math.atan2(probe.dot(north), probe.dot(east));
+  }
+
   function refreshObstacles() {
+    refreshRoamLimit();
     obstacleScratch.length = 0;
     const margin = THREE.MathUtils.degToRad(settings.obstacleMarginDegrees);
     const roots = getObstacleRoots();
@@ -336,7 +429,9 @@ export function createPig({
 
   /** 出生在鏡頭大致朝向的半球；避開障礙 */
   function spawnFacingCamera() {
-    const colat = settings.angleFromTopDegrees;
+    refreshRoamLimit();
+    // 出生點也不能在醬底下
+    const colat = Math.min(settings.angleFromTopDegrees, effectiveColatMax - 2);
     let az = azimuthTowardCamera();
     settings.azimuthDegrees = az;
     const offsets = [0, 18, -18, 32, -32, 50, -50, 90, -90];
@@ -367,6 +462,75 @@ export function createPig({
     }
   }
 
+  /** 小豬目前在世界中的身長（含整體縮放與入場縮放） */
+  function pigBodyLength() {
+    return settings.modelSize * settings.placementScale * Math.max(0.0001, introGrow);
+  }
+
+  function emitSmokePuff() {
+    const puff = smokePuffs.find((p) => !p.mesh.visible);
+    if (!puff) return;
+    const length = pigBodyLength();
+    tangentFromFacing(probe2);
+    // 出生點：屁股後方一點、貼近地面，左右隨機偏一點才不會排成一直線
+    placeEast.crossVectors(surfaceNormal, probe2).normalize();
+    smokeSpawn
+      .copy(anchor.position)
+      .addScaledVector(probe2, -length * 0.55)
+      .addScaledVector(surfaceNormal, length * 0.12)
+      .addScaledVector(placeEast, (Math.random() - 0.5) * length * 0.3);
+    puff.mesh.position.copy(smokeSpawn);
+    puff.mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+    // 往上飄、往後退、左右散開
+    puff.velocity
+      .copy(surfaceNormal)
+      .multiplyScalar(length * (0.55 + Math.random() * 0.35))
+      .addScaledVector(probe2, -length * 0.35)
+      .addScaledVector(placeEast, (Math.random() - 0.5) * length * 0.5);
+    puff.spin.set((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
+    puff.age = 0;
+    puff.life = settings.smokeLifeSeconds * (0.8 + Math.random() * 0.4);
+    puff.baseSize = length * 0.11 * settings.smokeSize * (0.8 + Math.random() * 0.4);
+    puff.mesh.scale.setScalar(puff.baseSize * 0.4);
+    puff.mesh.material.opacity = 0.85;
+    puff.mesh.visible = true;
+  }
+
+  function updateSmoke(deltaTime: number, moving: boolean) {
+    if (!smokeGroup.parent && anchor.parent) anchor.parent.add(smokeGroup);
+
+    if (moving && settings.smokeEnabled && settings.smokeRate > 0) {
+      smokeTimer -= deltaTime;
+      const interval = 1 / settings.smokeRate;
+      while (smokeTimer <= 0) {
+        emitSmokePuff();
+        smokeTimer += interval * (0.7 + Math.random() * 0.6);
+      }
+    } else {
+      // 停下來時歸零，下次一起步就馬上冒第一團
+      smokeTimer = 0;
+    }
+
+    for (const puff of smokePuffs) {
+      if (!puff.mesh.visible) continue;
+      puff.age += deltaTime;
+      const t = puff.age / puff.life;
+      if (t >= 1) {
+        puff.mesh.visible = false;
+        continue;
+      }
+      // 越飄越慢（阻力），先快速膨脹再緩慢變大，最後淡出
+      smokeDrift.copy(puff.velocity).multiplyScalar(deltaTime * (1 - t * 0.7));
+      puff.mesh.position.add(smokeDrift);
+      puff.mesh.rotation.x += puff.spin.x * deltaTime;
+      puff.mesh.rotation.y += puff.spin.y * deltaTime;
+      puff.mesh.rotation.z += puff.spin.z * deltaTime;
+      const grow = 0.4 + 0.9 * (1 - (1 - t) * (1 - t));
+      puff.mesh.scale.setScalar(puff.baseSize * grow);
+      puff.mesh.material.opacity = 0.85 * (1 - t * t);
+    }
+  }
+
   /** 只沿目前鼻頭方向在球面上走一步 */
   function tryAdvance(stepRad: number) {
     if (facingForward.lengthSq() < 1e-8) return false;
@@ -379,22 +543,24 @@ export function createPig({
     if (probe2.lengthSq() < 1e-8) return false;
 
     const next = rotateAlong(surfaceNormal, probe2, stepRad);
-    if (!isBlocked(next)) {
+    if (!isBlocked(next, false, surfaceNormal)) {
       surfaceNormal.copy(next);
       syncBearingFromFacing();
       bearing += pendingTurn;
       return true;
     }
 
-    const steerAngles = [0.5, -0.5, 0.95, -0.95, 1.45, -1.45];
     const col = colatitudeFromNormal(surfaceNormal);
-    if (col >= settings.roamColatitudeMax - 2) {
-      steerAngles.unshift(-0.85, -1.25);
+    if (col >= effectiveColatMax - 2) {
+      // 碰到緞帶邊界：直接把目標轉向頂端，身體會照轉向速度掉頭往上走
+      bearing = bearingTowardTop(surfaceNormal) + (Math.random() - 0.5) * 1.2;
+      return false;
     }
+    const steerAngles = [0.5, -0.5, 0.95, -0.95, 1.45, -1.45];
     for (const delta of steerAngles) {
       tangentFromBearing(surfaceNormal, bearing + delta, probe2);
       const probeNext = rotateAlong(surfaceNormal, probe2, stepRad);
-      if (!isBlocked(probeNext)) {
+      if (!isBlocked(probeNext, false, surfaceNormal)) {
         bearing += delta;
         return false;
       }
@@ -442,6 +608,7 @@ export function createPig({
 
     const roaming = introDone && introGrow >= 0.999;
     if (!roaming) {
+      updateSmoke(deltaTime, false);
       model.scale.setScalar(modelBaseScale);
       syncFaceTargetFromBearing();
       facingForward.copy(faceTarget);
@@ -459,11 +626,18 @@ export function createPig({
         bearing + (Math.random() - 0.5) * 2.4;
     }
 
+    // 人在界外（醬底下）時，遊走亂數先暫停，一律朝頂端走回來
+    if (colatitudeFromNormal(surfaceNormal) > effectiveColatMax) {
+      bearing = bearingTowardTop(surfaceNormal);
+    }
+
     blendFacingForward(deltaTime);
 
     const stepRad = THREE.MathUtils.degToRad(settings.roamSpeedDegrees) * deltaTime;
+    let movedThisFrame = false;
     if (stepRad > 0) {
       const moved = tryAdvance(stepRad);
+      movedThisFrame = moved;
       if (!moved) {
         stuckSeconds += deltaTime;
         wanderTimer = Math.min(wanderTimer, 0.2);
@@ -479,6 +653,7 @@ export function createPig({
     }
 
     applyPlacement();
+    updateSmoke(deltaTime, movedThisFrame);
 
     waddlePhase += deltaTime * 11.5;
     const wobble = settings.waddleStrength * Math.sin(waddlePhase);
@@ -521,6 +696,11 @@ export function formatPigSettingsForPaste(settings: PigSettings) {
     `  viewHemisphereDotMin: ${settings.viewHemisphereDotMin.toFixed(2)},\n` +
     `  turnDegreesPerSecond: ${settings.turnDegreesPerSecond.toFixed(0)},\n` +
     `  modelYawOffsetDegrees: ${settings.modelYawOffsetDegrees.toFixed(0)},\n` +
+    `  ribbonMarginDegrees: ${settings.ribbonMarginDegrees.toFixed(1)},\n` +
+    `  smokeEnabled: ${settings.smokeEnabled},\n` +
+    `  smokeRate: ${settings.smokeRate.toFixed(1)},\n` +
+    `  smokeSize: ${settings.smokeSize.toFixed(2)},\n` +
+    `  smokeLifeSeconds: ${settings.smokeLifeSeconds.toFixed(2)},\n` +
     `};`
   );
 }

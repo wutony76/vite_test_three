@@ -1371,6 +1371,14 @@ if (pigFolder && pig) {
     .onChange(apply)
     .onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'wanderSeconds', 0.5, 12, 0.1).name('轉向間隔 (秒)').onChange(apply).onFinishChange(logPigSettings);
+  pigFolder
+    .add(pig.settings, 'ribbonMarginDegrees', 0, 15, 0.5)
+    .name('離番茄醬餘量 (°)')
+    .onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'smokeEnabled').name('走動冒煙').onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'smokeRate', 0, 30, 0.5).name('煙量 (團/秒)').onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'smokeSize', 0.2, 3, 0.05).name('煙團大小').onFinishChange(logPigSettings);
+  pigFolder.add(pig.settings, 'smokeLifeSeconds', 0.2, 2.5, 0.05).name('煙存活 (秒)').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'waddleStrength', 0, 0.35, 0.01).name('搖晃幅度').onChange(apply).onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'sink', -0.15, 0.08, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(logPigSettings);
   pigFolder.add({ log: logPigSettings }, 'log').name('印出設定 (console)');
