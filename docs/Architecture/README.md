@@ -39,6 +39,8 @@ vite_test_three/
 │     ├─ sample_town/         Test B 小鎮場景，依 plans/sample_town.scene.json 組裝（build_scene.py）
 │     ├─ lamp_post/、crate_pile/  小鎮的裝飾物（街燈、木箱堆）
 │     ├─ neon_shop/           world 的 Gamehall 外觀：電波町霓虹小店（plans/neon_shop.plan.json，招牌 decal 由 scripts/make_neon_shop_decals.py 產生）
+│     ├─ mushroom_house/      world 的 mainHall 外觀：奇幻香菇屋（三層、粉紅菇傘＋兔耳、門口陽台；門可在面板調大小）（參考圖 tools/img/mushroom_house.jpg；plans/mushroom_house.{reference,plan}.json；零件在 lowpoly_kit/components/mushroom_house.py）
+│     ├─ treasure_chest/      world 綠球上的寶箱（plans/treasure_chest.plan.json，零件在 lowpoly_kit/components/chest.py）；裡面的漢堡由 src/world/objects/treasureChest.ts 用 burger.glb 堆出來
 │     ├─ shiitake/            world 綠球上的香菇（plans/shiitake.plan.json，零件在 lowpoly_kit/components/fungi.py；菇傘、菇柄是獨立節點，src/world/objects/shiitake.ts 分別調大小與高低）
 │     ├─ pig/、pig_v2/        world 綠球上的小豬：pig 是第一版（備用）；pig_v2 是粉紅色存錢筒造型（plans/pig_v2.plan.json，零件在 lowpoly_kit/components/animals.py，櫻花 decal 由 scripts/make_pig_v2_decals.py 產生；四腳、耳朵、尾巴是獨立節點，src/world/objects/pigRig.ts 做走路動作）
 │     │  （每個模型旁都有 <name>.manifest.json；GLB 以 meshopt 壓縮）
@@ -117,7 +119,7 @@ vite_test_three/
 │     ├─ softLayerPass.ts     柔邊圖層：浮空小星球（layer 2）單獨畫到 RenderTarget → 兩趟高斯模糊 → 輪廓用模糊版合成回畫面（天空背景之後、主場景之前）
 │     ├─ foregroundBlur.ts    前景模糊（移軸）：主場景畫完後複製畫面 → 半解析度高斯模糊 → 依畫面高度疊回（底部最糊，主要是前景番茄醬）
 │     ├─ debug/               surfaceDrag（貼球面拖曳）、cameraPlaneDrag（鏡頭座標拖曳）、groundPathEditor（在綠球上編輯小徑路點）
-│     └─ objects/             obj.ts 組裝；ketchup（醬汁質感：清漆、亮邊、接觸陰影、流動高光、氣泡、小豬漣漪）、house、pig／pigCloud／pigRig（存錢筒小豬的腳、耳朵、尾巴動作）、campfire、shiitake、floatingIsland、groundDetail（綠球斑塊／陰影帶／草叢／小徑／小道具；自訂小徑存在 groundPathsLayout.ts）、各種食物
+│     └─ objects/             obj.ts 組裝；ketchup（醬汁質感：清漆、亮邊、接觸陰影、流動高光、氣泡、小豬漣漪）、house、pig／pigCloud／pigRig（存錢筒小豬的腳、耳朵、尾巴動作）、campfire、shiitake、treasureChest（寶箱＋滿出來的漢堡＋金色閃光）、floatingIsland、groundDetail（綠球斑塊／陰影帶／草叢／小徑／小道具；自訂小徑存在 groundPathsLayout.ts）、各種食物
 ├─ openspec/
 │  ├─ project.md              專案規範（改程式前必讀）
 │  ├─ config.yaml             OpenSpec CLI 設定（schema: spec-driven）

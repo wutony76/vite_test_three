@@ -13,7 +13,7 @@ import * as THREE from 'three';
 const STAR_COUNT = 4;
 
 /** 四角星貼圖：中心最亮、十字尖角漸淡（用 canvas 畫一次，所有星星共用） */
-function makeStarTexture() {
+export function makeStarTexture() {
   const size = 64;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
@@ -46,7 +46,7 @@ function makeStarTexture() {
 }
 
 /** 柔和的圓形光暈 */
-function makeGlowTexture() {
+export function makeGlowTexture() {
   const size = 64;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;

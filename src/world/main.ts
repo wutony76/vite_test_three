@@ -26,6 +26,7 @@ import {
   type WorldLemonSlice,
   type WorldCampfire,
   type WorldShiitake,
+  type WorldTreasureChest,
   type WorldFrenchFries,
   type WorldFrenchFryStick,
   type WorldSalmonSteak,
@@ -35,6 +36,7 @@ import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
 import { CAMPFIRE_CHICKEN_SPIN_AXES, formatCampfireSettingsForPaste } from './objects/campfire';
 import { formatShiitakePlacementsForPaste } from './objects/shiitake';
+import { formatTreasureChestSettingsForPaste } from './objects/treasureChest';
 import { formatFloatingIslandSettingsForPaste } from './objects/floatingIsland';
 import { formatFrenchFriesPlacementsForPaste } from './objects/frenchFries';
 import { formatFrenchFryStickPlacementsForPaste } from './objects/frenchFryStick';
@@ -254,6 +256,8 @@ const {
   shiitakes,
   addShiitake,
   removeShiitake,
+  treasureChest,
+  mainHallDoor,
   floatingIsland,
   groundDetail,
 } = createObjs({ envMap, camera });
@@ -1712,6 +1716,41 @@ let lastRenderTime: number | null = null;
 }
 
 // 篝火（綠球上；可直接拖曳換位置）
+// 香菇屋（mainHall）大門大小
+{
+  const door = mainHallDoor.settings;
+  const folder = gui.addFolder('香菇屋大門（mainHall）');
+  const log = () =>
+    console.log(
+      `// 貼回 src/world/objects/obj.ts 的 MAIN_HALL_DOOR_DEFAULT\n` +
+        `export const MAIN_HALL_DOOR_DEFAULT: MainHallDoorSettings = { scale: ${door.scale.toFixed(2)}, width: ${door.width.toFixed(2)}, height: ${door.height.toFixed(2)} };`,
+    );
+  folder.add(door, 'scale', 0.4, 2, 0.01).name('門整體大小').onChange(mainHallDoor.apply).onFinishChange(log);
+  folder.add(door, 'width', 0.5, 2, 0.01).name('門寬').onChange(mainHallDoor.apply).onFinishChange(log);
+  folder.add(door, 'height', 0.5, 2, 0.01).name('門高').onChange(mainHallDoor.apply).onFinishChange(log);
+  folder.add({ log }, 'log').name('印出設定');
+}
+
+// 寶箱（綠球上；裝滿漢堡、金色閃光）
+const treasureFolder = treasureChest ? gui.addFolder('寶箱') : null;
+function logTreasure() {
+  if (treasureChest) console.log(formatTreasureChestSettingsForPaste(treasureChest.settings));
+}
+if (treasureFolder && treasureChest) {
+  const t = treasureChest.settings;
+  const apply = () => treasureChest.apply();
+  treasureFolder.add(t, 'enabled').name('顯示').onChange(apply).onFinishChange(logTreasure);
+  treasureFolder.add(t, 'burgerCount', 0, 13, 1).name('漢堡數量').onChange(apply).onFinishChange(logTreasure);
+  treasureFolder.add(t, 'burgerScale', 0.5, 1.6, 0.05).name('漢堡大小').onChange(apply).onFinishChange(logTreasure);
+  treasureFolder.add(t, 'sparkle').name('金色閃光').onFinishChange(logTreasure);
+  treasureFolder.add(t, 'size', 0.05, 0.4, 0.005).name('整體大小').onChange(apply).onFinishChange(logTreasure);
+  treasureFolder.add(t, 'angleFromTopDegrees', 0, 88, 1).name('離頂端 (°)').onChange(apply).onFinishChange(logTreasure);
+  treasureFolder.add(t, 'azimuthDegrees', -180, 180, 1).name('方位 (°)').onChange(apply).onFinishChange(logTreasure);
+  treasureFolder.add(t, 'spinDegrees', -180, 180, 1).name('自身旋轉 (°)').onChange(apply).onFinishChange(logTreasure);
+  treasureFolder.add(t, 'sink', -0.03, 0.03, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(logTreasure);
+  treasureFolder.add({ log: logTreasure }, 'log').name('印出設定');
+}
+
 // 香菇（綠球上；可複製多顆，點選或拖曳哪顆，面板就調哪顆）
 const shiitakeFolder = gui.addFolder('香菇');
 let selectedShiitake: WorldShiitake | null = null;
@@ -2338,6 +2377,7 @@ houseLabel.className = 'world-ui-chip';
 document.body.appendChild(houseLabel);
 // 屋頂的位置：每幀拿來投影到螢幕，重複利用避免一直 new
 const labelAnchor = new THREE.Vector3();
+const labelAnchorOther = new THREE.Vector3();
 
 /** 把選中房子的屋頂中心投影到螢幕，名字就浮在它正上方 */
 function updateHouseLabel() {
@@ -2367,9 +2407,27 @@ function updateHouseLabel() {
   const x = rect.left + (labelAnchor.x * 0.5 + 0.5) * rect.width;
   const y = rect.top + (-labelAnchor.y * 0.5 + 0.5) * rect.height;
   houseLabel.style.visibility = 'visible';
-  // 先移到屋頂的螢幕座標，再往上移一個標籤的高度，名字才不會壓在屋頂上
-  // 多留一點給 .world-ui-chip 指向房子的小尾巴
-  houseLabel.style.transform = `translate(${x}px, ${y}px) translate(-50%, calc(-100% - 14px))`;
+  // 屋頂上方放得下：照舊放在屋頂正上方（往上移一個標籤的高度，多留一點給指向房子的小尾巴）
+  const labelHeight = houseLabel.offsetHeight || 28;
+  if (y - labelHeight - 14 > rect.top + 8) {
+    houseLabel.classList.remove('is-side');
+    houseLabel.style.transform = `translate(${x}px, ${y}px) translate(-50%, calc(-100% - 14px))`;
+    return;
+  }
+  // 放不下（房子在畫面最上緣，例如 mainHall 的香菇屋）：改放在房子左側、大約一半高的地方，
+  // 小尾巴改成指向右邊的房子（CSS 的 .is-side）。用房子左右兩個角投影到畫面，取比較左的那個，
+  // 房子轉了方向也一樣會放在畫面上的左邊
+  labelAnchor.set(-selectedHouse.settings.width * 0.5, selectedHouse.settings.height * 0.55, 0);
+  selectedHouse.object.localToWorld(labelAnchor);
+  labelAnchor.project(camera);
+  labelAnchorOther.set(selectedHouse.settings.width * 0.5, selectedHouse.settings.height * 0.55, 0);
+  selectedHouse.object.localToWorld(labelAnchorOther);
+  labelAnchorOther.project(camera);
+  const leftmost = labelAnchor.x < labelAnchorOther.x ? labelAnchor : labelAnchorOther;
+  const sideX = rect.left + (leftmost.x * 0.5 + 0.5) * rect.width;
+  const sideY = rect.top + (-leftmost.y * 0.5 + 0.5) * rect.height;
+  houseLabel.classList.add('is-side');
+  houseLabel.style.transform = `translate(${sideX}px, ${sideY}px) translate(calc(-100% - 14px), -50%)`;
 }
 
 // 直接在畫面上拖曳房子：沿著綠球表面滑動
@@ -2389,10 +2447,12 @@ let surfaceDragTargets: Array<
   | WorldFrenchFryStick
   | WorldCampfire
   | WorldShiitake
+  | WorldTreasureChest
 > = [
   ...houses,
   ...(campfire ? [campfire] : []),
   ...shiitakes,
+  ...(treasureChest ? [treasureChest] : []),
   ...(PUDDING_SCENE_EDIT ? puddings : []),
   ...(CORN_SCENE_EDIT && foodVisibility.showCorn ? grilledCorns : []),
   ...friedEggsOnSphere(),
@@ -2407,6 +2467,7 @@ function refreshPuddingDragTargets() {
   surfaceDragTargets.push(...houses, ...friedEggsOnSphere());
   if (campfire) surfaceDragTargets.push(campfire);
   surfaceDragTargets.push(...shiitakes);
+  if (treasureChest) surfaceDragTargets.push(treasureChest);
   if (PUDDING_SCENE_EDIT) surfaceDragTargets.push(...puddings);
   if (CORN_SCENE_EDIT && foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
   if (foodVisibility.showSalmon) surfaceDragTargets.push(...salmonSteaks);
@@ -2460,10 +2521,12 @@ if (HOUSE_DRAG_ENABLED) {
       fryStickFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       campfireFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       shiitakeFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      treasureFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
     onDragEnd: (target) => {
       if (campfire && target.object === campfire.object) logCampfire();
       else if (shiitakes.some((item) => item.object === target.object)) logShiitakePlacements();
+      else if (treasureChest && target.object === treasureChest.object) logTreasure();
       else if (houses.some((house) => house.object === target.object)) logHouse();
       else if (PUDDING_SCENE_EDIT && puddings.some((item) => item.object === target.object)) logPuddingPlacements();
       else if (CORN_SCENE_EDIT && grilledCorns.some((item) => item.object === target.object)) logCornPlacements();

@@ -204,6 +204,20 @@
         transform: translateX(-50%) rotate(45deg);
         box-shadow: 2px 2px 0 rgb(90 61 82 / 12%);
       }
+
+      /* 房子上方放不下標籤時（房子在畫面最上緣），改放在房子左側：小尾巴改到右邊、指向房子 */
+      .world-ui-chip.is-side::after {
+        left: auto;
+        right: -6px;
+        top: 50%;
+        bottom: auto;
+        border-left: none;
+        border-bottom: none;
+        border-right: 2px solid var(--world-ui-ink);
+        border-top: 2px solid var(--world-ui-ink);
+        transform: translateY(-50%) rotate(45deg);
+        box-shadow: 2px -2px 0 rgb(90 61 82 / 12%);
+      }
     </style>
   </head>
   <body>

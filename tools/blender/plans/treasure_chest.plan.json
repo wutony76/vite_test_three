@@ -1,0 +1,179 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "treasure_chest",
+  "notes": "打開的寶箱（裡面的漢堡由 Three.js 用既有的 burger.glb 堆出來、滿出箱口）。箱身是中空的木箱（內底墊高，漢堡堆在上面）、金色包邊、正面金色鎖頭；箱蓋往後打開約 110°。正面朝 -Y，原點在箱底中心。",
+  "dimensions": {
+    "w": 0.56,
+    "d": 0.7,
+    "h": 0.56
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {
+      "tertiary_density": 1,
+      "geometry_complexity": 10,
+      "bevel_quality": 0
+    }
+  },
+  "style": {
+    "edge_wobble": 0.0
+  },
+  "materials": [
+    {
+      "name": "wood",
+      "hex": "#8A5530",
+      "roughness": 0.8
+    },
+    {
+      "name": "wood_dark",
+      "hex": "#4A2C18",
+      "roughness": 0.9
+    },
+    {
+      "name": "gold",
+      "hex": "#E8B640",
+      "roughness": 0.3,
+      "metallic": 0.7
+    },
+    {
+      "name": "keyhole",
+      "hex": "#2A1A10",
+      "roughness": 0.6
+    }
+  ],
+  "budget": {
+    "max_tris": 2500,
+    "max_primitives": 10
+  },
+  "components": [
+    {
+      "id": "body",
+      "kind": "chest_body",
+      "tier": "primary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "wood",
+      "params": {
+        "inner_material": "wood_dark",
+        "wall": 0.025,
+        "floor_height": 0.13
+      },
+      "bounds": [
+        [
+          -0.25,
+          -0.17,
+          0.0
+        ],
+        [
+          0.25,
+          0.17,
+          0.22
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "中空木箱：外牆、箱口一圈邊、往下到墊高的內底（深色）；內底墊高到 0.13，漢堡才會滿到箱口以上。",
+      "confidence": 0.85
+    },
+    {
+      "id": "bands",
+      "kind": "chest_bands",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "trim",
+      "material": "gold",
+      "params": {
+        "strap_x": [
+          -0.16,
+          0.16
+        ],
+        "strap_width": 0.035
+      },
+      "bounds": [
+        [
+          -0.26,
+          -0.18,
+          0.0
+        ],
+        [
+          0.26,
+          0.18,
+          0.225
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "兩條金色直條包邊（正面、背面）＋箱口金邊。",
+      "confidence": 0.8
+    },
+    {
+      "id": "lid",
+      "kind": "chest_lid",
+      "tier": "primary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "wood",
+      "params": {
+        "band_material": "gold",
+        "inner_material": "wood_dark",
+        "hinge": [
+          0.17,
+          0.22
+        ],
+        "depth": 0.34,
+        "dome": 0.1,
+        "open_degrees": 110,
+        "strap_x": [
+          -0.16,
+          0.16
+        ],
+        "strap_width": 0.035
+      },
+      "bounds": [
+        [
+          -0.255,
+          0.16,
+          0.205
+        ],
+        [
+          0.255,
+          0.35,
+          0.55
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "半圓拱形箱蓋，沿著背面上緣的鉸鍊往後打開 110°；兩條金色拱形包邊和箱身的直條對齊；底面深色。",
+      "confidence": 0.8
+    },
+    {
+      "id": "lock",
+      "kind": "chest_lock",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "gold",
+      "params": {
+        "keyhole_material": "keyhole"
+      },
+      "bounds": [
+        [
+          -0.035,
+          -0.19,
+          0.13
+        ],
+        [
+          0.035,
+          -0.17,
+          0.215
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "正面上緣的金色鎖頭＋深色鑰匙孔。",
+      "confidence": 0.8
+    }
+  ],
+  "export": {
+    "path": "public/models/treasure_chest/treasure_chest.glb",
+    "compress": true,
+    "clickable": [],
+    "anim_groups": {}
+  }
+}

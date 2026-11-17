@@ -251,6 +251,26 @@ def test_shiitake_parts_are_closed_and_cross_sits_on_dome():
     assert 0.0 <= z0 and z1 <= ctx.h + 1e-6, cross["bounds"]
 
 
+def test_treasure_chest_parts_are_closed():
+    """寶箱：箱身、箱蓋各是 1 個封閉島（中空箱身是一條 loft，不是方塊堆疊）；包邊、鎖頭是封閉的小零件。"""
+    _doc, _lay, built = _build_all("treasure_chest.plan.json")
+    _closed_single(built["body"][1])
+    _closed_single(built["lid"][1])
+    _closed_single(built["bands"][1], islands=8)
+    _closed_single(built["lock"][1], islands=2)
+
+
+def test_mushroom_house_parts_are_closed():
+    """香菇屋：屋身、菇傘各是 1 個封閉島；門窗、小藍菇、吊飾、底座、地上小物都是封閉的小零件，島數在上限內。"""
+    _doc, _lay, built = _build_all("mushroom_house.plan.json")
+    _closed_single(built["body"][1])
+    _closed_single(built["cap"][1])
+    # 門：門板、門框、兩條鉸鍊、門把、小圓窗玻璃、小圓窗框 = 7
+    for cid, islands in (("door", 7), ("window_low", 5), ("window_head_front", 5), ("shelves", 8),
+                         ("hanger_1", 5), ("hanger_2", 4), ("hanger_3", 6), ("hanger_4", 5), ("puddle", 4), ("props", 6), ("balcony", 8), ("bunny_ears", 2)):
+        _closed_single(built[cid][1], islands=islands)
+
+
 def test_registry_covers_plans():
     kinds = implemented_kinds()
     for plan in PLAN_FILES:

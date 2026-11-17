@@ -1,0 +1,47 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "mushroom_house",
+  "image": {"path": "tools/img/mushroom_house.jpg", "width": 800, "height": 983},
+  "medium": "手繪奇幻香菇屋概念圖（使用者提供的參考圖），略帶 3/4 的正面視角",
+  "view": {"type": "three_quarter", "source": "observed", "confidence": 0.8},
+  "scale_anchor": {"component": "door", "axis": "height", "meters": 2.0},
+  "silhouette": {
+    "outline": [[0.08, 0.38], [0.2, 0.12], [0.5, 0.09], [0.75, 0.2], [0.77, 0.32], [0.62, 0.36], [0.66, 0.6], [0.72, 0.82], [0.55, 0.9], [0.18, 0.88], [0.3, 0.62], [0.38, 0.45], [0.08, 0.38]],
+    "source": "observed", "confidence": 0.7
+  },
+  "palette": [
+    {"name": "body_cream", "hex": "#EDE3DA", "usage": "葫蘆形屋身", "sample": [0.42, 0.52, 0.5, 0.58]},
+    {"name": "moss", "hex": "#7E8A3C", "usage": "脖子那圈青苔", "sample": [0.42, 0.55, 0.52, 0.58]},
+    {"name": "cap_top", "hex": "#5B4AA8", "usage": "菇傘上面（紫藍）", "sample": [0.2, 0.15, 0.4, 0.22]},
+    {"name": "cap_rim", "hex": "#B5443A", "usage": "菇傘邊緣的紅色木板", "sample": [0.3, 0.13, 0.5, 0.16]},
+    {"name": "cap_under", "hex": "#E2B24E", "usage": "菇傘底面（黃橘、放射紋）", "sample": [0.15, 0.32, 0.3, 0.45]},
+    {"name": "frame_green", "hex": "#8DA43A", "usage": "門框、窗框", "sample": [0.46, 0.72, 0.5, 0.8]},
+    {"name": "wood", "hex": "#A0522D", "usage": "門板、窗上的小屋簷、木頭裝飾", "sample": [0.49, 0.77, 0.6, 0.85]},
+    {"name": "fungus_blue", "hex": "#4E5BC9", "usage": "屋身上的小藍菇、吊飾的月牙", "sample": [0.62, 0.62, 0.68, 0.66]},
+    {"name": "ground_pink", "hex": "#A86A7A", "usage": "地上的粉紫水窪底座", "sample": [0.2, 0.83, 0.6, 0.88]}
+  ],
+  "components": [
+    {"id": "body", "kind": "mush_body", "tier": "primary", "bbox": [0.27, 0.22, 0.65, 0.88], "material_hint": "body_cream", "source": "observed", "confidence": 0.85},
+    {"id": "cap", "kind": "mush_house_cap", "tier": "primary", "bbox": [0.08, 0.09, 0.77, 0.5], "material_hint": "cap_top", "source": "observed", "confidence": 0.85},
+    {"id": "door", "kind": "mush_door", "tier": "primary", "bbox": [0.45, 0.69, 0.66, 0.88], "material_hint": "wood", "source": "observed", "confidence": 0.85},
+    {"id": "window_low", "kind": "mush_window", "tier": "secondary", "bbox": [0.28, 0.62, 0.42, 0.77], "material_hint": "frame_green", "source": "observed", "confidence": 0.8},
+    {"id": "window_head_front", "kind": "mush_window", "tier": "secondary", "bbox": [0.52, 0.27, 0.66, 0.43], "material_hint": "frame_green", "source": "observed", "confidence": 0.8},
+    {"id": "window_head_left", "kind": "mush_window", "tier": "secondary", "bbox": [0.31, 0.33, 0.4, 0.47], "material_hint": "frame_green", "source": "observed", "confidence": 0.8},
+    {"id": "shelves", "kind": "mush_shelves", "tier": "tertiary", "bbox": [0.5, 0.4, 0.7, 0.72], "material_hint": "fungus_blue", "source": "observed", "confidence": 0.7},
+    {"id": "hangers", "kind": "mush_hangers", "tier": "tertiary", "bbox": [0.12, 0.2, 0.75, 0.7], "material_hint": "fungus_blue", "source": "observed", "confidence": 0.7},
+    {"id": "puddle", "kind": "mush_puddle", "tier": "secondary", "bbox": [0.14, 0.8, 0.78, 0.93], "material_hint": "ground_pink", "source": "observed", "confidence": 0.75},
+    {"id": "props", "kind": "mush_props", "tier": "tertiary", "bbox": [0.18, 0.72, 0.8, 0.9], "material_hint": "wood", "source": "observed", "confidence": 0.65}
+  ],
+  "surfaces": [
+    {"id": "cap_top_surface", "region": [[0.15, 0.12], [0.6, 0.1], [0.62, 0.2], [0.2, 0.3]], "class": "painted", "pattern": "plaster", "base_hex": "#5B4AA8", "scale_m": 1.0, "components": ["cap"], "source": "observed", "confidence": 0.6},
+    {"id": "body_surface", "region": [[0.35, 0.6], [0.6, 0.6], [0.62, 0.85], [0.33, 0.85]], "class": "painted", "pattern": "plaster", "base_hex": "#EDE3DA", "scale_m": 0.5, "components": ["body"], "source": "observed", "confidence": 0.6}
+  ],
+  "hidden": [
+    {"id": "back_side", "assumption": "背面同樣是白色屋身，沒有門窗；菇傘背面同色", "source": "inferred", "confidence": 0.6}
+  ],
+  "excluded": [
+    {"reason": "畫框、標題與簽名", "what": "frame_text"},
+    {"reason": "脖子右側那根小管子、窗戶上的細麻繩綁結，畫面上太小", "what": "tiny_details"},
+    {"reason": "菇傘底面的放射紋、紫藍色的筆觸紋理，先用純色表現", "what": "painted_strokes"}
+  ]
+}

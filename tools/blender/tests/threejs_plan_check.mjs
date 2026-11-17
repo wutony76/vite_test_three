@@ -146,7 +146,14 @@ if (!preview) {
     check(surface.srgb === surface.total, `貼圖材質的 base color 是 sRGB（${surface.srgb}/${surface.total}）`);
     check(surface.orm === surface.total, `貼圖材質有粗糙度／金屬度貼圖（${surface.orm}/${surface.total}）`);
     check(surface.normalOk === surface.normalTotal, `法線貼圖不是 sRGB（${surface.normalOk}/${surface.normalTotal}）`);
-    check(ao.total > 0 && ao.channel1 === ao.total, `AO 貼圖使用第二組 UV（${ao.channel1}/${ao.total}）`);
+    // plan 可以用 detail.overrides.bake = 'none' 主動關掉 AO 烘焙（例如香菇屋的門會在網頁上縮放，
+    // 烘焙在牆上的門陰影不會跟著變）。這時改成檢查「真的沒有 AO 貼圖」，而不是要求一定要有
+    const bakeMode = plan.detail?.overrides?.bake ?? 'ao';
+    if (bakeMode === 'none') {
+      check(ao.total === 0, `plan 關閉 AO 烘焙，GLB 也沒有 AO 貼圖（${ao.total}）`);
+    } else {
+      check(ao.total > 0 && ao.channel1 === ao.total, `AO 貼圖使用第二組 UV（${ao.channel1}/${ao.total}）`);
+    }
   }
 }
 

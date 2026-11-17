@@ -49,6 +49,7 @@ import { createPig, type PigSettings } from './pig';
 import type { PigCloudSettings, PigCloudState } from './pigCloud';
 import { createCampfire, type CampfireSettings } from './campfire';
 import { createShiitake, SHIITAKE_DEFAULT, SHIITAKE_PLACEMENTS, type ShiitakeSettings } from './shiitake';
+import { createTreasureChest, type TreasureChestSettings } from './treasureChest';
 import { createFloatingIsland } from './floatingIsland';
 import { createGroundDetail, type GroundObstacle } from './groundDetail';
 
@@ -63,6 +64,20 @@ const GAME_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/game_hall/gameHal
 // 電波町霓虹小店（頂樓「電・波・町」霓虹招牌，plan 在 tools/blender/plans/neon_shop.plan.json）
 // 想換到 Gamehall：把上一行改成下面這個網址，並把 Gamehall 的 spinDegrees 改成 189（招牌面才會朝向鏡頭）
 // `${import.meta.env.BASE_URL}models/neon_shop/neon_shop.glb`
+// mainHall 的外觀：奇幻香菇屋（三層白色葫蘆屋身、粉紅菇傘＋兔耳、門口陽台），plan 在 tools/blender/plans/mushroom_house.plan.json
+const MAIN_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/mushroom_house/mushroom_house.glb`;
+
+/** 香菇屋（mainHall）大門的大小：面板調完按「印出設定」，貼回這裡 */
+export type MainHallDoorSettings = {
+  /** 整體倍率 */
+  scale: number;
+  /** 寬度倍率（再乘上整體倍率） */
+  width: number;
+  /** 高度倍率（再乘上整體倍率） */
+  height: number;
+};
+
+export const MAIN_HALL_DOOR_DEFAULT: MainHallDoorSettings = { scale: 0.8, width: 1, height: 1 };
 const TW_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/twhall/twhall.glb`;
 // bgRoom 的外觀：日式街角三層小樓（一樓投幣洗衣店＋外側樓梯、二樓麻雀館），plan 在 tools/blender/plans/laundry.plan.json
 const LAUNDRY_MODEL_URL = `${import.meta.env.BASE_URL}models/laundry/laundry.glb`;
@@ -83,6 +98,9 @@ export const WORLD_GLTF_URLS = [
   `${import.meta.env.BASE_URL}models/roast_chicken/roast_chicken.glb`,
   `${import.meta.env.BASE_URL}models/pig_v2/pig_v2.glb`,
   `${import.meta.env.BASE_URL}models/shiitake/shiitake.glb`,
+  `${import.meta.env.BASE_URL}models/treasure_chest/treasure_chest.glb`,
+  `${import.meta.env.BASE_URL}models/burger/burger.glb`,
+  `${import.meta.env.BASE_URL}models/mushroom_house/mushroom_house.glb`,
 ] as const;
 
 // true = 載入網路下載的模型；false = 顯示原本的綠色球
@@ -168,7 +186,49 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   // 要用緞帶的軸來決定種在哪，所以放在緞帶建立之後
   // 加成 ground pivot 的子物件（跟綠球同層）：球怎麼移動、縮放，房子都會跟著走，且影子能落在球面上
   const mainHall = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
+  // 換成香菇屋：長方體的比例改成跟模型一樣（寬 7、高 12.5、深 7.4 → 1.3 : 2.33 : 1.38），
+  // fitIntoHouseBox 是「三邊都不超出」的等比縮放，比例不合會被最緊的那一邊縮小
+  Object.assign(mainHall.settings, {
+    width: 1.3,
+    height: 2.33,
+    depth: 1.38,
+    // 底座水窪很薄，下沉太多會整片埋進地裡（原本長方體是 0.03）
+    sink: 0.004,
+    // 使用者在面板調好的擺放（門朝鏡頭、放在綠球頂端）
+    angleFromTopDegrees: 2,
+    azimuthDegrees: -66,
+    spinDegrees: 104,
+    scale: 0.195,
+  });
+  mainHall.applySettings();
   ground.add(mainHall.object);
+  // 菇傘邊垂下的 4 條香菇串（每條是模型裡的獨立節點 mushroom_house_hanger_1～4）
+  const mainHallHangers: THREE.Object3D[] = [];
+  /**
+   * 香菇屋的大門可以在面板調大小。門在模型裡是獨立節點，原點在門底中心（陽台平台上），
+   * 所以縮放這個節點時門會「站在平台上」往上、往兩側變大，不會浮起來或沉進平台。
+   */
+  const mainHallDoorSettings: MainHallDoorSettings = { ...MAIN_HALL_DOOR_DEFAULT };
+  let mainHallDoor: THREE.Object3D | null = null;
+  // 節點原本的縮放：meshopt 壓縮可能讓節點縮放不是 1，套倍率時要「原本 × 倍率」
+  const mainHallDoorBaseScale = new THREE.Vector3(1, 1, 1);
+  function applyMainHallDoor() {
+    if (!mainHallDoor) return;
+    const s = Math.max(0.1, mainHallDoorSettings.scale);
+    (mainHallDoor as THREE.Object3D).scale.set(
+      mainHallDoorBaseScale.x * s * Math.max(0.1, mainHallDoorSettings.width),
+      mainHallDoorBaseScale.y * s * Math.max(0.1, mainHallDoorSettings.height),
+      mainHallDoorBaseScale.z * s,
+    );
+  }
+  attachHouseModel(mainHall, MAIN_HALL_MODEL_URL, (model) => {
+    model.traverse((child) => {
+      if (/_hanger_\d+$/.test(child.name)) mainHallHangers.push(child);
+      if (child.name.endsWith('_door')) mainHallDoor = child;
+    });
+    if (mainHallDoor) mainHallDoorBaseScale.copy((mainHallDoor as THREE.Object3D).scale);
+    applyMainHallDoor();
+  });
 
   type PuddingRuntime = ReturnType<typeof createPudding>;
   const puddingEntries: Array<{ world: WorldPudding; runtime: PuddingRuntime }> = [];
@@ -620,6 +680,15 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     campfireRuntime.setIntroGrow(0);
   }
 
+  // 寶箱：裝滿漢堡、滿到掉出來，上方有金色閃光
+  const treasureRuntime = puddingAxes
+    ? createTreasureChest({ groundRadius: GROUND_RADIUS, up: puddingAxes.up, front: puddingAxes.front, envMap })
+    : null;
+  if (treasureRuntime) {
+    ground.add(treasureRuntime.object);
+    treasureRuntime.setIntroGrow(0);
+  }
+
   // 香菇：種在綠球上，可以複製好幾顆；菇傘大小、菇柄高低、厚度各自在面板調
   type ShiitakeRuntime = ReturnType<typeof createShiitake>;
   const shiitakeEntries: Array<{ world: WorldShiitake; runtime: ShiitakeRuntime }> = [];
@@ -690,6 +759,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     if (campfireRuntime?.settings.enabled) roots.push(campfireRuntime.footprint);
     // 香菇也是障礙：小豬會繞過它，草叢、小石頭也不會撒在它身上
     for (const { world } of shiitakeEntries) if (world.settings.enabled) roots.push(world.object);
+    if (treasureRuntime?.settings.enabled) roots.push(treasureRuntime.object);
     for (const { world } of puddingEntries) roots.push(world.object);
     for (const { world } of grilledCornEntries) roots.push(world.object);
     for (const { world } of salmonSteakEntries) roots.push(world.object);
@@ -1037,6 +1107,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         pigRuntime?.setIntroGrow(1);
         campfireRuntime?.setIntroGrow(1);
         for (const { runtime } of shiitakeEntries) runtime.setIntroGrow(1);
+        treasureRuntime?.setIntroGrow(1);
         floatingIsland.setIntroGrow(1);
       }
     }
@@ -1111,6 +1182,19 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       campfireRuntime.update(deltaTime);
     }
     for (const { runtime } of shiitakeEntries) runtime.update(deltaTime);
+    // 香菇屋（mainHall）的香菇串隨風輕輕打轉：每條繞自己的繩子轉，節奏錯開才不會整齊得像機器
+    mainHallHangers.forEach((hanger, index) => {
+      hanger.rotation.y = Math.sin(time * 0.9 + index * 1.3) * THREE.MathUtils.degToRad(20);
+    });
+    if (treasureRuntime) {
+      treasureRuntime.update(deltaTime);
+      if (!introDone) {
+        // 房子長完之後「碰」地冒出來
+        const chestStart = housesIntroEnd + 0.45;
+        const chestT = THREE.MathUtils.clamp((introElapsed - chestStart) / 0.8, 0, 1);
+        treasureRuntime.setIntroGrow(easeOutBack(chestT, 2.4));
+      }
+    }
     if (!introDone) {
       // 跟篝火差不多時候一顆接一顆「啵」地長出來
       shiitakeEntries.forEach(({ runtime }, index) => {
@@ -1205,6 +1289,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     pigRuntime?.setIntroGrow(0);
     campfireRuntime?.setIntroGrow(0);
     for (const { runtime } of shiitakeEntries) runtime.setIntroGrow(0);
+    treasureRuntime?.setIntroGrow(0);
     floatingIsland.setIntroGrow(0);
   }
 
@@ -1263,6 +1348,18 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     shiitakes,
     addShiitake,
     removeShiitake,
+    mainHallDoor: { settings: mainHallDoorSettings, apply: applyMainHallDoor },
+    treasureChest: treasureRuntime
+      ? ({
+          id: 'treasure_chest',
+          label: '寶箱',
+          object: treasureRuntime.object,
+          settings: treasureRuntime.settings,
+          apply: treasureRuntime.applySettings,
+          getNormal: treasureRuntime.getNormal,
+          setNormal: treasureRuntime.setNormal,
+        } as WorldTreasureChest)
+      : null,
     groundDetail,
     floatingIsland: { object: floatingIsland.object, settings: floatingIsland.settings, apply: floatingIsland.applySettings },
     houses: [
@@ -1341,6 +1438,16 @@ export type WorldPig = {
   /** 立刻跑去篝火看烤雞（測試用） */
   visitNow: () => boolean;
   isVisiting: () => boolean;
+};
+
+export type WorldTreasureChest = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: TreasureChestSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
 };
 
 export type WorldShiitake = {

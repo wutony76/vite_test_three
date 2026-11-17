@@ -1,0 +1,56 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "mushroom_house",
+  "glb": "mushroom_house.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
+  ],
+  "root": "mushroom_house_Root",
+  "clickable": [
+    "mushroom_house_door"
+  ],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 6916,
+    "primitives": 17,
+    "meshes": 16,
+    "materials": 2,
+    "file_bytes": 304140
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "warn",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "door_wood": {
+        "class": "wood",
+        "pattern": "planks",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 1.2,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "planks",
+          "seed": 1458094628,
+          "hash": "56e8c2246433"
+        }
+      }
+    },
+    "bake": {},
+    "decals": 0,
+    "gpu_texture_mb": 4.04,
+    "flat_ratio": 0.976,
+    "texture_count": 5,
+    "texture_kb": 14.8,
+    "images": 5,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 297.0
+  }
+}
