@@ -52,3 +52,7 @@
 
 - 無頭瀏覽器特寫：金幣呈金黃色，周圍看得到四角星閃光和金色光暈，console 沒有 error（`assets/pig-v2-coin-shine.png`）。
 - `npx tsc --noEmit`、`npm run build` 通過。
+
+## 換色 sRGB 修正
+
+- `pigTint.ts` 原本用 `Color.r×255`（線性空間），換出來的顏色比選的更深。改成 `getHex()` 取 sRGB；預設色改成 `#dc8295`，修正後畫面和原本的 `#efbdc9` 一樣。

@@ -109,7 +109,8 @@ export const PIG_LAYOUT_DEFAULT: PigSettings = {
   visitWatchMinSeconds: 3,
   visitWatchMaxSeconds: 6,
   visitCooldownSeconds: 15,
-  bodyColor: '#efbdc9',
+  // 原本是 '#efbdc9'，但舊版換色把顏色算深了；'#dc8295' 是修正後畫面上看起來一樣的值
+  bodyColor: '#dc8295',
 };
 
 /**

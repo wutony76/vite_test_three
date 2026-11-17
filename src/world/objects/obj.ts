@@ -48,6 +48,7 @@ import {
 import { createPig, type PigSettings } from './pig';
 import type { PigCloudSettings, PigCloudState } from './pigCloud';
 import { createCampfire, type CampfireSettings } from './campfire';
+import { createShiitake, SHIITAKE_DEFAULT, SHIITAKE_PLACEMENTS, type ShiitakeSettings } from './shiitake';
 import { createFloatingIsland } from './floatingIsland';
 import { createGroundDetail, type GroundObstacle } from './groundDetail';
 
@@ -80,7 +81,8 @@ export const WORLD_GLTF_URLS = [
   `${import.meta.env.BASE_URL}models/french_fry/french_fry.glb`,
   `${import.meta.env.BASE_URL}models/fried_egg/fried_egg.glb`,
   `${import.meta.env.BASE_URL}models/roast_chicken/roast_chicken.glb`,
-  `${import.meta.env.BASE_URL}models/pig/pig.glb`,
+  `${import.meta.env.BASE_URL}models/pig_v2/pig_v2.glb`,
+  `${import.meta.env.BASE_URL}models/shiitake/shiitake.glb`,
 ] as const;
 
 // true = 載入網路下載的模型；false = 顯示原本的綠色球
@@ -618,6 +620,65 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     campfireRuntime.setIntroGrow(0);
   }
 
+  // 香菇：種在綠球上，可以複製好幾顆；菇傘大小、菇柄高低、厚度各自在面板調
+  type ShiitakeRuntime = ReturnType<typeof createShiitake>;
+  const shiitakeEntries: Array<{ world: WorldShiitake; runtime: ShiitakeRuntime }> = [];
+  const shiitakes: WorldShiitake[] = [];
+
+  function spawnShiitake(id: string, layout: ShiitakeSettings, grown = false) {
+    if (!puddingAxes) return null;
+    const runtime = createShiitake({
+      groundRadius: GROUND_RADIUS,
+      up: puddingAxes.up,
+      front: puddingAxes.front,
+      envMap,
+      layout: { ...layout },
+    });
+    ground.add(runtime.object);
+    const world: WorldShiitake = {
+      id,
+      label: id,
+      object: runtime.object,
+      settings: runtime.settings,
+      apply: runtime.applySettings,
+      getNormal: runtime.getNormal,
+      setNormal: runtime.setNormal,
+      setHighlight: runtime.setHighlight,
+    };
+    shiitakeEntries.push({ world, runtime });
+    shiitakes.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  for (const placement of SHIITAKE_PLACEMENTS) {
+    const { id, ...layout } = placement;
+    spawnShiitake(id, layout);
+  }
+
+  function nextShiitakeId() {
+    let n = shiitakeEntries.length + 1;
+    while (shiitakes.some((item) => item.id === `shiitake_${n}`)) n += 1;
+    return `shiitake_${n}`;
+  }
+
+  /** 複製一顆：沿用 seed（通常是目前選中那顆）的所有設定，方位往旁邊挪 12°，才不會疊在同一個位置 */
+  function addShiitake(seed?: Partial<ShiitakeSettings>): WorldShiitake | null {
+    const base: ShiitakeSettings = { ...SHIITAKE_DEFAULT, ...seed };
+    base.azimuthDegrees = wrapDegrees(base.azimuthDegrees + 12);
+    return spawnShiitake(nextShiitakeId(), base, introDone);
+  }
+
+  function removeShiitake(entry: WorldShiitake) {
+    const index = shiitakeEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    shiitakeEntries[index].runtime.dispose();
+    shiitakeEntries.splice(index, 1);
+    const listIndex = shiitakes.indexOf(entry);
+    if (listIndex >= 0) shiitakes.splice(listIndex, 1);
+    return true;
+  }
+
   // 浮空小星球：飄在畫面右後方天空，位置跟著鏡頭（跟荷包蛋太陽一樣）
   const floatingIsland = createFloatingIsland({ camera });
   all.add(floatingIsland.object);
@@ -627,6 +688,8 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     const roots: THREE.Object3D[] = introHouses.map((house) => house.object);
     // 只給石圈＋木柴（footprint），火星和煙飛很高，算進去會讓避障範圍變超大
     if (campfireRuntime?.settings.enabled) roots.push(campfireRuntime.footprint);
+    // 香菇也是障礙：小豬會繞過它，草叢、小石頭也不會撒在它身上
+    for (const { world } of shiitakeEntries) if (world.settings.enabled) roots.push(world.object);
     for (const { world } of puddingEntries) roots.push(world.object);
     for (const { world } of grilledCornEntries) roots.push(world.object);
     for (const { world } of salmonSteakEntries) roots.push(world.object);
@@ -970,6 +1033,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(1);
         pigRuntime?.setIntroGrow(1);
         campfireRuntime?.setIntroGrow(1);
+        for (const { runtime } of shiitakeEntries) runtime.setIntroGrow(1);
         floatingIsland.setIntroGrow(1);
       }
     }
@@ -1042,6 +1106,15 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       const fireT = introDone ? 1 : THREE.MathUtils.clamp((introElapsed - fireStart) / 0.8, 0, 1);
       campfireRuntime.setIntroGrow(easeOutBack(fireT, 2.0));
       campfireRuntime.update(deltaTime);
+    }
+    for (const { runtime } of shiitakeEntries) runtime.update(deltaTime);
+    if (!introDone) {
+      // 跟篝火差不多時候一顆接一顆「啵」地長出來
+      shiitakeEntries.forEach(({ runtime }, index) => {
+        const mushroomStart = housesIntroEnd + 0.3 + index * 0.12;
+        const mushroomT = THREE.MathUtils.clamp((introElapsed - mushroomStart) / 0.7, 0, 1);
+        runtime.setIntroGrow(easeOutBack(mushroomT, 2.2));
+      });
     }
     if (pigRuntime) {
       const pigStart = introSettings.emptyHold + introSettings.ballSeconds * 0.55;
@@ -1124,6 +1197,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(0);
     pigRuntime?.setIntroGrow(0);
     campfireRuntime?.setIntroGrow(0);
+    for (const { runtime } of shiitakeEntries) runtime.setIntroGrow(0);
     floatingIsland.setIntroGrow(0);
   }
 
@@ -1177,6 +1251,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     removeFrenchFryStick,
     pig,
     campfire,
+    shiitakes,
+    addShiitake,
+    removeShiitake,
     groundDetail,
     floatingIsland: { object: floatingIsland.object, settings: floatingIsland.settings, apply: floatingIsland.applySettings },
     houses: [
@@ -1255,6 +1332,17 @@ export type WorldPig = {
   /** 立刻跑去篝火看烤雞（測試用） */
   visitNow: () => boolean;
   isVisiting: () => boolean;
+};
+
+export type WorldShiitake = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: ShiitakeSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+  setHighlight: (on: boolean) => void;
 };
 
 export type WorldCampfire = {

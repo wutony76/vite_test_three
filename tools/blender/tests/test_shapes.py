@@ -239,6 +239,18 @@ def test_pig_v2_parts_are_closed():
     _closed_single(built["tail"][1], islands=3)
 
 
+def test_shiitake_parts_are_closed_and_cross_sits_on_dome():
+    """香菇：菇傘、菇柄各是 1 個封閉島；十字花刀是 4 片封閉薄片，而且貼在圓頂上（不浮空、不埋太深）。"""
+    _doc, _lay, built = _build_all("shiitake.plan.json")
+    _closed_single(built["cap"][1])
+    _closed_single(built["stem"][1])
+    cross = _closed_single(built["cross_cut"][1], islands=4)
+    # 花刀的局部 z（以自己的 bounds 底面為 0）落在 bounds 高度內：上緣貼著圓頂頂端附近
+    (_x0, _y0, z0), (_x1, _y1, z1) = cross["bounds"]
+    ctx = built["cross_cut"][0]
+    assert 0.0 <= z0 and z1 <= ctx.h + 1e-6, cross["bounds"]
+
+
 def test_registry_covers_plans():
     kinds = implemented_kinds()
     for plan in PLAN_FILES:

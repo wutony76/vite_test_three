@@ -25,6 +25,7 @@ import {
   type WorldPudding,
   type WorldLemonSlice,
   type WorldCampfire,
+  type WorldShiitake,
   type WorldFrenchFries,
   type WorldFrenchFryStick,
   type WorldSalmonSteak,
@@ -33,6 +34,7 @@ import { whenGltfMountsIdle, whenGltfsReady } from './objects/sharedGltf';
 import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
 import { CAMPFIRE_CHICKEN_SPIN_AXES, formatCampfireSettingsForPaste } from './objects/campfire';
+import { formatShiitakePlacementsForPaste } from './objects/shiitake';
 import { formatFloatingIslandSettingsForPaste } from './objects/floatingIsland';
 import { formatFrenchFriesPlacementsForPaste } from './objects/frenchFries';
 import { formatFrenchFryStickPlacementsForPaste } from './objects/frenchFryStick';
@@ -245,6 +247,9 @@ const {
   removeFrenchFryStick,
   pig,
   campfire,
+  shiitakes,
+  addShiitake,
+  removeShiitake,
   floatingIsland,
   groundDetail,
 } = createObjs({ envMap, camera });
@@ -1652,6 +1657,78 @@ let lastRenderTime: number | null = null;
 }
 
 // 篝火（綠球上；可直接拖曳換位置）
+// 香菇（綠球上；可複製多顆，點選或拖曳哪顆，面板就調哪顆）
+const shiitakeFolder = gui.addFolder('香菇');
+let selectedShiitake: WorldShiitake | null = null;
+const SHIITAKE_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+
+function logShiitakePlacements() {
+  if (shiitakes.length === 0) return;
+  console.log(formatShiitakePlacementsForPaste(shiitakes.map((item) => ({ id: item.id, settings: item.settings }))));
+}
+
+function clearShiitakePanelSliders() {
+  shiitakeFolder.title('香菇');
+  for (const controller of [...shiitakeFolder.controllers]) {
+    if (SHIITAKE_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+/** 面板改成調 entry 這一顆：先拆掉舊的滑桿，再為這顆重建（滑桿綁的是各自的 settings 物件） */
+function bindShiitakePanel(entry: WorldShiitake) {
+  const alreadyShowing = entry === selectedShiitake && shiitakeFolder.controllers.length > SHIITAKE_PANEL_ACTIONS.size;
+  for (const item of shiitakes) item.setHighlight(item === entry);
+  selectedShiitake = entry;
+  if (alreadyShowing) return;
+  clearShiitakePanelSliders();
+  shiitakeFolder.title(`香菇 · ${entry.label}`);
+  const settings = entry.settings;
+  const apply = () => entry.apply();
+  const log = logShiitakePlacements;
+  shiitakeFolder.add(settings, 'enabled').name('顯示').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(settings, 'capScale', 0.5, 6, 0.05).name('菇傘大小').onChange(apply).onFinishChange(log);
+  shiitakeFolder.addColor(settings, 'capColor').name('菇傘顏色').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(settings, 'stemHeight', 0.2, 8, 0.05).name('菇柄高度').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(settings, 'capThickness', 0.3, 2, 0.05).name('菇傘厚度').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(settings, 'size', 0.02, 0.25, 0.005).name('整體大小').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(settings, 'angleFromTopDegrees', 0, 88, 1).name('離頂端 (°)').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(settings, 'azimuthDegrees', -180, 180, 1).name('方位 (°)').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(settings, 'spinDegrees', -180, 180, 1).name('自身旋轉 (°)').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(settings, 'tiltDegrees', -45, 45, 1).name('傾斜 (°)').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(settings, 'sink', -0.03, 0.03, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(settings, 'swayDegrees', 0, 15, 0.5).name('晃動幅度 (°)').onFinishChange(log);
+  shiitakeFolder.add(settings, 'swaySpeed', 0, 4, 0.05).name('晃動速度').onFinishChange(log);
+}
+
+const shiitakeControls = {
+  add() {
+    // 複製目前選中的那顆（大小、菇傘、菇柄都一樣），放在它旁邊
+    const created = addShiitake(selectedShiitake ? { ...selectedShiitake.settings } : undefined);
+    if (!created) return;
+    bindShiitakePanel(created);
+    refreshPuddingDragTargets();
+    logShiitakePlacements();
+  },
+  remove() {
+    if (!selectedShiitake) return;
+    if (!removeShiitake(selectedShiitake)) return;
+    selectedShiitake = null;
+    clearShiitakePanelSliders();
+    const next = shiitakes[shiitakes.length - 1];
+    if (next) bindShiitakePanel(next);
+    refreshPuddingDragTargets();
+    logShiitakePlacements();
+  },
+  log() {
+    logShiitakePlacements();
+  },
+};
+shiitakeFolder.add(shiitakeControls, 'add').name('複製香菇');
+shiitakeFolder.add(shiitakeControls, 'remove').name('移除選中香菇');
+shiitakeFolder.add(shiitakeControls, 'log').name('印出全部擺設 (console)');
+if (shiitakes[0]) bindShiitakePanel(shiitakes[0]);
+
 const campfireFolder = campfire ? gui.addFolder('篝火') : null;
 function logCampfire() {
   if (!campfire) return;
@@ -2256,9 +2333,11 @@ let surfaceDragTargets: Array<
   | WorldFrenchFries
   | WorldFrenchFryStick
   | WorldCampfire
+  | WorldShiitake
 > = [
   ...houses,
   ...(campfire ? [campfire] : []),
+  ...shiitakes,
   ...(PUDDING_SCENE_EDIT ? puddings : []),
   ...(CORN_SCENE_EDIT && foodVisibility.showCorn ? grilledCorns : []),
   ...friedEggsOnSphere(),
@@ -2272,6 +2351,7 @@ function refreshPuddingDragTargets() {
   surfaceDragTargets.length = 0;
   surfaceDragTargets.push(...houses, ...friedEggsOnSphere());
   if (campfire) surfaceDragTargets.push(campfire);
+  surfaceDragTargets.push(...shiitakes);
   if (PUDDING_SCENE_EDIT) surfaceDragTargets.push(...puddings);
   if (CORN_SCENE_EDIT && foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
   if (foodVisibility.showSalmon) surfaceDragTargets.push(...salmonSteaks);
@@ -2305,6 +2385,8 @@ if (HOUSE_DRAG_ENABLED) {
       }
       const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
       if (salmonEntry) bindSalmonPanel(salmonEntry);
+      const shiitakeEntry = shiitakes.find((item) => item.object === target.object);
+      if (shiitakeEntry) bindShiitakePanel(shiitakeEntry);
       const lemonEntry = lemonSlices.find((item) => item.object === target.object);
       if (lemonEntry) bindLemonPanel(lemonEntry);
       const friesEntry = frenchFries.find((item) => item.object === target.object);
@@ -2322,9 +2404,11 @@ if (HOUSE_DRAG_ENABLED) {
       friesFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       fryStickFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       campfireFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      shiitakeFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
     onDragEnd: (target) => {
       if (campfire && target.object === campfire.object) logCampfire();
+      else if (shiitakes.some((item) => item.object === target.object)) logShiitakePlacements();
       else if (houses.some((house) => house.object === target.object)) logHouse();
       else if (PUDDING_SCENE_EDIT && puddings.some((item) => item.object === target.object)) logPuddingPlacements();
       else if (CORN_SCENE_EDIT && grilledCorns.some((item) => item.object === target.object)) logCornPlacements();
@@ -2345,6 +2429,8 @@ if (HOUSE_DRAG_ENABLED) {
       }
       const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
       if (salmonEntry) bindSalmonPanel(salmonEntry);
+      const shiitakeEntry = shiitakes.find((item) => item.object === target.object);
+      if (shiitakeEntry) bindShiitakePanel(shiitakeEntry);
       const lemonEntry = lemonSlices.find((item) => item.object === target.object);
       if (lemonEntry) bindLemonPanel(lemonEntry);
       const friesEntry = frenchFries.find((item) => item.object === target.object);

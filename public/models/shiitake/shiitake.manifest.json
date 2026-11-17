@@ -1,0 +1,40 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "shiitake",
+  "glb": "shiitake.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
+  ],
+  "root": "shiitake_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 1298,
+    "primitives": 3,
+    "meshes": 3,
+    "materials": 1,
+    "file_bytes": 50804
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "warn",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {},
+    "bake": {},
+    "decals": 0,
+    "gpu_texture_mb": 0.04,
+    "flat_ratio": 1.0,
+    "texture_count": 2,
+    "texture_kb": 0.2,
+    "images": 2,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 49.6
+  }
+}

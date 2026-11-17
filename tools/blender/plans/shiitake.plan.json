@@ -1,0 +1,148 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "shiitake",
+  "notes": "香菇（參考 tools/img/shiitake_side.jpg 的側面造型＋ tools/img/shiitake_top.jpg 的十字花刀）。菇傘與菇柄是獨立節點：Three.js 面板可分別調菇傘大小、菇柄高低。菇傘做成扁平（不要像蘑菇那麼厚）。正面朝 -Y，原點在菇柄底部中心。",
+  "dimensions": {
+    "w": 0.12,
+    "d": 0.12,
+    "h": 0.07
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {
+      "tertiary_density": 1,
+      "geometry_complexity": 12,
+      "bevel_quality": 0
+    }
+  },
+  "style": {
+    "edge_wobble": 0.0
+  },
+  "materials": [
+    {
+      "name": "cap",
+      "hex": "#8A4B22",
+      "roughness": 0.35
+    },
+    {
+      "name": "cap_rim",
+      "hex": "#6E3818",
+      "roughness": 0.4
+    },
+    {
+      "name": "gills",
+      "hex": "#4A2A1A",
+      "roughness": 0.7
+    },
+    {
+      "name": "flesh",
+      "hex": "#EAD6B4",
+      "roughness": 0.5
+    },
+    {
+      "name": "stem",
+      "hex": "#E3CBA4",
+      "roughness": 0.55
+    }
+  ],
+  "budget": {
+    "max_tris": 1800,
+    "max_primitives": 6
+  },
+  "components": [
+    {
+      "id": "stem",
+      "kind": "mushroom_stem",
+      "tier": "primary",
+      "method": "component",
+      "profile": "organic",
+      "material": "stem",
+      "bounds": [
+        [
+          -0.018,
+          -0.018,
+          0.0
+        ],
+        [
+          0.018,
+          0.018,
+          0.05
+        ]
+      ],
+      "source": "observed",
+      "assumption": "短而粗的米白圓柱，底部略寬、切口平；上端約 8 mm 插進菇傘底面。",
+      "confidence": 0.85
+    },
+    {
+      "id": "cap",
+      "kind": "mushroom_cap",
+      "tier": "primary",
+      "method": "component",
+      "profile": "organic",
+      "material": "cap",
+      "params": {
+        "rim_material": "cap_rim",
+        "gills_material": "gills"
+      },
+      "bounds": [
+        [
+          -0.06,
+          -0.06,
+          0.03
+        ],
+        [
+          0.06,
+          0.06,
+          0.064
+        ]
+      ],
+      "source": "observed",
+      "assumption": "扁平的香菇傘（厚度約為直徑的 0.28）：圓頂平緩、邊緣往內捲一圈（深咖啡），底面是深色菌褶，中間留出菇柄的位置。",
+      "confidence": 0.85
+    },
+    {
+      "id": "cross_cut",
+      "kind": "mushroom_cross",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "flesh",
+      "parent": "cap",
+      "bounds": [
+        [
+          -0.042,
+          -0.042,
+          0.052
+        ],
+        [
+          0.042,
+          0.042,
+          0.0655
+        ]
+      ],
+      "source": "observed",
+      "assumption": "頂部十字花刀：4 片葉形、沿圓頂曲面的米白切口（貼在菇傘表面）。",
+      "confidence": 0.8,
+      "params": {
+        "cap_bounds": [
+          [
+            -0.06,
+            -0.06,
+            0.03
+          ],
+          [
+            0.06,
+            0.06,
+            0.064
+          ]
+        ]
+      }
+    }
+  ],
+  "export": {
+    "path": "public/models/shiitake/shiitake.glb",
+    "compress": true,
+    "clickable": [],
+    "anim_groups": {}
+  }
+}

@@ -62,10 +62,11 @@ export function createPigTint(model: THREE.Object3D) {
   const pick = new THREE.Color();
 
   function setColor(hex: string) {
-    pick.set(hex);
-    const tr = pick.r * 255;
-    const tg = pick.g * 255;
-    const tb = pick.b * 255;
+    // getHex() 回傳的是 sRGB（選色器上看到的值）；pick.r 是線性空間，直接 ×255 會變得比選的更深、更飽和
+    const rgb = pick.set(hex).getHex();
+    const tr = (rgb >> 16) & 255;
+    const tg = (rgb >> 8) & 255;
+    const tb = rgb & 255;
     const src = original.data;
     const dst = output.data;
     for (let i = 0; i < src.length; i += 4) {
