@@ -3,6 +3,8 @@ import { cloneGltfMaterialsOnly, loadGltfOnce } from './sharedGltf';
 import { createSplash } from './splash';
 
 const ROAST_CHICKEN_URL = `${import.meta.env.BASE_URL}models/roast_chicken/roast_chicken.glb`;
+// 醬上漂的其他食物（香菇）：沿用綠球上已有的模型，跟球上的東西呼應
+const SHIITAKE_URL = `${import.meta.env.BASE_URL}models/shiitake/shiitake.glb`;
 // 薯條：細長方塊（不載入 GLB）；長邊與碰撞半徑以 REFERENCE 比例縮放
 const FRY_REFERENCE_LENGTH = 0.06;
 const FRY_REFERENCE_REACH = 0.038;
@@ -17,7 +19,8 @@ export type FryFoodSettings = {
 };
 
 const fryFoodSettings: FryFoodSettings = {
-  size: 0.027,
+  // 0.027 時在畫面上只是一個小橘點；放大到看得出是一根薯條
+  size: 0.045,
 };
 
 function fryCollisionReach() {
@@ -37,12 +40,90 @@ export type ChickenFoodSettings = {
   boneColor: string;
 };
 
-const CHICKEN_CRUST_PALETTE = ['#a35205', '#d27219', '#7e4120'] as const;
+// 換成深番茄紅的醬之後，舊的深咖啡色表皮（#7e4120 等）跟醬糊成一團 → 改成亮一點的金黃烤色
+const CHICKEN_CRUST_PALETTE = ['#e0952e', '#f2b246', '#c97a2a'] as const;
 
 const chickenFoodSettings: ChickenFoodSettings = {
-  size: 0.065,
+  size: 0.095,
   boneColor: '#fff8f0',
 };
+
+/** 醬上其他食物（香菇）的大小與所有食物的亮邊（控制面板可調） */
+export type ExtraFoodSettings = {
+  /** 香菇最長邊（公尺） */
+  mushroomSize: number;
+  /** 香菇中心離醬面多高（× 香菇大小）。越小沉越深；0 ≈ 一半泡在醬裡 */
+  mushroomFloat: number;
+  /** 食物邊緣亮光：讓食物從紅色的醬上「跳」出來，0 = 關閉 */
+  rim: number;
+};
+
+/**
+ * 香菇漂在醬上要「躺著」：直立時菇柄插進醬裡，看起來像從土裡長出來，不合邏輯。
+ * 轉 70° 而不是 90°：菇柄橫躺、菇傘往上斜一點，比完全側立自然，也看得到菇傘上的十字花刀
+ */
+const MUSHROOM_LIE_DEGREES = 70;
+
+const extraFoodSettings: ExtraFoodSettings = {
+  mushroomSize: 0.075,
+  // 0.3 時只沉一小截；使用者要「再沉下去一半」→ 約一半泡在醬裡
+  mushroomFloat: 0,
+  rim: 0.45,
+};
+
+/** 所有食物材質共用的亮邊強度：面板改這個值，全部食物立刻跟著變（不用重編 shader） */
+const foodRimUniform = { value: extraFoodSettings.rim };
+
+/**
+ * 食物邊緣亮光（菲涅耳）：越側面越亮。
+ * 少了它，金黃色的雞腿、薯條放在深紅色的醬上，邊緣會跟醬的暗部混在一起，看不出輪廓。
+ * 用 userData 標記：同一個材質只包一次，避免重複注入
+ */
+function addFoodRim(material: THREE.Material) {
+  if (material.userData.foodRim) return;
+  material.userData.foodRim = true;
+  const previous = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    previous.call(material, shader, renderer);
+    shader.uniforms.uFoodRim = foodRimUniform;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uFoodRim;')
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        totalEmissiveRadiance += vec3(1.0, 0.93, 0.8) * uFoodRim * pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.5);`,
+      );
+  };
+  material.needsUpdate = true;
+}
+
+function addFoodRimToObject(object: THREE.Object3D) {
+  object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) addFoodRim(material);
+  });
+}
+
+function mushroomReach() {
+  return extraFoodSettings.mushroomSize * 0.55;
+}
+
+/** 每種食物沿著醬佔多長（碰撞半徑） */
+function foodReach(kind: FoodKind) {
+  if (kind === 'nugget') return chickenCollisionReach();
+  if (kind === 'fry') return fryCollisionReach();
+  return mushroomReach();
+}
+
+/** 每種食物的中心離醬面多高（負 = 一部分埋進醬裡） */
+function foodLift(kind: FoodKind) {
+  if (kind === 'nugget') return chickenSurfaceLift();
+  if (kind === 'fry') return frySurfaceLift();
+  // 香菇側躺漂著，沉多深由面板「香菇浮起高度」決定（× 香菇大小）
+  return extraFoodSettings.mushroomSize * extraFoodSettings.mushroomFloat;
+}
 
 function pickChickenCrustColor(seed: number) {
   const random = createRandom(8800 + seed * 131);
@@ -100,11 +181,16 @@ const RING_OFFSET_Z = 0.13;
 const SPLASH_ENABLED = false;
 // 醬海裡烤雞的數量。控制面板可以改，這裡是一打開畫面時的數量
 const FOOD_COUNT = 11;
+// 一打開畫面時實際放幾塊。11 塊大多在綠球背面或畫面邊緣，前景常常一塊都看不到 → 多放一些。
+// 前 FOOD_COUNT 塊的種類、位置維持原樣；多出來的依 EXTRA_FOOD_KINDS 輪流放（含香菇）
+const FOOD_COUNT_DEFAULT = 20;
+const EXTRA_FOOD_KINDS: FoodKind[] = ['mushroom', 'nugget', 'fry', 'mushroom', 'fry', 'nugget', 'mushroom', 'fry'];
 // 滑桿上限。形狀和材質是共用的，不會每一塊都做一份新的
 const FOOD_COUNT_MAX = 150;
 // 番茄醬海：三角魚鰭（鯊魚），沿環較快游動
 const SHARK_FIN_ENABLED = true;
-const SHARK_FIN_COLOR = 0xc07ab8;
+// 淡紫粉（舊 0xc07ab8）不像鯊魚 → 深藍灰，在紅醬上對比清楚
+const SHARK_FIN_COLOR = 0x56708c;
 // 整圈進度 / 秒；烤雞約 0.006~0.046，鰭快很多才有「掠過醬海」的感覺
 const SHARK_FIN_DRIFT = 0.115;
 /** 沿醬環截面左右擺（弧度上限），0 = 貼外緣直線游 */
@@ -118,7 +204,8 @@ const SHARK_FIN_WAVE_SCALE = 2;
 const SHARK_FIN_WAVE_OPACITY = 0.52;
 const SHARK_FIN_WAVE_SIDE = 0.016;
 const SHARK_FIN_WAVE_TRAIL = 0.028;
-const SHARK_FIN_WAVE_COLOR = 0xff85e9;
+// 亮粉色（舊 0xff85e9）放在番茄紅上很突兀 → 奶油白，像醬被劃開翻起的亮面
+const SHARK_FIN_WAVE_COLOR = 0xfff0dc;
 
 /**
  * 簡單的「可重現亂數」（mulberry32）：同一個 seed 每次產生的數列都一樣
@@ -179,6 +266,64 @@ class KetchupCurve extends THREE.Curve<THREE.Vector3> {
 }
 
 /**
+ * 醬汁質感（面板「番茄醬質感」可調，調完印出貼回 KETCHUP_SAUCE_DEFAULT）
+ *
+ * 舊版的問題：顏色是全場最飽和的 #e83055、粗糙度 0.42、清漆只有 0.2、又加了橘色自發光把暗部填平，
+ * 再加上管子只切 25×8 段 → 前景一大片看起來像「紅色塑膠板」，看不出是濕亮的醬。
+ */
+export type KetchupSauceSettings = {
+  /** 醬的主色（番茄醬是帶一點橘的暖深紅） */
+  color: string;
+  /** 暗部透出來的顏色（自發光），0 強度 = 不補光 */
+  emissiveColor: string;
+  emissiveStrength: number;
+  roughness: number;
+  /** 清漆層：濕亮感主要靠它 */
+  clearcoat: number;
+  clearcoatRoughness: number;
+  envIntensity: number;
+  /** 菲涅耳亮邊：越側面越亮，黏稠液體的邊緣特徵 */
+  rimStrength: number;
+  rimColor: string;
+  rimPower: number;
+  /** 貼著綠球那一側變暗的程度（接觸陰影） */
+  contactDark: number;
+  /** 沿著流動方向移動的高光條紋 */
+  streakStrength: number;
+  streakSpeed: number;
+  /** 醬面的小氣泡亮點 */
+  bubbleStrength: number;
+  /** 小豬靠近醬邊時的漣漪 */
+  rippleStrength: number;
+  /** 小豬離醬面多近（世界單位）開始起漣漪 */
+  rippleDistance: number;
+};
+
+export const KETCHUP_SAUCE_DEFAULT: KetchupSauceSettings = {
+  color: '#c42a1f',
+  emissiveColor: '#3a0c02',
+  emissiveStrength: 0.6,
+  roughness: 0.24,
+  clearcoat: 0.7,
+  clearcoatRoughness: 0.2,
+  envIntensity: 0.5,
+  rimStrength: 0.35,
+  rimColor: '#ff9a7a',
+  rimPower: 2.6,
+  contactDark: 0.45,
+  streakStrength: 0.12,
+  streakSpeed: 1,
+  bubbleStrength: 0.35,
+  rippleStrength: 0.6,
+  rippleDistance: 0.08,
+};
+
+/** 同時存在的漣漪數量上限（shader 的陣列長度） */
+const RIPPLE_SLOTS = 4;
+/** 一圈漣漪擴散多久（秒） */
+const RIPPLE_LIFE = 1.4;
+
+/**
  * 番茄醬的材質：緞帶和噴濺的醬滴共用同一組設定，顏色、光澤才會一致
  * 用函式每次產生新的一份，而不是共用同一個材質：緞帶會再加上流動變形，醬滴不需要
  */
@@ -216,7 +361,9 @@ function createTubeGeometry(curve: KetchupCurve) {
   // 參數：路徑、沿路徑切幾段、管子半徑、管子圓周切幾段、頭尾是否接起來
   // 段數切細一點，下面 shader 推動頂點時表面才會平滑，不會一格一格
   // const geometry = new THREE.TubeGeometry(curve, 400, TUBE_RADIUS, 24, true);
-  const geometry = new THREE.TubeGeometry(curve, 25, TUBE_RADIUS, 8, true);
+  // 舊版 25×8 段：近看是一塊塊平面，高光只會一整片亮或一整片暗，看起來像塑膠板。
+  // 200×24 段讓表面圓滑，清漆高光、亮邊才會是一條漂亮的弧線
+  const geometry = new THREE.TubeGeometry(curve, 200, TUBE_RADIUS, 24, true);
 
   // aProgress：每個頂點在管子上走到哪裡（0 ~ 1），shader 用它算「哪一段該鼓起來」
   // TubeGeometry 的 uv.x 剛好就是沿管子的進度，複製一份成自訂屬性
@@ -225,6 +372,10 @@ function createTubeGeometry(curve: KetchupCurve) {
   const progress = new Float32Array(uv.count);
   for (let i = 0; i < uv.count; i++) progress[i] = uv.getX(i);
   geometry.setAttribute('aProgress', new THREE.BufferAttribute(progress, 1));
+  // aRadial：繞管子一圈的位置（0 ~ 1），uv.y 就是。給小氣泡排格子用
+  const radial = new Float32Array(uv.count);
+  for (let i = 0; i < uv.count; i++) radial[i] = uv.getY(i);
+  geometry.setAttribute('aRadial', new THREE.BufferAttribute(radial, 1));
   return geometry;
 }
 
@@ -259,6 +410,10 @@ export type SharkFinSettings = {
   /** 截面 S 擺幅度，0 = 貼外緣中線 */
   curveAmp: number;
   curveRate: number;
+  /** 平均幾秒躍出醬面一次（0 = 不跳） */
+  jumpEvery: number;
+  /** 躍起的高度（世界單位） */
+  jumpHeight: number;
 };
 
 /** 魚鰭兩側卡通水波：控制面板可調 */
@@ -296,6 +451,19 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     // 載入時醬從 uWrapOrigin 開始，沿著圈圈長到 uWrap。1 = 已經繞滿
     uWrap: { value: 0 },
     uWrapOrigin: { value: 0 },
+    // ── 醬汁質感（由 applySauceSettings 寫入）──
+    uRimStrength: { value: 0 },
+    uRimColor: { value: new THREE.Color() },
+    uRimPower: { value: 2.6 },
+    uContactDark: { value: 0 },
+    uStreakStrength: { value: 0 },
+    uStreakTime: { value: 0 },
+    uBubbleStrength: { value: 0 },
+    uBallCenter: { value: new THREE.Vector3() },
+    // 漣漪：xyz = 世界座標中心、w = 開始時間（uRippleClock 的秒數）；w < 0 代表空位
+    uRipples: { value: Array.from({ length: RIPPLE_SLOTS }, () => new THREE.Vector4(0, 0, 0, -100)) },
+    uRippleClock: { value: 0 },
+    uRippleStrength: { value: 0 },
   };
 
   // onBeforeCompile：在 three.js 編譯內建材質的 shader 前插入自己的程式碼
@@ -304,6 +472,12 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     shader.uniforms.uTime = uniforms.uTime;
     shader.uniforms.uWrap = uniforms.uWrap;
     shader.uniforms.uWrapOrigin = uniforms.uWrapOrigin;
+    for (const key of [
+      'uRimStrength', 'uRimColor', 'uRimPower', 'uContactDark', 'uStreakStrength', 'uStreakTime',
+      'uBubbleStrength', 'uBallCenter', 'uRipples', 'uRippleClock', 'uRippleStrength',
+    ] as const) {
+      shader.uniforms[key] = uniforms[key];
+    }
 
     shader.fragmentShader = shader.fragmentShader
       .replace(
@@ -311,7 +485,68 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
         `#include <common>
         uniform float uWrap;
         uniform float uWrapOrigin;
-        varying float vWrapProgress;`,
+        varying float vWrapProgress;
+        uniform float uRimStrength;
+        uniform vec3 uRimColor;
+        uniform float uRimPower;
+        uniform float uContactDark;
+        uniform float uStreakStrength;
+        uniform float uStreakTime;
+        uniform float uBubbleStrength;
+        uniform vec3 uBallCenter;
+        uniform vec4 uRipples[${RIPPLE_SLOTS}];
+        uniform float uRippleClock;
+        uniform float uRippleStrength;
+        varying float vRadial;
+        varying vec3 vSauceWorldPos;
+        varying vec3 vSauceWorldNormal;
+        // 一圈漣漪的亮度：離中心 d、已經擴散 age 秒 → 一道往外推的細環，越久越淡
+        float sauceRipple(vec3 p) {
+          float sum = 0.0;
+          for (int i = 0; i < ${RIPPLE_SLOTS}; i++) {
+            vec4 r = uRipples[i];
+            float age = uRippleClock - r.w;
+            if (age <= 0.0 || age >= ${RIPPLE_LIFE.toFixed(2)}) continue;
+            float d = distance(p, r.xyz);
+            float front = age * 0.085;
+            float band = exp(-pow((d - front) / 0.011, 2.0));
+            sum += band * (1.0 - age / ${RIPPLE_LIFE.toFixed(2)});
+          }
+          return sum;
+        }
+        float sauceHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }`,
+      )
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        // 接觸陰影：法線越朝向綠球中心（貼地那一側），醬越暗。少了它，醬像浮在球外面的一圈塑膠
+        vec3 toBall = normalize(uBallCenter - vSauceWorldPos);
+        float contact = clamp(dot(normalize(vSauceWorldNormal), toBall), 0.0, 1.0);
+        diffuseColor.rgb *= 1.0 - uContactDark * contact * contact;`,
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        {
+          vec3 viewDir = normalize(vViewPosition);
+          float facing = clamp(dot(normal, viewDir), 0.0, 1.0);
+          // ① 菲涅耳亮邊：越側面（facing 越小）越亮
+          totalEmissiveRadiance += uRimColor * uRimStrength * pow(1.0 - facing, uRimPower);
+          // ② 流動高光條紋：沿著管子方向往前移動的細亮帶，帶一點彎曲，只出現在正對鏡頭的那面
+          float wave = vWrapProgress * 6.2831853 * 20.0 - uStreakTime * 2.0
+                     + sin(vRadial * 6.2831853 * 2.0 + vWrapProgress * 40.0) * 1.4;
+          float streak = pow(0.5 + 0.5 * sin(wave), 48.0) * facing * facing;
+          totalEmissiveRadiance += vec3(1.0, 0.85, 0.8) * uStreakStrength * streak;
+          // ③ 小氣泡：把醬面切成小格子，少數格子放一顆亮點，跟著醬一起往前流
+          vec2 cell = vec2(vWrapProgress * 420.0 - uStreakTime * 1.2, vRadial * 52.0);
+          vec2 id = floor(cell);
+          vec2 f = fract(cell) - 0.5;
+          float pick = step(0.94, sauceHash(id));
+          float bubble = pick * smoothstep(0.32, 0.12, length(f)) * facing;
+          totalEmissiveRadiance += vec3(1.0, 0.92, 0.88) * uBubbleStrength * bubble;
+          // ④ 漣漪
+          totalEmissiveRadiance += vec3(1.0, 0.8, 0.75) * uRippleStrength * sauceRipple(vSauceWorldPos) * 0.6;
+        }`,
       )
       .replace(
         '#include <clipping_planes_fragment>',
@@ -326,7 +561,14 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
         `#include <common>
         uniform float uTime;
         attribute float aProgress;
-        varying float vWrapProgress;`,
+        attribute float aRadial;
+        varying float vWrapProgress;
+        varying float vRadial;
+        varying vec3 vSauceWorldPos;
+        varying vec3 vSauceWorldNormal;
+        uniform vec4 uRipples[${RIPPLE_SLOTS}];
+        uniform float uRippleClock;
+        uniform float uRippleStrength;`,
       )
       // begin_vertex 之後 transformed 就是頂點原始位置，在這裡把它推出去
       .replace(
@@ -342,14 +584,27 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
                      * sin(position.z * 7.0 + uTime * 2.1);
         // 沿法線（管子表面朝外的方向）推動：正值變粗、負值變細
         transformed += objectNormal * (blob * ${BLOB_AMOUNT.toFixed(4)} + wobble * ${WOBBLE_AMOUNT.toFixed(4)});
-        vWrapProgress = aProgress;`,
+        vWrapProgress = aProgress;
+        vRadial = aRadial;
+        vSauceWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        vSauceWorldNormal = normalize(mat3(modelMatrix) * objectNormal);
+        // ⑤ 漣漪也讓醬面微微隆起一圈（不只是變亮），看起來才像真的被碰到
+        float rippleLift = 0.0;
+        for (int i = 0; i < ${RIPPLE_SLOTS}; i++) {
+          vec4 r = uRipples[i];
+          float age = uRippleClock - r.w;
+          if (age <= 0.0 || age >= ${RIPPLE_LIFE.toFixed(2)}) continue;
+          float d = distance(vSauceWorldPos, r.xyz);
+          rippleLift += exp(-pow((d - age * 0.085) / 0.012, 2.0)) * (1.0 - age / ${RIPPLE_LIFE.toFixed(2)});
+        }
+        transformed += objectNormal * rippleLift * 0.006 * uRippleStrength;`,
       );
   };
 
   const mesh = new THREE.Mesh(geometry, material);
   // 烤雞掛在緞帶自己身上：mesh 繞 y 軸轉的時候，它們會跟著醬一起繞，不用另外算位置
   // 用 let：控制面板改數量時會換掉這份清單，update 每幀讀到的才是新的
-  let riders = createRiders(mesh, FOOD_COUNT);
+  let riders = createRiders(mesh, FOOD_COUNT_DEFAULT);
   loadFoodPrototypes(() => {
     for (const rider of riders) upgradeRiderMesh(rider);
   });
@@ -362,7 +617,13 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     depth: 0.008,
     curveAmp: SHARK_FIN_CURVE_AMP,
     curveRate: SHARK_FIN_CURVE_RATE,
+    jumpEvery: 9,
+    jumpHeight: 0.07,
   };
+  // 跳躍狀態：jumpT < 0 = 在醬裡游；0～1 = 空中的進度
+  let jumpT = -1;
+  let jumpTimer = 4 + Math.random() * 4;
+  const JUMP_SECONDS = 1.0;
   let sharkFin: Rider | null = sharkFinSettings.enabled ? createSharkFinRider(mesh, sharkFinSettings) : null;
   const sharkFinWaveSettings: SharkFinWaveSettings = {
     enabled: SHARK_FIN_WAVE_ENABLED,
@@ -379,8 +640,84 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   function applySharkFinWaveSettings() {
     finWaves.applyColor();
   }
-  const foodSettings = { count: FOOD_COUNT };
+  const foodSettings = { count: FOOD_COUNT_DEFAULT };
+
+  /** 香菇大小／亮邊改了：重建原型、換上新尺寸 */
+  function applyExtraFoodSettings() {
+    foodRimUniform.value = Math.max(0, extraFoodSettings.rim);
+    rebuildExtraPrototypes();
+    for (const rider of riders) {
+      if (rider.kind === 'mushroom') upgradeRiderMesh(rider);
+    }
+    if (sharkFin) setWrap(uniforms.uWrap.value);
+  }
   const visualSettings: KetchupVisualSettings = { opacity: 1 };
+  const sauceSettings: KetchupSauceSettings = { ...KETCHUP_SAUCE_DEFAULT };
+
+  /** 把 sauceSettings 套到材質和 shader uniform 上（面板每次改值都會呼叫） */
+  function applySauceSettings() {
+    const s = sauceSettings;
+    material.color.set(s.color);
+    material.emissive.set(s.emissiveColor).multiplyScalar(Math.max(0, s.emissiveStrength));
+    material.roughness = THREE.MathUtils.clamp(s.roughness, 0, 1);
+    material.clearcoat = THREE.MathUtils.clamp(s.clearcoat, 0, 1);
+    material.clearcoatRoughness = THREE.MathUtils.clamp(s.clearcoatRoughness, 0, 1);
+    material.envMapIntensity = Math.max(0, s.envIntensity);
+    uniforms.uRimStrength.value = Math.max(0, s.rimStrength);
+    uniforms.uRimColor.value.set(s.rimColor);
+    uniforms.uRimPower.value = Math.max(0.5, s.rimPower);
+    uniforms.uContactDark.value = THREE.MathUtils.clamp(s.contactDark, 0, 1);
+    uniforms.uStreakStrength.value = Math.max(0, s.streakStrength);
+    uniforms.uBubbleStrength.value = Math.max(0, s.bubbleStrength);
+    uniforms.uRippleStrength.value = Math.max(0, s.rippleStrength);
+  }
+  applySauceSettings();
+
+  // ── 漣漪：小豬靠近醬邊時，在醬面上「離小豬最近的點」起一圈 ──
+  let rippleClock = 0;
+  let rippleSlot = 0;
+  let rippleCooldown = 0;
+  const touchLocal = new THREE.Vector3();
+  const touchCenter = new THREE.Vector3();
+  const touchWorldScale = new THREE.Vector3();
+
+  /**
+   * 每幀呼叫：worldPos 是小豬（或其他會碰到醬的東西）的世界座標。
+   * 換算到緞帶自己的座標 → 找同一個角度上的管子中心線 → 量離醬面多遠；
+   * 夠近就在醬面上那一點放一圈漣漪（有冷卻時間，站著不動也只會一圈一圈慢慢冒）。
+   */
+  function touch(worldPos: THREE.Vector3) {
+    if (rippleCooldown > 0 || sauceSettings.rippleStrength <= 0) return;
+    mesh.updateMatrixWorld();
+    touchLocal.copy(worldPos);
+    mesh.worldToLocal(touchLocal);
+    const angle = Math.atan2(touchLocal.z, touchLocal.x);
+    const t = ((angle / (Math.PI * 2)) % 1 + 1) % 1;
+    curve.getPoint(t, touchCenter);
+    mesh.localToWorld(touchCenter);
+    mesh.getWorldScale(touchWorldScale);
+    const tubeWorld = TUBE_RADIUS * touchWorldScale.x;
+    const fromCenter = touchLocal.copy(worldPos).sub(touchCenter);
+    const gap = fromCenter.length() - tubeWorld;
+    if (gap > sauceSettings.rippleDistance) return;
+    // 醬面上最靠近小豬的點 = 中心線往小豬方向走一個管子半徑
+    const surface = touchCenter.addScaledVector(fromCenter.normalize(), tubeWorld);
+    addRipple(surface);
+    rippleCooldown = 0.45;
+  }
+
+  /** 在醬面上（世界座標）放一圈漣漪；delay 秒後才開始擴散 */
+  function addRipple(worldPoint: THREE.Vector3, delay = 0) {
+    const slot = uniforms.uRipples.value[rippleSlot];
+    slot.set(worldPoint.x, worldPoint.y, worldPoint.z, rippleClock + delay);
+    rippleSlot = (rippleSlot + 1) % RIPPLE_SLOTS;
+  }
+  const landingPoint = new THREE.Vector3();
+
+  /** 綠球中心（世界座標），接觸陰影用 */
+  function setBallCenter(center: THREE.Vector3) {
+    uniforms.uBallCenter.value.copy(center);
+  }
 
   function applyChickenFoodSettings() {
     rebuildChickenPrototype();
@@ -542,11 +879,15 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   function update(time: number) {
     // 傳進 shader 的時間先乘上倍率：shader 裡所有用到 uTime 的動畫會一起變快或變慢
     uniforms.uTime.value = time * FLOW_SPEED;
+    uniforms.uStreakTime.value = time * Math.max(0, sauceSettings.streakSpeed);
     // 整條緞帶繞自己的軸（翻起來之後的 y 軸）慢慢轉，看起來像醬汁在繞著球跑
     mesh.rotation.y = time * SPIN_SPEED;
     // 配料貼在醬的外側，沿著醬慢慢漂。不看鏡頭，旋轉畫面時才不會跟著滑
     const deltaTime = lastTime === null ? 0 : Math.min(time - lastTime, 0.1);
     lastTime = time;
+    rippleClock += deltaTime;
+    uniforms.uRippleClock.value = rippleClock;
+    rippleCooldown = Math.max(0, rippleCooldown - deltaTime);
     mesh.updateWorldMatrix(true, false);
     riderInverse.copy(mesh.matrixWorld).invert();
     if (sharkFin && sharkFinSettings.enabled) {
@@ -566,6 +907,25 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
         sharkFin.climb = 0;
       }
       yieldFoodFromShark(sharkFin, riders, ringLength, time);
+
+      // ── 偶爾躍出醬面：畫一道弧線，落回醬裡時醬面起兩圈漣漪 ──
+      if (jumpT >= 0) {
+        jumpT += deltaTime / JUMP_SECONDS;
+        if (jumpT >= 1) {
+          jumpT = -1;
+          // 落水點：鰭目前的位置（緞帶座標 → 世界座標）
+          landingPoint.copy(sharkFin.mesh.position).applyMatrix4(mesh.matrixWorld);
+          addRipple(landingPoint);
+          addRipple(landingPoint, 0.35);
+        }
+      } else if (sharkFinSettings.jumpEvery > 0) {
+        jumpTimer -= deltaTime;
+        if (jumpTimer <= 0) {
+          jumpT = 0;
+          // 間隔加一點亂數，才不會像節拍器一樣準時
+          jumpTimer = sharkFinSettings.jumpEvery * (0.6 + Math.random() * 0.8);
+        }
+      }
     }
     const pushDecay = Math.exp(-3.2 * deltaTime);
     for (const rider of riders) {
@@ -627,7 +987,10 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
         rider.kind === 'sharkFin'
           ? 0
           : Math.sin(time * 0.9 + rider.phase) * 0.007 + Math.sin(time * 0.27 + rider.driftPhase) * 0.004;
-      rider.mesh.position.copy(riderWorld).addScaledVector(riderDir, TUBE_RADIUS + swell + rider.lift + bob);
+      const airborne = rider.kind === 'sharkFin' && jumpT >= 0;
+      // 跳躍弧線：sin(π t) 從 0 升到頂再落回 0
+      const jumpLift = airborne ? Math.sin(Math.PI * jumpT) * sharkFinSettings.jumpHeight : 0;
+      rider.mesh.position.copy(riderWorld).addScaledVector(riderDir, TUBE_RADIUS + swell + rider.lift + bob + jumpLift);
       rider.mesh.position.applyMatrix4(riderInverse);
       if (rider.kind === 'sharkFin') {
         // 解析切線 + 固定游向：只朝前或朝後，不吃 getTangent 分段抖動
@@ -639,9 +1002,11 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
         else finLateral.normalize();
         finBasis.makeBasis(flowAlongTube, riderLocalDir, finLateral);
         rider.mesh.quaternion.setFromRotationMatrix(finBasis);
+        // 空中：上升時鰭尖往前上仰、下降時往前下栽（繞鰭自己的側向軸轉）
+        if (airborne) rider.mesh.rotateZ((0.5 - jumpT) * 1.2);
         finWaves.update(
           deltaTime,
-          sharkFinWaveSettings.enabled && sharkFinSettings.enabled && rider.mesh.visible,
+          sharkFinWaveSettings.enabled && sharkFinSettings.enabled && rider.mesh.visible && !airborne,
           rider.mesh.position,
           flowAlongTube,
           finLateral,
@@ -724,6 +1089,10 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     applyRingSettings,
     visualSettings,
     applyVisualSettings,
+    sauceSettings,
+    applySauceSettings,
+    touch,
+    setBallCenter,
     foodSettings,
     setFoodCount,
     chickenFoodSettings,
@@ -731,6 +1100,8 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     rerollChickenCrustColors,
     fryFoodSettings,
     applyFryFoodSettings,
+    extraFoodSettings,
+    applyExtraFoodSettings,
     sharkFinSettings,
     applySharkFinSettings,
     sharkFinWaveSettings,
@@ -818,7 +1189,8 @@ function sauceSwell(progress: number, surface: THREE.Vector3, uTime: number) {
   return blob * BLOB_AMOUNT + wobble * WOBBLE_AMOUNT;
 }
 
-type RiderKind = 'nugget' | 'fry' | 'sharkFin';
+type FoodKind = 'nugget' | 'fry' | 'mushroom';
+type RiderKind = FoodKind | 'sharkFin';
 
 type Rider = {
   mesh: THREE.Object3D;
@@ -890,12 +1262,41 @@ function darkenSunkSide(geometry: THREE.BufferGeometry) {
 function disposeRider(rider: Rider) {
   // GLB 原型是共用的，只拆掉這一顆的實例
   rider.mesh.removeFromParent();
-  if (rider.kind === 'nugget' || rider.kind === 'fry') disposeFoodInstance(rider.mesh);
+  if (rider.kind !== 'sharkFin') disposeFoodInstance(rider.mesh);
 }
 
 type FoodPrototype = { clone: () => THREE.Object3D };
 
 let nuggetPrototype: FoodPrototype | null = null;
+let mushroomPrototype: FoodPrototype | null = null;
+let mushroomSourceRoot: THREE.Object3D | null = null;
+
+/**
+ * 香菇的原型：沿用 GLB 的材質，只提高一點自發光（在醬的紅色反光裡才不會變暗沉），
+ * 大小縮到面板設定的尺寸
+ */
+function rebuildExtraPrototypes() {
+  const tint = (mesh: THREE.Mesh) => {
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      if (!('emissive' in material)) continue;
+      const m = material as THREE.MeshStandardMaterial;
+      m.emissive.copy(m.color).multiplyScalar(0.35);
+      m.emissiveMap = m.map ?? null;
+      m.emissiveIntensity = 0.5;
+      m.envMapIntensity = 0.15;
+      m.polygonOffset = true;
+      m.polygonOffsetFactor = -2;
+      m.polygonOffsetUnits = -2;
+    }
+  };
+  if (mushroomSourceRoot) {
+    mushroomPrototype = lyingPrototype(
+      foodPrototypeFromRoot(mushroomSourceRoot.clone(true), extraFoodSettings.mushroomSize, false, tint),
+      MUSHROOM_LIE_DEGREES,
+    );
+  }
+}
 let foodPrototypeLoadStarted = false;
 
 function enhanceFoodMaterial(mesh: THREE.Mesh, crustColor: string) {
@@ -947,6 +1348,28 @@ function fitFoodPrototype(root: THREE.Object3D, targetMax: number, layChickenFla
   if (layChickenFlat) root.rotation.x = Math.PI / 2;
 }
 
+/**
+ * 讓食物「躺著」：外面包一層 Group，繞 X 軸轉 degrees 度。
+ *
+ * 為什麼不直接轉原型的 root：root 的原點在模型自己的原點（香菇是菇柄底部），
+ * 直接轉會繞著菇柄底部甩出去，整顆偏離中心。fitFoodPrototype 已經把模型置中在「包外那一層」的原點，
+ * 所以轉外層 = 繞著香菇自己的中心轉，躺下後還是在原位。
+ */
+function lyingPrototype(prototype: FoodPrototype, degrees: number): FoodPrototype {
+  return {
+    clone: () => {
+      // 兩層：外層 holder 交給漂浮系統（每幀都會重設它的朝向，讓它的 +Y 對準醬面法線），
+      // 內層 tilt 才是「躺下」的旋轉。只包一層的話，躺下的角度每幀都會被覆蓋掉，又變回直立
+      const holder = new THREE.Group();
+      const tilt = new THREE.Group();
+      tilt.rotation.x = THREE.MathUtils.degToRad(degrees);
+      tilt.add(prototype.clone());
+      holder.add(tilt);
+      return holder;
+    },
+  };
+}
+
 function foodPrototypeFromRoot(
   root: THREE.Object3D,
   targetMax: number,
@@ -974,6 +1397,14 @@ function prepareFoodPrototype(source: THREE.Object3D, targetMax: number): FoodPr
 function loadFoodPrototypes(onReady: () => void) {
   if (foodPrototypeLoadStarted) return;
   foodPrototypeLoadStarted = true;
+  // 香菇載完就先換上（不用等烤雞）
+  loadGltfOnce(SHIITAKE_URL)
+    .then((gltf) => {
+      mushroomSourceRoot = gltf.scene;
+      rebuildExtraPrototypes();
+      onReady();
+    })
+    .catch((error) => console.error(`[ketchup] 香菇模型載入失敗：${SHIITAKE_URL}`, error));
   loadGltfOnce(ROAST_CHICKEN_URL)
     .then((gltf) => {
       chickenSourceRoot = gltf.scene;
@@ -986,9 +1417,12 @@ function loadFoodPrototypes(onReady: () => void) {
     });
 }
 
-function createFoodMesh(kind: 'nugget' | 'fry') {
+function createFoodMesh(kind: FoodKind) {
   if (kind === 'nugget' && nuggetPrototype) return nuggetPrototype.clone();
-  return new THREE.Mesh(sharedFoodGeometry(kind), sharedFoodMaterial(kind));
+  if (kind === 'mushroom' && mushroomPrototype) return mushroomPrototype.clone();
+  // 模型還沒載入：先用方塊占位（香菇借用雞塊的方塊）
+  const placeholder: RiderKind = kind === 'fry' ? 'fry' : 'nugget';
+  return new THREE.Mesh(sharedFoodGeometry(placeholder), sharedFoodMaterial(placeholder));
 }
 
 function disposeFoodInstance(object: THREE.Object3D) {
@@ -1008,7 +1442,7 @@ function disposeFoodInstance(object: THREE.Object3D) {
 }
 
 function upgradeRiderMesh(rider: Rider) {
-  if (rider.kind !== 'nugget' && rider.kind !== 'fry') return;
+  if (rider.kind === 'sharkFin') return;
   const parent = rider.mesh.parent;
   if (!parent) return;
   const position = rider.mesh.position.clone();
@@ -1022,14 +1456,11 @@ function upgradeRiderMesh(rider: Rider) {
   next.visible = visible;
   parent.add(next);
   rider.mesh = next;
-  if (rider.kind === 'nugget') {
-    rider.reach = chickenCollisionReach();
-    rider.lift = chickenSurfaceLift();
-    applyChickenAppearance(next, rider.crustColor);
-  } else {
-    rider.reach = fryCollisionReach();
-    rider.lift = frySurfaceLift();
-  }
+  rider.reach = foodReach(rider.kind);
+  rider.lift = foodLift(rider.kind);
+  if (rider.kind === 'nugget') applyChickenAppearance(next, rider.crustColor);
+  // 材質是每塊各自 clone 的，clone 不會帶 onBeforeCompile → 每換一次模型都要重新加亮邊
+  addFoodRimToObject(next);
 }
 
 let nuggetGeometry: THREE.BoxGeometry | null = null;
@@ -1044,17 +1475,29 @@ let sharkFinMaterial: THREE.MeshPhongMaterial | null = null;
 function sharedSharkFinGeometry(depth = 0.008) {
   if (sharkFinGeometry && sharkFinGeometryDepth === depth) return sharkFinGeometry;
   if (sharkFinGeometry) sharkFinGeometry.dispose();
-  // ◺ 直角三角：左下直角、左上尖、右下與底邊相接（不是等腰三稜錐）
-  const baseW = 0.056;
-  const height = 0.062;
-  const tipFlat = 0.011;
+  // 鯊魚鰭：前緣（+X，游的方向）是外凸的弧線，鰭尖往後勾，後緣內凹 —— 一看就是鯊魚。
+  // 舊版是直角三角形的平板（沒倒角），從側面看像一張紙片。
+  // 尺寸比舊版大 1.3 倍：在畫面上更容易注意到
+  const baseW = 0.073;
+  const height = 0.08;
   const outline = new THREE.Shape();
   outline.moveTo(0, 0);
   outline.lineTo(baseW, 0);
-  outline.lineTo(tipFlat, height);
-  outline.lineTo(0, height - tipFlat);
+  // 前緣：從底部前端往上彎到鰭尖（控制點偏前上方 → 外凸）
+  outline.quadraticCurveTo(baseW * 0.62, height * 0.62, baseW * 0.06, height);
+  // 後緣：鰭尖往後下回到底部（控制點偏內 → 內凹的「勾」）
+  outline.quadraticCurveTo(baseW * 0.2, height * 0.42, baseW * 0.16, 0);
   outline.closePath();
-  const geom = new THREE.ExtrudeGeometry(outline, { depth, bevelEnabled: false });
+  // 倒角：邊緣圓潤，有厚度感；curveSegments 讓弧線順
+  const bevel = Math.min(depth * 0.45, 0.004);
+  const geom = new THREE.ExtrudeGeometry(outline, {
+    depth,
+    bevelEnabled: true,
+    bevelThickness: bevel,
+    bevelSize: bevel * 0.8,
+    bevelSegments: 3,
+    curveSegments: 14,
+  });
   geom.translate(-baseW * 0.5, 0, -depth / 2);
   darkenSunkSide(geom);
   sharkFinGeometry = geom;
@@ -1179,7 +1622,7 @@ function riderSpec(index: number) {
     return spec!;
   }
   const random = createRandom(11 + index * 97);
-  const kind = index % FOOD_COUNT < 3 ? 'nugget' : 'fry';
+  const kind = EXTRA_FOOD_KINDS[(index - FOOD_COUNT) % EXTRA_FOOD_KINDS.length];
   const angle = random() * Math.PI * 2;
   return oneSpec(kind, angle, random);
 }
@@ -1203,7 +1646,8 @@ function sharedFinWaveTexture() {
     const cy = size * 0.58;
     const strokes = [
       { w: 4.5, rgba: 'rgba(255,255,255,0.92)' },
-      { w: 3.2, rgba: 'rgba(190,235,255,0.75)' },
+      // 舊版這一筆是淡藍色，配粉紅水波；醬是番茄紅之後改成暖奶油色
+      { w: 3.2, rgba: 'rgba(255,214,170,0.75)' },
       { w: 2.4, rgba: 'rgba(255,255,255,0.55)' },
     ];
     for (let i = 0; i < 3; i++) {
@@ -1342,7 +1786,7 @@ function createSharkFinRider(parent: THREE.Object3D, settings: SharkFinSettings)
     kind: 'sharkFin',
     center,
     progress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
-    reach: 0.034,
+    reach: 0.044, // 鰭放大 1.3 倍後，碰到食物的範圍也跟著變大
     drift: settings.drift,
     driftPhase: random() * Math.PI * 2,
     yawSpeed: 0,
@@ -1368,8 +1812,9 @@ function createSharkFinRider(parent: THREE.Object3D, settings: SharkFinSettings)
   };
 }
 
-function oneSpec(kind: 'nugget' | 'fry', angle: number, random: () => number) {
-  const nugget = kind === 'nugget';
+function oneSpec(kind: FoodKind, angle: number, random: () => number) {
+  // 只有薯條會斜斜地插在醬裡；其他食物平放
+  const nugget = kind !== 'fry';
   return {
     kind,
     angle,
@@ -1392,6 +1837,7 @@ function createRider(parent: THREE.Object3D, index: number): Rider {
   // 載入完成前先用方塊占位；原型就緒後會 upgradeRiderMesh 換成 GLB
   const mesh = createFoodMesh(kind);
   if (kind === 'nugget') applyChickenAppearance(mesh, crustColor);
+  addFoodRimToObject(mesh);
 
   // 一開始的位置。之後每幀會沿著圈圈改這個點
   const center = new THREE.Vector3(Math.cos(angle) * ORBIT_RADIUS, 0, Math.sin(angle) * ORBIT_RADIUS);
@@ -1405,7 +1851,7 @@ function createRider(parent: THREE.Object3D, index: number): Rider {
     progress: THREE.MathUtils.euclideanModulo(angle, Math.PI * 2) / (Math.PI * 2),
     // 有的幾乎停在醬裡，有的漂得比較快，才不會永遠保持同樣的間距
     // 薯條較長，轉到順著圈時比較容易碰到旁邊那塊
-    reach: kind === 'nugget' ? chickenCollisionReach() : fryCollisionReach(),
+    reach: foodReach(kind),
     drift: spec.drift,
     driftPhase: spec.driftPhase,
     yawSpeed: spec.yawSpeed,
@@ -1414,7 +1860,7 @@ function createRider(parent: THREE.Object3D, index: number): Rider {
     climbSpeed: spec.climbSpeed,
     climbRate: spec.climbRate,
     // 負得比半高少一點：大部分埋在醬的外側，只留一截露出來
-    lift: kind === 'nugget' ? chickenSurfaceLift() : frySurfaceLift(),
+    lift: foodLift(kind),
     kind,
     yaw: spec.yaw,
     // 薯條只微微傾斜。斜太多時兩端會翹出醬面，整根看起來浮在空中
@@ -1432,4 +1878,28 @@ function createRider(parent: THREE.Object3D, index: number): Rider {
     yieldClimbDir: 1,
     freeSectionAfterShark: false,
   };
+}
+
+export function formatKetchupSauceSettingsForPaste(s: KetchupSauceSettings) {
+  return (
+    `// 貼回 src/world/objects/ketchup.ts 的 KETCHUP_SAUCE_DEFAULT\n` +
+    `export const KETCHUP_SAUCE_DEFAULT: KetchupSauceSettings = {\n` +
+    `  color: '${s.color}',\n` +
+    `  emissiveColor: '${s.emissiveColor}',\n` +
+    `  emissiveStrength: ${s.emissiveStrength.toFixed(2)},\n` +
+    `  roughness: ${s.roughness.toFixed(2)},\n` +
+    `  clearcoat: ${s.clearcoat.toFixed(2)},\n` +
+    `  clearcoatRoughness: ${s.clearcoatRoughness.toFixed(2)},\n` +
+    `  envIntensity: ${s.envIntensity.toFixed(2)},\n` +
+    `  rimStrength: ${s.rimStrength.toFixed(2)},\n` +
+    `  rimColor: '${s.rimColor}',\n` +
+    `  rimPower: ${s.rimPower.toFixed(1)},\n` +
+    `  contactDark: ${s.contactDark.toFixed(2)},\n` +
+    `  streakStrength: ${s.streakStrength.toFixed(2)},\n` +
+    `  streakSpeed: ${s.streakSpeed.toFixed(2)},\n` +
+    `  bubbleStrength: ${s.bubbleStrength.toFixed(2)},\n` +
+    `  rippleStrength: ${s.rippleStrength.toFixed(2)},\n` +
+    `  rippleDistance: ${s.rippleDistance.toFixed(3)},\n` +
+    `};`
+  );
 }

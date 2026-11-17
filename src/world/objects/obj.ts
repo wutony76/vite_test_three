@@ -979,6 +979,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   placeFlowers(0);
   if (ground !== all) ground.visible = false;
 
+  const pigTouchScratch = new THREE.Vector3();
+  const ballCenterScratch = new THREE.Vector3();
+
   /** 每幀呼叫：time 單位是秒，讓會動的物件更新動畫 */
   function update(time: number) {
     const deltaTime = lastUpdateTime === null ? 0 : Math.min(time - lastUpdateTime, 0.1);
@@ -1125,7 +1128,11 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       } catch (error) {
         console.error('[pig] update 失敗', error);
       }
+      // 小豬走到醬邊時，醬面起一圈漣漪
+      if (introDone) ketchup.touch(pigRuntime.object.getWorldPosition(pigTouchScratch));
     }
+    // 醬的接觸陰影要知道綠球中心在哪（入場時綠球會移動）
+    ketchup.setBallCenter(ground.getWorldPosition(ballCenterScratch));
 
     friedEggEntries.forEach(({ runtime }, index) => {
       if (introDone) {
@@ -1208,6 +1215,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     update,
     ketchupRing: { object: ketchup.ringObject, settings: ketchup.ringSettings, apply: ketchup.applyRingSettings },
     ketchupVisual: { settings: ketchup.visualSettings, apply: ketchup.applyVisualSettings },
+    ketchupSauce: { settings: ketchup.sauceSettings, apply: ketchup.applySauceSettings },
     // 食物數量：面板上的滑桿改這個，再叫 apply 把多出來或少掉的塊數補上
     ketchupFood: { settings: ketchup.foodSettings, apply: () => ketchup.setFoodCount(ketchup.foodSettings.count) },
     ketchupChicken: {
@@ -1216,6 +1224,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       rerollColors: ketchup.rerollChickenCrustColors,
     },
     ketchupFry: { settings: ketchup.fryFoodSettings, apply: ketchup.applyFryFoodSettings },
+    ketchupExtraFood: { settings: ketchup.extraFoodSettings, apply: ketchup.applyExtraFoodSettings },
     ketchupShark: { settings: ketchup.sharkFinSettings, apply: ketchup.applySharkFinSettings },
     ketchupSharkWaves: { settings: ketchup.sharkFinWaveSettings, apply: ketchup.applySharkFinWaveSettings },
     rainbow: { settings: rainbow.settings, apply: rainbow.applyRainbowSettings },

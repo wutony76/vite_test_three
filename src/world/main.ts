@@ -51,6 +51,8 @@ import { enableSurfaceDrag } from './debug/surfaceDrag';
 import { enableCameraPlaneDrag } from './debug/cameraPlaneDrag';
 import { createStyleGrade, formatStyleGradeSettingsForPaste } from './styleGrade';
 import { createSoftLayerPass, formatSoftLayerSettingsForPaste } from './softLayerPass';
+import { createForegroundBlur, formatForegroundBlurSettingsForPaste } from './foregroundBlur';
+import { formatKetchupSauceSettingsForPaste } from './objects/ketchup';
 import { FLOATING_ISLAND_LAYER } from './objects/floatingIsland';
 import { GROUND_PATH_MODES, formatGroundDetailSettingsForPaste, formatGroundPathsForPaste } from './objects/groundDetail';
 import { enableGroundPathEditor } from './debug/groundPathEditor';
@@ -209,9 +211,11 @@ const {
   update: updateObjs,
   ketchupRing,
   ketchupVisual,
+  ketchupSauce,
   ketchupFood,
   ketchupChicken,
   ketchupFry,
+  ketchupExtraFood,
   ketchupShark,
   ketchupSharkWaves,
   rainbow,
@@ -652,6 +656,31 @@ function logRainbow() {
   );
 }
 
+// 番茄醬質感：顏色、光澤、亮邊、接觸陰影、流動高光、氣泡、漣漪
+const sauceFolder = gui.addFolder('番茄醬質感');
+{
+  const sauce = ketchupSauce.settings;
+  const apply = ketchupSauce.apply;
+  const log = () => console.log(formatKetchupSauceSettingsForPaste(sauce));
+  sauceFolder.addColor(sauce, 'color').name('醬的顏色').onChange(apply).onFinishChange(log);
+  sauceFolder.addColor(sauce, 'emissiveColor').name('暗部透色').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'emissiveStrength', 0, 2, 0.05).name('暗部透色強度').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'roughness', 0, 1, 0.01).name('粗糙度（低=亮滑）').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'clearcoat', 0, 1, 0.01).name('清漆光澤').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'clearcoatRoughness', 0, 1, 0.01).name('清漆粗糙度').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'envIntensity', 0, 2, 0.05).name('環境反射').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'rimStrength', 0, 1.5, 0.01).name('邊緣亮光').onChange(apply).onFinishChange(log);
+  sauceFolder.addColor(sauce, 'rimColor').name('邊緣亮光顏色').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'rimPower', 0.5, 8, 0.1).name('邊緣亮光寬窄（大=窄）').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'contactDark', 0, 1, 0.01).name('貼地陰影').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'streakStrength', 0, 1, 0.01).name('流動高光').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'streakSpeed', 0, 4, 0.05).name('流動速度').onFinishChange(log);
+  sauceFolder.add(sauce, 'bubbleStrength', 0, 1.5, 0.01).name('小氣泡').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'rippleStrength', 0, 2, 0.05).name('小豬漣漪強度').onChange(apply).onFinishChange(log);
+  sauceFolder.add(sauce, 'rippleDistance', 0, 0.2, 0.005).name('多近起漣漪').onFinishChange(log);
+  sauceFolder.add({ log }, 'log').name('印出設定');
+}
+
 const ringFolder = gui.addFolder('番茄醬緞帶');
 const ring = ketchupRing.settings;
 // onChange：拖拉中每一格都即時套用，馬上看到效果
@@ -687,6 +716,17 @@ ringFolder
   .onChange(ketchupFry.apply)
   .onFinishChange(logKetchupFry);
 
+// 醬上其他食物（香菇）＋所有食物的亮邊
+const extraFood = ketchupExtraFood.settings;
+const logExtraFood = () =>
+  console.log(
+    `// 貼回 src/world/objects/ketchup.ts 的 extraFoodSettings\n` +
+      `mushroomSize: ${extraFood.mushroomSize.toFixed(3)}, mushroomFloat: ${extraFood.mushroomFloat.toFixed(2)}, rim: ${extraFood.rim.toFixed(2)}`,
+  );
+ringFolder.add(extraFood, 'mushroomSize', 0.02, 0.15, 0.001).name('香菇大小 (m)').onChange(ketchupExtraFood.apply).onFinishChange(logExtraFood);
+ringFolder.add(extraFood, 'mushroomFloat', -0.3, 0.5, 0.01).name('香菇浮起高度（小=沉）').onChange(ketchupExtraFood.apply).onFinishChange(logExtraFood);
+ringFolder.add(extraFood, 'rim', 0, 1.5, 0.01).name('食物邊緣亮光').onChange(ketchupExtraFood.apply).onFinishChange(logExtraFood);
+
 const sharkFolder = gui.addFolder('番茄醬海・鯊魚');
 const shark = ketchupShark.settings;
 sharkFolder.add(shark, 'enabled').name('顯示魚鰭').onChange(ketchupShark.apply);
@@ -697,6 +737,8 @@ sharkFolder.add(shark, 'lift', -0.05, 0.04, 0.001).name('埋入醬面 lift').onC
 sharkFolder.add(shark, 'depth', 0.003, 0.025, 0.001).name('厚度 depth').onChange(ketchupShark.apply).onFinishChange(logSharkFin);
 sharkFolder.add(shark, 'curveAmp', 0, 0.85, 0.02).name('曲線幅度 curveAmp').onFinishChange(logSharkFin);
 sharkFolder.add(shark, 'curveRate', 0.1, 2.5, 0.05).name('曲線速度 curveRate').onFinishChange(logSharkFin);
+sharkFolder.add(shark, 'jumpEvery', 0, 30, 0.5).name('平均幾秒跳一次（0=不跳）').onFinishChange(logSharkFin);
+sharkFolder.add(shark, 'jumpHeight', 0, 0.2, 0.005).name('跳躍高度').onFinishChange(logSharkFin);
 sharkFolder
   .add(ketchupVisual.settings, 'opacity', 0, 1, 0.02)
   .name('醬透明（看魚鰭）')
@@ -739,7 +781,8 @@ function logSharkFin() {
       `const SHARK_FIN_COLOR = ${hex(shark.color)};\n` +
       `// forward ${shark.forward}, lift ${shark.lift.toFixed(3)}, depth ${shark.depth.toFixed(3)}\n` +
       `const SHARK_FIN_CURVE_AMP = ${shark.curveAmp.toFixed(2)};\n` +
-      `const SHARK_FIN_CURVE_RATE = ${shark.curveRate.toFixed(2)};`,
+      `const SHARK_FIN_CURVE_RATE = ${shark.curveRate.toFixed(2)};\n` +
+      `// jumpEvery ${shark.jumpEvery.toFixed(1)}, jumpHeight ${shark.jumpHeight.toFixed(3)}`,
   );
 }
 
@@ -1607,6 +1650,18 @@ if (groundDetail) {
 
 // 浮空小星球的柔邊圖層：在天空背景之後、主場景之前畫（見 render()）
 const islandSoftPass = createSoftLayerPass({ renderer, scene, camera, layer: FLOATING_ISLAND_LAYER });
+// 前景模糊（移軸）：畫面底部那條（主要是靠近鏡頭的番茄醬）往下越來越糊
+const foregroundBlur = createForegroundBlur({ renderer });
+{
+  const fb = foregroundBlur.settings;
+  const folder = gui.addFolder('前景模糊（移軸）');
+  const log = () => console.log(formatForegroundBlurSettingsForPaste(fb));
+  folder.add(fb, 'enabled').name('啟用').onFinishChange(log);
+  folder.add(fb, 'band', 0, 0.8, 0.01).name('模糊範圍（底部往上）').onFinishChange(log);
+  folder.add(fb, 'feather', 0.05, 1, 0.01).name('過渡柔和度').onFinishChange(log);
+  folder.add(fb, 'blurRadius', 0.5, 8, 0.1).name('模糊程度').onFinishChange(log);
+  folder.add(fb, 'strength', 0, 1, 0.01).name('最底部強度').onFinishChange(log);
+}
 let lastRenderTime: number | null = null;
 
 // 浮空小星球（右後方天空，位置跟著鏡頭）
@@ -2538,6 +2593,7 @@ function render(time: number) {
   // 背景不寫深度，但仍清一次深度緩衝，確保主場景物件不會被背景擋住
   renderer.clearDepth();
   renderer.render(scene, camera);
+  foregroundBlur.render();
 }
 renderer.setAnimationLoop(render);
 // 蓋板後先等 glb、分幀掛載、著色器預熱，再旋開，避免重整時畫面頓一下
