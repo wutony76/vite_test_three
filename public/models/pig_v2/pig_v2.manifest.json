@@ -1,0 +1,54 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "pig_v2",
+  "glb": "pig_v2.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
+  ],
+  "root": "pig_v2_Root",
+  "clickable": [],
+  "anim_groups": {
+    "ears": [
+      "pig_v2_ear_l",
+      "pig_v2_ear_r"
+    ],
+    "legs": [
+      "pig_v2_leg_bl",
+      "pig_v2_leg_br",
+      "pig_v2_leg_fl",
+      "pig_v2_leg_fr"
+    ],
+    "tail": [
+      "pig_v2_tail"
+    ]
+  },
+  "stats": {
+    "triangles": 1932,
+    "primitives": 12,
+    "meshes": 12,
+    "materials": 2,
+    "file_bytes": 95392
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "warn",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {},
+    "bake": {},
+    "decals": 2,
+    "gpu_texture_mb": 0.37,
+    "flat_ratio": 1.0,
+    "texture_count": 3,
+    "texture_kb": 3.0,
+    "images": 3,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 93.2
+  }
+}

@@ -775,6 +775,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       object: pigRuntime.object,
       settings: pigRuntime.settings,
       apply: pigRuntime.applySettings,
+      applyColor: pigRuntime.applyColor,
       cloud: pigRuntime.cloud.settings,
       getCloudState: pigRuntime.cloud.getState,
       visitNow: pigRuntime.visitNow,
@@ -1246,6 +1247,8 @@ export type WorldPig = {
   object: THREE.Object3D;
   settings: PigSettings;
   apply: () => void;
+  /** 只套用顏色（不會讓小豬重生） */
+  applyColor: () => void;
   /** 頭上烏雲的設定（面板即時讀取，不用 apply） */
   cloud: PigCloudSettings;
   getCloudState: () => PigCloudState;

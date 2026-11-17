@@ -1,0 +1,415 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "pig_v2",
+  "notes": "第二版小豬：粉紅色存錢筒造型（短腿），依使用者提供的存錢筒參考圖風格。身體是一條連續 loft（肚子滑順、不凹），背上投幣孔插一枚金幣，兩側白色櫻花；尾巴＋黃色小花。四腳、耳朵、尾巴是獨立節點給 Three.js 做動作。不做眼睛、鼻孔，也不做肚子窗、槽內金幣和字樣（畫面上太小看不到）。正面朝 -Y，原點在 footprint 中心地面。",
+  "dimensions": {
+    "w": 0.15,
+    "d": 0.23,
+    "h": 0.17
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {
+      "tertiary_density": 1,
+      "geometry_complexity": 10,
+      "bevel_quality": 0
+    }
+  },
+  "style": {
+    "edge_wobble": 0.0
+  },
+  "materials": [
+    {
+      "name": "red",
+      "hex": "#F2869F",
+      "roughness": 0.25
+    },
+    {
+      "name": "snout",
+      "hex": "#E77290",
+      "roughness": 0.25
+    },
+    {
+      "name": "ear_inner",
+      "hex": "#D65A7E",
+      "roughness": 0.35
+    },
+    {
+      "name": "hoof",
+      "hex": "#D9678A",
+      "roughness": 0.3
+    },
+    {
+      "name": "slot",
+      "hex": "#5A1418",
+      "roughness": 0.6
+    },
+    {
+      "name": "gold",
+      "hex": "#F4B731",
+      "roughness": 0.3,
+      "metallic": 0.6
+    },
+    {
+      "name": "gold_rim",
+      "hex": "#D98E1C",
+      "roughness": 0.3,
+      "metallic": 0.6
+    },
+    {
+      "name": "tail_pink",
+      "hex": "#E7759A",
+      "roughness": 0.3
+    },
+    {
+      "name": "flower",
+      "hex": "#FFD23F",
+      "roughness": 0.55
+    },
+    {
+      "name": "flower_center",
+      "hex": "#F59E2B",
+      "roughness": 0.55
+    }
+  ],
+  "budget": {
+    "max_tris": 2600,
+    "max_primitives": 22,
+    "max_texture_kb": 200,
+    "max_gpu_texture_mb": 2
+  },
+  "components": [
+    {
+      "id": "body",
+      "kind": "piggy_body",
+      "tier": "primary",
+      "method": "component",
+      "profile": "organic",
+      "material": "red",
+      "params": {
+        "snout_material": "snout"
+      },
+      "bounds": [
+        [
+          -0.065,
+          -0.085,
+          0.001
+        ],
+        [
+          0.065,
+          0.08,
+          0.131
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "存錢筒：圓胖橢圓身、頭身一體、前端扁圓柱豬鼻；肚子是完整圓弧（不凹）。",
+      "confidence": 0.85
+    },
+    {
+      "id": "coin_slot",
+      "kind": "piggy_slot",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "slot",
+      "bounds": [
+        [
+          -0.005,
+          -0.016,
+          0.121
+        ],
+        [
+          0.005,
+          0.02,
+          0.132
+        ]
+      ],
+      "source": "observed",
+      "assumption": "背上沿前後方向的深色投幣孔。",
+      "confidence": 0.85
+    },
+    {
+      "id": "top_coin",
+      "kind": "piggy_top_coin",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "gold",
+      "params": {
+        "rim_material": "gold_rim"
+      },
+      "bounds": [
+        [
+          -0.0035,
+          -0.016,
+          0.114
+        ],
+        [
+          0.0035,
+          0.02,
+          0.15
+        ]
+      ],
+      "source": "observed",
+      "assumption": "一枚金幣一半插進投幣孔、一半露在外面。",
+      "confidence": 0.85
+    },
+    {
+      "id": "leg_fl",
+      "kind": "pig_leg",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "red",
+      "params": {
+        "hoof_material": "hoof",
+        "taper": 0.82
+      },
+      "bounds": [
+        [
+          -0.051,
+          -0.051,
+          0.0
+        ],
+        [
+          -0.019,
+          -0.019,
+          0.026
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "存錢筒的短圓錐腳。",
+      "confidence": 0.85
+    },
+    {
+      "id": "leg_fr",
+      "kind": "pig_leg",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "red",
+      "params": {
+        "hoof_material": "hoof",
+        "taper": 0.82
+      },
+      "bounds": [
+        [
+          0.019,
+          -0.051,
+          0.0
+        ],
+        [
+          0.051,
+          -0.019,
+          0.026
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "同 leg_fl。",
+      "confidence": 0.85
+    },
+    {
+      "id": "leg_bl",
+      "kind": "pig_leg",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "red",
+      "params": {
+        "hoof_material": "hoof",
+        "taper": 0.82
+      },
+      "bounds": [
+        [
+          -0.051,
+          0.029,
+          0.0
+        ],
+        [
+          -0.019,
+          0.061,
+          0.026
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "同 leg_fl。",
+      "confidence": 0.85
+    },
+    {
+      "id": "leg_br",
+      "kind": "pig_leg",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "red",
+      "params": {
+        "hoof_material": "hoof",
+        "taper": 0.82
+      },
+      "bounds": [
+        [
+          0.019,
+          0.029,
+          0.0
+        ],
+        [
+          0.051,
+          0.061,
+          0.026
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "同 leg_fl。",
+      "confidence": 0.85
+    },
+    {
+      "id": "ear_l",
+      "kind": "pig_ear",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "red",
+      "params": {
+        "inner_material": "ear_inner",
+        "side": -1,
+        "tilt_forward": 18,
+        "splay": 14,
+        "thickness": 0.32
+      },
+      "bounds": [
+        [
+          -0.05,
+          -0.042,
+          0.104
+        ],
+        [
+          -0.018,
+          -0.016,
+          0.148
+        ]
+      ],
+      "source": "observed",
+      "assumption": "尖尖立起的耳朵，略往前傾。",
+      "confidence": 0.8
+    },
+    {
+      "id": "ear_r",
+      "kind": "pig_ear",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "red",
+      "params": {
+        "inner_material": "ear_inner",
+        "side": 1,
+        "tilt_forward": 18,
+        "splay": 14,
+        "thickness": 0.32
+      },
+      "bounds": [
+        [
+          0.018,
+          -0.042,
+          0.104
+        ],
+        [
+          0.05,
+          -0.016,
+          0.148
+        ]
+      ],
+      "source": "observed",
+      "assumption": "同 ear_l。",
+      "confidence": 0.8
+    },
+    {
+      "id": "tail",
+      "kind": "pig_tail",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "tail_pink",
+      "params": {
+        "flower_material": "flower",
+        "flower_center_material": "flower_center"
+      },
+      "bounds": [
+        [
+          -0.025,
+          0.07,
+          0.056
+        ],
+        [
+          0.025,
+          0.115,
+          0.116
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "沿用：螺旋小尾巴＋尾端黃色五瓣小花。",
+      "confidence": 0.8
+    }
+  ],
+  "decals": [
+    {
+      "id": "sakura_r",
+      "target": "body",
+      "face": "right",
+      "rect": [
+        [
+          0.022,
+          0.09
+        ],
+        [
+          0.046,
+          0.114
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/pig_v2/decals/sakura.png"
+      },
+      "pixels_per_meter": 3000
+    },
+    {
+      "id": "sakura_l",
+      "target": "body",
+      "face": "left",
+      "rect": [
+        [
+          0.022,
+          0.09
+        ],
+        [
+          0.046,
+          0.114
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/pig_v2/decals/sakura.png"
+      },
+      "pixels_per_meter": 3000
+    }
+  ],
+  "export": {
+    "path": "public/models/pig_v2/pig_v2.glb",
+    "compress": true,
+    "clickable": [],
+    "anim_groups": {
+      "legs": [
+        "leg_fl",
+        "leg_fr",
+        "leg_bl",
+        "leg_br"
+      ],
+      "ears": [
+        "ear_l",
+        "ear_r"
+      ],
+      "tail": [
+        "tail"
+      ]
+    }
+  }
+}

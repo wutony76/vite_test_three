@@ -1363,6 +1363,8 @@ function logPigSettings() {
 
 if (pigFolder && pig) {
   const apply = () => pig.apply();
+  // 顏色只重畫貼圖，不呼叫 apply（apply 會讓小豬重生到鏡頭前）
+  pigFolder.addColor(pig.settings, 'bodyColor').name('小豬顏色').onChange(() => pig.applyColor()).onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'modelSize', 0.05, 0.45, 0.005).name('大小 (m)').onChange(apply).onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'placementScale', 0.1, 2.5, 0.01).name('整體縮放').onChange(apply).onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'angleFromTopDegrees', 8, 88, 1).name('重生離頂端 (°)').onChange(apply).onFinishChange(logPigSettings);

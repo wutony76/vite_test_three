@@ -234,8 +234,11 @@ def build_decals(plan_id, decals, objects, root, collection, base_dir):
     contents = []
     for decal in decals:
         (h0, v0), (h1, v1) = decal["rect"]
-        width = max(16, min(MAX_SIDE, round((h1 - h0) * PIXELS_PER_METER)))
-        height = max(16, min(MAX_SIDE, round((v1 - v0) * PIXELS_PER_METER)))
+        # pixels_per_meter：小東西上的字（例如 0.04 m 寬的小豬身上字樣）用預設 512 px/m 只有 20 px，字會糊成一團；
+        # 這種情況在 plan 裡單獨調高。大招牌維持預設，否則整張 decal atlas 會變大、吃 GPU 記憶體
+        ppm = decal.get("pixels_per_meter", PIXELS_PER_METER)
+        width = max(16, min(MAX_SIDE, round((h1 - h0) * ppm)))
+        height = max(16, min(MAX_SIDE, round((v1 - v0) * ppm)))
         pixels, extra = render_content(decal, width, height, base_dir)
         warnings += extra
         contents.append(pixels)

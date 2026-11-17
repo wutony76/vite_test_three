@@ -48,7 +48,7 @@ KINDS = (
     "fried_egg_white", "fried_egg_yolk",
     "salmon_steak", "salmon_vertebra",
     "lemon_slice",
-    "cartoon_pig",
+    "cartoon_pig", "pig_body", "pig_leg", "pig_ear", "pig_tail", "pig_face_dots", "piggy_body", "piggy_slot", "piggy_top_coin",
     "pumpkin_body", "pumpkin_stem",
     "econoline_camper", "vehicle_wheel", "vehicle_bumper", "vehicle_grille",
     "vehicle_headlight", "side_mirror", "vehicle_antenna", "camper_side_window",

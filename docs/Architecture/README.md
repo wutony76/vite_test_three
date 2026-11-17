@@ -39,6 +39,7 @@ vite_test_three/
 │     ├─ sample_town/         Test B 小鎮場景，依 plans/sample_town.scene.json 組裝（build_scene.py）
 │     ├─ lamp_post/、crate_pile/  小鎮的裝飾物（街燈、木箱堆）
 │     ├─ neon_shop/           world 的 Gamehall 外觀：電波町霓虹小店（plans/neon_shop.plan.json，招牌 decal 由 scripts/make_neon_shop_decals.py 產生）
+│     ├─ pig/、pig_v2/        world 綠球上的小豬：pig 是第一版（備用）；pig_v2 是粉紅色存錢筒造型（plans/pig_v2.plan.json，零件在 lowpoly_kit/components/animals.py，櫻花 decal 由 scripts/make_pig_v2_decals.py 產生；四腳、耳朵、尾巴是獨立節點，src/world/objects/pigRig.ts 做走路動作）
 │     │  （每個模型旁都有 <name>.manifest.json；GLB 以 meshopt 壓縮）
 │     └─ tree_round/          小鎮用樹（organic + Voxel Remesh 示範）
 ├─ tools/
@@ -114,7 +115,7 @@ vite_test_three/
 │     ├─ styleGrade.ts        畫面風格統一：onBeforeCompile 注入全場色調（陰影偏淡紫、整體往粉色）＋寫實貼圖降對比，共用 uniform 即時調整
 │     ├─ softLayerPass.ts     柔邊圖層：浮空小星球（layer 2）單獨畫到 RenderTarget → 兩趟高斯模糊 → 輪廓用模糊版合成回畫面（天空背景之後、主場景之前）
 │     ├─ debug/               surfaceDrag（貼球面拖曳）、cameraPlaneDrag（鏡頭座標拖曳）、groundPathEditor（在綠球上編輯小徑路點）
-│     └─ objects/             obj.ts 組裝；ketchup、house、pig／pigCloud、campfire、floatingIsland、groundDetail（綠球斑塊／陰影帶／草叢／小徑／小道具；自訂小徑存在 groundPathsLayout.ts）、各種食物
+│     └─ objects/             obj.ts 組裝；ketchup、house、pig／pigCloud／pigRig（存錢筒小豬的腳、耳朵、尾巴動作）、campfire、floatingIsland、groundDetail（綠球斑塊／陰影帶／草叢／小徑／小道具；自訂小徑存在 groundPathsLayout.ts）、各種食物
 ├─ openspec/
 │  ├─ project.md              專案規範（改程式前必讀）
 │  ├─ config.yaml             OpenSpec CLI 設定（schema: spec-driven）

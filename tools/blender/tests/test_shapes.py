@@ -230,6 +230,15 @@ def test_salmon_steak_is_closed_and_fills_bounds():
     assert x1 - x0 > 0.14 and y1 - y0 > 0.23 and z1 - z0 > 0.02
 
 
+def test_pig_v2_parts_are_closed():
+    """存錢筒小豬：身體是 1 個封閉島；腳、耳朵、投幣孔、金幣都是封閉的；尾巴＝管子＋花瓣片＋花心。"""
+    _doc, _lay, built = _build_all("pig_v2.plan.json")
+    _closed_single(built["body"][1])
+    for cid in ("leg_fl", "leg_br", "ear_l", "ear_r", "coin_slot", "top_coin"):
+        _closed_single(built[cid][1])
+    _closed_single(built["tail"][1], islands=3)
+
+
 def test_registry_covers_plans():
     kinds = implemented_kinds()
     for plan in PLAN_FILES:

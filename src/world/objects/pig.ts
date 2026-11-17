@@ -1,8 +1,15 @@
 import * as THREE from 'three';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { cloneGltfInstance, loadGltfOnce, scheduleGltfMount } from './sharedGltf';
 import { createPigCloud } from './pigCloud';
+import { createPigRig } from './pigRig';
+import { createPigTint } from './pigTint';
 
-const PIG_URL = `${import.meta.env.BASE_URL}models/pig/pig.glb`;
+/**
+ * 小豬模型。第二版（pig_v2）的腳、耳朵、尾巴是獨立節點，會走路擺腿、尾巴上的小花跟著搖。
+ * 想換回第一版：改成 `models/pig/pig.glb`（沒有獨立節點，rig 會自動略過，只剩整隻搖晃）。
+ */
+const PIG_URL = `${import.meta.env.BASE_URL}models/pig_v2/pig_v2.glb`;
 
 const direction = new THREE.Vector3();
 const probe = new THREE.Vector3();
@@ -66,13 +73,15 @@ export type PigSettings = {
   visitWatchMaxSeconds: number;
   /** 看完之後至少隔幾秒才會再想去 */
   visitCooldownSeconds: number;
+  /** 小豬身體顏色（只換粉紅色系的部位；金幣、櫻花、黃花不變），見 pigTint.ts */
+  bodyColor: string;
 };
 
 export const PIG_LAYOUT_DEFAULT: PigSettings = {
   angleFromTopDegrees: 38,
-  azimuthDegrees: 10,
+  azimuthDegrees: 0,
   sink: 0.004,
-  placementScale: 0.33,
+  placementScale: 0.3,
   modelSize: 0.19,
   roamSpeedDegrees: 4,
   roamColatitudeMin: 12,
@@ -99,6 +108,7 @@ export const PIG_LAYOUT_DEFAULT: PigSettings = {
   visitWatchMinSeconds: 3,
   visitWatchMaxSeconds: 6,
   visitCooldownSeconds: 15,
+  bodyColor: '#efbdc9',
 };
 
 /**
@@ -160,6 +170,8 @@ export function createPig({
   const anchor = new THREE.Object3D();
   anchor.name = 'world_pig';
   let model: THREE.Object3D | null = null;
+  let rig: ReturnType<typeof createPigRig> = null;
+  let tint: ReturnType<typeof createPigTint> = null;
   let modelBaseScale = 1;
   let introGrow = 1;
   let waddlePhase = 0;
@@ -516,6 +528,37 @@ export function createPig({
     builtModelSize = settings.modelSize;
   }
 
+  /**
+   * 平滑著色：Low Poly 匯出時每個面各自一組頂點（法線、vertex color 每面固定），所以看起來一格一格。
+   * 存錢筒要「上釉陶瓷」的滑順感：把同位置的頂點合併、重算法線，光影就會在面與面之間連續漸變。
+   *   - 先拿掉 normal 和 color：它們每面不同，不拿掉 mergeVertices 會認為頂點不一樣而不合併
+   *   - uv 保留：身體和豬鼻、腿和蹄的 uv 不同，那條交界不會被合併，正好留下清楚的折邊
+   *   - 材質要複製一份並關掉 vertexColors：沒有 color 屬性卻開著 vertexColors，WebGL 會讀到 (0,0,0) → 全黑
+   */
+  function smoothShade(root: THREE.Object3D) {
+    const smoothMaterials = new Map<THREE.Material, THREE.Material>();
+    root.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh || !/_(body|leg_\w+|tail)$/.test(mesh.name)) return;
+      const geometry = mesh.geometry.clone();
+      geometry.deleteAttribute('normal');
+      geometry.deleteAttribute('color');
+      const merged = mergeVertices(geometry, 1e-4);
+      merged.computeVertexNormals();
+      mesh.geometry = merged;
+      const source = mesh.material as THREE.MeshStandardMaterial;
+      let smooth = smoothMaterials.get(source);
+      if (!smooth) {
+        const copy = source.clone();
+        copy.vertexColors = false;
+        copy.flatShading = false;
+        smoothMaterials.set(source, copy);
+        smooth = copy;
+      }
+      mesh.material = smooth;
+    });
+  }
+
   function enhanceMaterials(root: THREE.Object3D) {
     root.traverse((child) => {
       const mesh = child as THREE.Mesh;
@@ -527,17 +570,21 @@ export function createPig({
       for (const material of materials) {
         if (!('color' in material)) continue;
         const m = material as THREE.MeshStandardMaterial;
-        m.color.setHex(0xf5a8c8);
-        if ('emissive' in m) {
-          m.emissive.setHex(0xf090b0);
-          m.emissiveIntensity = 0.28;
-        }
-        if ('metalness' in m) m.metalness = 0;
-        if ('roughness' in m) m.roughness = Math.min(0.55, m.roughness || 0.42);
+        // 不再把顏色蓋成粉紅：pig_v2 的鼻子、蹄、金幣、櫻花、黃色小花都在貼圖裡，蓋掉就全變同一色了。
+        // 也不加白色自發光：emissive 白 × 貼圖會把紅色洗成粉白，存錢筒就沒有「亮紅陶瓷」的感覺。
+        if ('emissive' in m) m.emissiveIntensity = 0;
+        if ('metalness' in m) m.metalness = Math.min(m.metalness, 0.6);
         if (envMap && 'envMap' in m) {
           m.envMap = envMap;
-          m.envMapIntensity = 0.22;
+          // 亮面反光：存錢筒是上釉的陶瓷，環境反射強一點才有光澤；半透明的肚子窗再更亮，像玻璃
+          m.envMapIntensity = m.transparent ? 0.9 : 0.55;
         }
+        // 半透明窗不寫深度：不然窗後面的金幣會被窗「擋掉」畫不出來
+        if (m.transparent) {
+          m.depthWrite = false;
+          mesh.castShadow = false; // 玻璃不該投出實心的影子
+        }
+        m.needsUpdate = true;
       }
     });
   }
@@ -842,8 +889,12 @@ export function createPig({
     .then((gltf) => {
       scheduleGltfMount(() => {
         model = cloneGltfInstance(gltf.scene);
+        smoothShade(model);
         fitModel(model);
         enhanceMaterials(model);
+        rig = createPigRig(model);
+        tint = createPigTint(model);
+        tint?.setColor(settings.bodyColor);
         anchor.add(model);
         applyPlacement();
       });
@@ -864,6 +915,11 @@ export function createPig({
     applyPlacement();
   }
 
+  /** 只換顏色：不像 applySettings 會讓小豬重生到鏡頭前 */
+  function applyColor() {
+    tint?.setColor(settings.bodyColor);
+  }
+
   function setIntroGrow(value: number) {
     introGrow = THREE.MathUtils.clamp(value, 0, 1);
     anchor.scale.setScalar(settings.placementScale * Math.max(0.0001, introGrow));
@@ -878,6 +934,7 @@ export function createPig({
     if (!roaming) {
       updateSmoke(deltaTime, false);
       model.scale.setScalar(modelBaseScale);
+      rig?.update(deltaTime, waddlePhase, 0);
       syncFaceTargetFromBearing();
       facingForward.copy(faceTarget);
       applyPlacement();
@@ -947,6 +1004,8 @@ export function createPig({
     const wobble = strength * Math.sin(waddlePhase);
     const sway = strength * 0.65 * Math.sin(waddlePhase * 0.5 + 0.8);
     wobbleScale.set(1 + sway * 0.35, 1 + wobble, 1 - sway * 0.25);
+    // 腳步跟整隻搖晃用同一個相位；停下來看東西時 waddleAmount → 0，腳慢慢回正
+    rig?.update(deltaTime, waddlePhase, movedThisFrame ? waddleAmount : waddleAmount * 0.5);
     model.scale.set(
       modelBaseScale * wobbleScale.x,
       modelBaseScale * wobbleScale.y,
@@ -959,6 +1018,7 @@ export function createPig({
     settings,
     cloud,
     applySettings,
+    applyColor,
     setIntroGrow,
     update,
     getNormal: () => surfaceNormal.clone(),
@@ -1005,6 +1065,7 @@ export function formatPigSettingsForPaste(settings: PigSettings) {
     `  visitWatchMinSeconds: ${settings.visitWatchMinSeconds.toFixed(1)},\n` +
     `  visitWatchMaxSeconds: ${settings.visitWatchMaxSeconds.toFixed(1)},\n` +
     `  visitCooldownSeconds: ${settings.visitCooldownSeconds.toFixed(1)},\n` +
+    `  bodyColor: '${settings.bodyColor}',\n` +
     `};`
   );
 }

@@ -529,6 +529,7 @@ def _validate_decals(doc, c, component_ids):
         elif rect[0][0] >= rect[1][0] or rect[0][1] >= rect[1][1]:
             c.error("PLAN_RANGE", f"{path}.rect", f"左下角必須小於右上角，拿到 {rect}")
         c.in_range(c.get(decal, "offset", path, "number", required=False), 0.0005, 0.05, f"{path}.offset")
+        c.in_range(c.get(decal, "pixels_per_meter", path, "number", required=False), 64, 8192, f"{path}.pixels_per_meter")
         content = c.get(decal, "content", path, "dict")
         if content is None:
             continue
