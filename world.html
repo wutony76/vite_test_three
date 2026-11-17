@@ -236,6 +236,19 @@
         transform: translateY(-50%) rotate(45deg);
         box-shadow: 2px -2px 0 rgb(90 61 82 / 12%);
       }
+
+      /* 轉到房子背面時，標籤改放在右側：小尾巴在左邊、指向房子 */
+      .world-ui-chip.is-side-right::after {
+        left: -6px;
+        top: 50%;
+        bottom: auto;
+        border-right: none;
+        border-top: none;
+        border-left: 2px solid var(--world-ui-ink);
+        border-bottom: 2px solid var(--world-ui-ink);
+        transform: translateY(-50%) rotate(45deg);
+        box-shadow: -2px 2px 0 rgb(90 61 82 / 12%);
+      }
     </style>
   </head>
   <body>

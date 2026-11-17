@@ -2386,6 +2386,9 @@ document.body.appendChild(houseLabel);
 // 屋頂的位置：每幀拿來投影到螢幕，重複利用避免一直 new
 const labelAnchor = new THREE.Vector3();
 const labelAnchorOther = new THREE.Vector3();
+const labelHousePos = new THREE.Vector3();
+const labelFront = new THREE.Vector3();
+const labelToCamera = new THREE.Vector3();
 
 /** 把選中房子的屋頂中心投影到螢幕，名字就浮在它正上方 */
 /**
@@ -2394,6 +2397,7 @@ const labelAnchorOther = new THREE.Vector3();
  */
 const HOUSE_LABEL_DISPLAY: Record<string, { title: string; note?: string }> = {
   mainHall: { title: '龍兔的家', note: '（點擊進入會看到詳細資訊）' },
+  projectRoom: { title: '工作間' },
 };
 let renderedHouseLabel = '';
 
@@ -2445,24 +2449,34 @@ function updateHouseLabel() {
   // 屋頂上方放得下：照舊放在屋頂正上方（往上移一個標籤的高度，多留一點給指向房子的小尾巴）
   const labelHeight = houseLabel.offsetHeight || 28;
   if (y - labelHeight - 14 > rect.top + 8) {
-    houseLabel.classList.remove('is-side');
+    houseLabel.classList.remove('is-side', 'is-side-right');
     houseLabel.style.transform = `translate(${x}px, ${y}px) translate(-50%, calc(-100% - 14px))`;
     return;
   }
-  // 放不下（房子在畫面最上緣，例如 mainHall 的香菇屋）：改放在房子左側、大約一半高的地方，
-  // 小尾巴改成指向右邊的房子（CSS 的 .is-side）。用房子左右兩個角投影到畫面，取比較左的那個，
-  // 房子轉了方向也一樣會放在畫面上的左邊
+  // 放不下（房子在畫面最上緣，例如 mainHall 的香菇屋）：改放在房子旁邊、大約一半高的地方。
+  //   看得到正面：放在畫面上的左邊，小尾巴在標籤右邊指向房子（.is-side）
+  //   轉到背面：放在右邊，小尾巴在左邊（.is-side-right）
+  // 正面朝房子自己的 +Z（模型的正面）；跟「房子 → 鏡頭」同向就是看得到正面
+  selectedHouse.object.getWorldPosition(labelHousePos);
+  labelFront.set(0, 0, 1).transformDirection(selectedHouse.object.matrixWorld);
+  labelToCamera.copy(camera.position).sub(labelHousePos);
+  const seeingBack = labelFront.dot(labelToCamera) < 0;
+  // 房子左右兩個角都投影到畫面上，取畫面上比較左（或比較右）的那個，房子轉了方向也放得對
   labelAnchor.set(-selectedHouse.settings.width * 0.5, selectedHouse.settings.height * 0.55, 0);
   selectedHouse.object.localToWorld(labelAnchor);
   labelAnchor.project(camera);
   labelAnchorOther.set(selectedHouse.settings.width * 0.5, selectedHouse.settings.height * 0.55, 0);
   selectedHouse.object.localToWorld(labelAnchorOther);
   labelAnchorOther.project(camera);
-  const leftmost = labelAnchor.x < labelAnchorOther.x ? labelAnchor : labelAnchorOther;
-  const sideX = rect.left + (leftmost.x * 0.5 + 0.5) * rect.width;
-  const sideY = rect.top + (-leftmost.y * 0.5 + 0.5) * rect.height;
-  houseLabel.classList.add('is-side');
-  houseLabel.style.transform = `translate(${sideX}px, ${sideY}px) translate(calc(-100% - 14px), -50%)`;
+  const leftIsFirst = labelAnchor.x < labelAnchorOther.x;
+  const edge = seeingBack === leftIsFirst ? labelAnchorOther : labelAnchor;
+  const sideX = rect.left + (edge.x * 0.5 + 0.5) * rect.width;
+  const sideY = rect.top + (-edge.y * 0.5 + 0.5) * rect.height;
+  houseLabel.classList.toggle('is-side', !seeingBack);
+  houseLabel.classList.toggle('is-side-right', seeingBack);
+  houseLabel.style.transform = seeingBack
+    ? `translate(${sideX}px, ${sideY}px) translate(14px, -50%)`
+    : `translate(${sideX}px, ${sideY}px) translate(calc(-100% - 14px), -50%)`;
 }
 
 // 直接在畫面上拖曳房子：沿著綠球表面滑動
