@@ -617,7 +617,8 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     depth: 0.008,
     curveAmp: SHARK_FIN_CURVE_AMP,
     curveRate: SHARK_FIN_CURVE_RATE,
-    jumpEvery: 9,
+    // 0 = 不跳：使用者不要鯊魚跳出醬面（面板「平均幾秒跳一次」可以再打開）
+    jumpEvery: 0,
     jumpHeight: 0.07,
   };
   // 跳躍狀態：jumpT < 0 = 在醬裡游；0～1 = 空中的進度
