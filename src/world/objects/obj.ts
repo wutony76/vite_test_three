@@ -50,6 +50,7 @@ import type { PigCloudSettings, PigCloudState } from './pigCloud';
 import { createCampfire, type CampfireSettings } from './campfire';
 import { createShiitake, SHIITAKE_DEFAULT, SHIITAKE_PLACEMENTS, type ShiitakeSettings } from './shiitake';
 import { createTreasureChest, type TreasureChestSettings } from './treasureChest';
+import { createProjectRoomStyle } from './projectRoomStyle';
 import { createFloatingIsland } from './floatingIsland';
 import { createGroundDetail, type GroundObstacle } from './groundDetail';
 
@@ -584,11 +585,11 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   const projectRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   // 第二棟用面板調過的數值，跟第一棟分開，不改 house.ts 的預設
   Object.assign(projectRoom.settings, {
-    angleFromTopDegrees: 7,
-    azimuthDegrees: 68,
-    spinDegrees: 89,
-    sink: 0.015,
-    scale: 0.25,
+    angleFromTopDegrees: 6,
+    azimuthDegrees: 63,
+    spinDegrees: 99,
+    sink: 0.01,
+    scale: 0.22,
     width: 0.9,
     height: 1.3,
     depth: 1.1,
@@ -596,7 +597,13 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   });
   projectRoom.applySettings();
   ground.add(projectRoom.object);
-  attachHouseModel(projectRoom, PROJECT_ROOM_MODEL_URL);
+  // projectRoom 的「香菇屋風格」：參考 mainHall 換配色、加香菇串等小裝飾，不改建築結構；面板可開關比較
+  const projectRoomStyleSettings = { enabled: true };
+  let projectRoomStyle: ReturnType<typeof createProjectRoomStyle> | null = null;
+  attachHouseModel(projectRoom, PROJECT_ROOM_MODEL_URL, (model) => {
+    projectRoomStyle = createProjectRoomStyle(model);
+    projectRoomStyle.setEnabled(projectRoomStyleSettings.enabled);
+  });
 
   // BG
   const bgRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
@@ -1182,6 +1189,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       campfireRuntime.update(deltaTime);
     }
     for (const { runtime } of shiitakeEntries) runtime.update(deltaTime);
+    projectRoomStyle?.update(deltaTime);
     // 香菇屋（mainHall）的香菇串隨風輕輕打轉：每條繞自己的繩子轉，節奏錯開才不會整齊得像機器
     mainHallHangers.forEach((hanger, index) => {
       hanger.rotation.y = Math.sin(time * 0.9 + index * 1.3) * THREE.MathUtils.degToRad(20);
@@ -1349,6 +1357,10 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     addShiitake,
     removeShiitake,
     mainHallDoor: { settings: mainHallDoorSettings, apply: applyMainHallDoor },
+    projectRoomStyle: {
+      settings: projectRoomStyleSettings,
+      apply: () => projectRoomStyle?.setEnabled(projectRoomStyleSettings.enabled),
+    },
     treasureChest: treasureRuntime
       ? ({
           id: 'treasure_chest',

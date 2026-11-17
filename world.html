@@ -205,6 +205,24 @@
         box-shadow: 2px 2px 0 rgb(90 61 82 / 12%);
       }
 
+      /* 標籤兩行：上面是名字，下面一行小字備註（例如「點擊進入會看到詳細資訊」） */
+      .world-ui-chip {
+        text-align: center;
+      }
+
+      .world-ui-chip-title {
+        display: block;
+      }
+
+      .world-ui-chip-note {
+        display: block;
+        margin-top: 1px;
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0;
+        opacity: 0.72;
+      }
+
       /* 房子上方放不下標籤時（房子在畫面最上緣），改放在房子左側：小尾巴改到右邊、指向房子 */
       .world-ui-chip.is-side::after {
         left: auto;

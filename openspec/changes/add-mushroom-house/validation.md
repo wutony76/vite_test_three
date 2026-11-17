@@ -58,3 +58,7 @@
 
 - Three.js plan check：ALL PASS（新增的檢查項「plan 關閉 AO 烘焙，GLB 也沒有 AO 貼圖（0）」）。laundry、treasure_chest 照舊通過；neon_shop 的 2 項是原本就有的刻意設計。
 - 瀏覽器：門 0.8 和 1.4 時，門周圍牆面都沒有殘留的固定暗影；console 沒有 error（`assets/mushroom-house-door.png`）。
+
+## 第八版（標籤文字）
+
+- 瀏覽器：mainHall 標籤顯示「龍兔的家」，下一行是較小的「（點擊進入會看到詳細資訊）」，仍在房子左側；console 沒有 error。

@@ -99,3 +99,9 @@
 - **陰影不跟著門動的原因**：門加上 Surface Engine 木板貼圖之後，game_default 預設會做 AO 烘焙（`bake: ao`），把門在牆上造成的暗影烤進屋身的 AO 貼圖。門在網頁上縮放時，烤好的暗影還是原尺寸，牆上會留一圈固定的陰影。
 - **修正**：plan 的 `detail.overrides.bake = "none"`，不烘焙 AO，陰影交給即時光影，門多大影子就多大。GPU 貼圖從 4.37 MB 降到 4.04 MB。
 - **檢查程式**：`threejs_plan_check.mjs` 的 AO 檢查改成依 plan 的 bake 設定。關掉烘焙時檢查「沒有 AO 貼圖」，其他模型照舊要求 AO 用第二組 UV。
+
+## 11. 使用者回饋：標籤改成「龍兔的家」＋小字備註
+
+- `main.ts` 新增 `HOUSE_LABEL_DISPLAY`：房子內部名稱 → 給訪客看的標題與備註。mainHall 的標題是「龍兔的家」，備註是「（點擊進入會看到詳細資訊）」。沒列出的房子照舊顯示內部名稱；面板上的名稱不變。
+- `renderHouseLabelText()` 把標籤組成兩個 span（`.world-ui-chip-title`、`.world-ui-chip-note`）。內容沒變時不重建 DOM，避免每幀重新排版。
+- `world.html`：標籤文字置中；備註字級 10px、字重 500、透明度 0.72。

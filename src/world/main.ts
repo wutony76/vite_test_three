@@ -258,6 +258,7 @@ const {
   removeShiitake,
   treasureChest,
   mainHallDoor,
+  projectRoomStyle,
   floatingIsland,
   groundDetail,
 } = createObjs({ envMap, camera });
@@ -1731,6 +1732,13 @@ let lastRenderTime: number | null = null;
   folder.add({ log }, 'log').name('印出設定');
 }
 
+// projectRoom 的香菇屋風格（參考 mainHall；關掉 = 原本的配色）
+gui
+  .addFolder('projectRoom 香菇屋風格')
+  .add(projectRoomStyle.settings, 'enabled')
+  .name('套用香菇屋風格')
+  .onChange(projectRoomStyle.apply);
+
 // 寶箱（綠球上；裝滿漢堡、金色閃光）
 const treasureFolder = treasureChest ? gui.addFolder('寶箱') : null;
 function logTreasure() {
@@ -2380,6 +2388,33 @@ const labelAnchor = new THREE.Vector3();
 const labelAnchorOther = new THREE.Vector3();
 
 /** 把選中房子的屋頂中心投影到螢幕，名字就浮在它正上方 */
+/**
+ * 標籤上顯示的文字：房子的內部名稱（面板上看到的 mainHall 等）不一定適合給訪客看，
+ * 這裡可以換成好讀的名字，並在下面加一行小字備註。沒列出來的房子照舊顯示內部名稱。
+ */
+const HOUSE_LABEL_DISPLAY: Record<string, { title: string; note?: string }> = {
+  mainHall: { title: '龍兔的家', note: '（點擊進入會看到詳細資訊）' },
+};
+let renderedHouseLabel = '';
+
+function renderHouseLabelText(label: string) {
+  // 每幀都會呼叫：內容沒變就不要重建 DOM（重建會讓瀏覽器每幀重新排版）
+  if (renderedHouseLabel === label) return;
+  renderedHouseLabel = label;
+  const display = HOUSE_LABEL_DISPLAY[label];
+  houseLabel.replaceChildren();
+  const title = document.createElement('span');
+  title.className = 'world-ui-chip-title';
+  title.textContent = display?.title ?? label;
+  houseLabel.append(title);
+  if (display?.note) {
+    const note = document.createElement('span');
+    note.className = 'world-ui-chip-note';
+    note.textContent = display.note;
+    houseLabel.append(note);
+  }
+}
+
 function updateHouseLabel() {
   if (!selectedHouse) {
     houseLabel.style.visibility = 'hidden';
@@ -2390,7 +2425,7 @@ function updateHouseLabel() {
     houseLabel.style.visibility = 'hidden';
     return;
   }
-  houseLabel.textContent = selectedHouse.label;
+  renderHouseLabelText(selectedHouse.label);
   // 幾何的原點在底部，屋頂在自己的 +Y、還沒乘縮放的高度；localToWorld 會把縮放和地球的旋轉算進去
   labelAnchor.set(0, selectedHouse.settings.height, 0);
   // 父層（綠球）的矩陣可能還沒更新，少了這行拖曳當下名字會晚一幀
