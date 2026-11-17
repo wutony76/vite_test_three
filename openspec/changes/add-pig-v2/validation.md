@@ -47,3 +47,8 @@
 | test_shapes | 21 / 21（pig_v2 測試改成 `test_pig_v2_parts_are_closed`） |
 | Three.js plan check | ALL PASS |
 | 瀏覽器 | console 沒有 error；特寫看到身體平滑、沒有凹陷，肚子沒有金幣和字 |
+
+## 金幣發光驗證
+
+- 無頭瀏覽器特寫：金幣呈金黃色，周圍看得到四角星閃光和金色光暈，console 沒有 error（`assets/pig-v2-coin-shine.png`）。
+- `npx tsc --noEmit`、`npm run build` 通過。

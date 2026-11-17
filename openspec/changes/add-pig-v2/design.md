@@ -75,3 +75,14 @@ Boolean 挖洞會產生 ngon 和碎三角形，而 organic profile 要求 1 個�
   1. 拿掉每面各自的 normal 和 vertex color，`mergeVertices` 後重算法線。
   2. uv 保留，所以身體和豬鼻、腿和蹄的交界仍然是清楚的折邊。
   3. 複製材質並關掉 `vertexColors`，否則沒有 color 屬性時 WebGL 會讀到黑色。
+
+## 7. 背上金幣閃閃發光（`src/world/objects/pigCoinShine.ts`）
+
+- 金幣材質是另外複製的一份，不影響共用 atlas 的身體：
+  - 不用貼圖，直接設明亮的金黃色 #ffe36b。atlas 的 #F4B731 在暖色燈光下偏橘。
+  - metalness 0.55、roughness 0.22、envMapIntensity 1.4，產生金屬光澤。
+  - 自發光 #ffcc33，強度在 0.25～0.65 之間像呼吸一樣起伏。
+- 背後一圈金色光暈（加法混合的 Sprite），跟著呼吸節奏變亮變暗。
+- 金幣周圍有 4 顆四角星 Sprite，每顆的相位和週期都不同，透明度用 max(0, sin)³，大部分時間暗、偶爾一閃。
+- 光暈和星星設 `toneMapped: false`，畫面風格統一（styleGrade）不會幫它們調色，也不會被壓暗。
+- 必須在 `enhanceMaterials` 之後建立，因為 `enhanceMaterials` 會把 emissive 歸零。

@@ -4,6 +4,7 @@ import { cloneGltfInstance, loadGltfOnce, scheduleGltfMount } from './sharedGltf
 import { createPigCloud } from './pigCloud';
 import { createPigRig } from './pigRig';
 import { createPigTint } from './pigTint';
+import { createPigCoinShine } from './pigCoinShine';
 
 /**
  * 小豬模型。第二版（pig_v2）的腳、耳朵、尾巴是獨立節點，會走路擺腿、尾巴上的小花跟著搖。
@@ -172,6 +173,7 @@ export function createPig({
   let model: THREE.Object3D | null = null;
   let rig: ReturnType<typeof createPigRig> = null;
   let tint: ReturnType<typeof createPigTint> = null;
+  let coinShine: ReturnType<typeof createPigCoinShine> = null;
   let modelBaseScale = 1;
   let introGrow = 1;
   let waddlePhase = 0;
@@ -895,6 +897,8 @@ export function createPig({
         rig = createPigRig(model);
         tint = createPigTint(model);
         tint?.setColor(settings.bodyColor);
+        // 要在 enhanceMaterials 之後：它會把 emissive 歸零、統一 envMap 強度，金幣的發光設定得蓋在它後面
+        coinShine = createPigCoinShine(model);
         anchor.add(model);
         applyPlacement();
       });
@@ -928,6 +932,7 @@ export function createPig({
   function update(deltaTime: number, introDone: boolean) {
     anchor.scale.setScalar(settings.placementScale * Math.max(0.0001, introGrow));
     if (!model) return;
+    coinShine?.update(deltaTime);
 
     const roaming = introDone && introGrow >= 0.999;
     cloud.update(deltaTime, roaming);

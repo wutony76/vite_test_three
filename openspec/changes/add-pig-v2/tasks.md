@@ -11,4 +11,5 @@
 - [x] 9. 依使用者回饋：顏色調粉、腳露出的長度減半，重新建模並驗證
 - [x] 10. 面板新增「小豬顏色」（pigTint.ts）：只換粉紅色系部位，瀏覽器實測換成藍色，金幣和黃花不變
 - [x] 11. 肚子改滑順：移除凹槽、肚子窗、槽內金幣、「希希」；身體加密環數；網頁端平滑著色
-- [x] 12. 文件：OpenSpec、Engineering Evidence、Architecture README
+- [x] 12. 背上金幣閃閃發光：金黃色金屬材質＋呼吸自發光＋光暈＋閃爍四角星（pigCoinShine.ts）
+- [x] 13. 文件：OpenSpec、Engineering Evidence、Architecture README

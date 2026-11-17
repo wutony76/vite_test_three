@@ -16,7 +16,7 @@
     - `tools/blender/textures/manual/pig_v2/decals/*.png`
   - 測試：`tools/blender/tests/test_shapes.py`
   - 模型：`public/models/pig_v2/pig_v2.glb`、`pig_v2.manifest.json`
-  - 網頁端：`src/world/objects/pig.ts`、`pigRig.ts`（新，動作）、`pigTint.ts`（新，面板換色）、`obj.ts`、`main.ts`
+  - 網頁端：`src/world/objects/pig.ts`、`pigRig.ts`（新，動作）、`pigTint.ts`（新，面板換色）、`pigCoinShine.ts`（新，金幣發光）、`obj.ts`、`main.ts`
 
 ## 驗證佐證
 
@@ -29,6 +29,7 @@
 | `assets/pig-v2-closeup.png` | 場景中特寫（關掉手電筒） |
 | `assets/pig-v2-in-scene.png` | 預設鏡頭 |
 | `assets/pig-v2-tint.png` | 面板換色前後（預設、藍色） |
+| `assets/pig-v2-coin-shine.png` | 背上金幣發光與閃光 |
 
 ## 風險與後續追蹤
 
