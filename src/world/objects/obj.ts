@@ -55,6 +55,8 @@ import { createShiitake, SHIITAKE_DEFAULT, SHIITAKE_PLACEMENTS, type ShiitakeSet
 import { createTreasureChest, type TreasureChestSettings } from './treasureChest';
 import { createProjectRoomStyle } from './projectRoomStyle';
 import { createHappyFatShop, type HappyFatShopSettings } from './happyFatShop';
+import { createChineseTemple, type ChineseTempleSettings } from './chineseTemple';
+import { createBigBun, type BigBunSettings } from './bigBun';
 import {
   createRetroArcade,
   RETRO_ARCADE_DEFAULT,
@@ -95,15 +97,15 @@ export type MainHallDoorSettings = {
 
 export const MAIN_HALL_DOOR_DEFAULT: MainHallDoorSettings = { scale: 0.8, width: 1, height: 1 };
 const TW_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/twhall/twhall.glb`;
-// bgRoom 的外觀：日式街角三層小樓（一樓投幣洗衣店＋外側樓梯、二樓麻雀館），plan 在 tools/blender/plans/laundry.plan.json
-const LAUNDRY_MODEL_URL = `${import.meta.env.BASE_URL}models/laundry/laundry.glb`;
+// bgRoom 的外觀：點心樓（程式拼出來的圓形中式樓閣，見 chineseTemple.ts），取代原本的日式洗衣店小樓。
+// 洗衣店模型還在 public/models/laundry/laundry.glb（plan 在 tools/blender/plans/laundry.plan.json），
+// 想換回來：把 attachChineseTemple 換回 attachHouseModel(bgRoom, 那個網址)，並把網址加回 WORLD_GLTF_URLS
 
 export const WORLD_GLTF_URLS = [
   MODEL_URL,
   PROJECT_ROOM_MODEL_URL,
   GAME_HALL_MODEL_URL,
   TW_HALL_MODEL_URL,
-  LAUNDRY_MODEL_URL,
   `${import.meta.env.BASE_URL}models/pudding/pudding.glb`,
   `${import.meta.env.BASE_URL}models/grilled_corn/grilled_corn.glb`,
   `${import.meta.env.BASE_URL}models/salmon_steak/salmon_steak.glb`,
@@ -633,21 +635,23 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
   // BG
   const bgRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   Object.assign(bgRoom.settings, {
-    angleFromTopDegrees: 31,
-    azimuthDegrees: -77,
-    spinDegrees: 84,
-    sink: 0.02,
-    scale: 0.14,
-    // 洗衣店模型約 5.4×7.6×5.0 m（寬×高×深），盒子比例跟著改成瘦高；
-    // 少了這步，fitIntoHouseBox 等比例縮放時會被「高度」卡住，整棟變很小
-    width: 1.0,
+    angleFromTopDegrees: 28,
+    azimuthDegrees: -85,
+    spinDegrees: 104,
+    sink: 0.005,
+    scale: 0.18,
+    // 點心樓寬、高、深差不多（圓形，含屋頂上的金幣約 3.6 × 3.6 × 3.6），盒子也做成正方；
+    // 少了這步，fitIntoHouseBox 等比例縮放時會被最短的那一邊卡住，整棟變很小
+    width: 1.4,
     height: 1.4,
-    depth: 0.93,
+    depth: 1.4,
     color: '#1cab5a',
   });
   bgRoom.applySettings();
   ground.add(bgRoom.object);
-  attachHouseModel(bgRoom, LAUNDRY_MODEL_URL);
+  // 點心樓：金色用不染色的環境貼圖，才不會反射出紅色
+  const chineseTempleRuntime = createChineseTemple({ envMap: eggEnvMap });
+  attachChineseTemple(bgRoom, chineseTempleRuntime.object);
 
   // TW
   const twRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
@@ -740,6 +744,16 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     ground.add(happyFatRuntime.object);
     happyFatRuntime.setIntroGrow(0);
   }
+
+  // 大包子：正面一個金色閃閃發亮的「金」字（整顆用程式拼，不用 GLB）。金字用不染色的環境貼圖，才不會反射出紅色
+  const bigBunRuntime = puddingAxes
+    ? createBigBun({ groundRadius: GROUND_RADIUS, up: puddingAxes.up, front: puddingAxes.front, envMap: eggEnvMap })
+    : null;
+  if (bigBunRuntime) {
+    ground.add(bigBunRuntime.object);
+    bigBunRuntime.setIntroGrow(0);
+  }
+
 
   // 復古街機：第一台放在 GameHall（電 • 波 • 町 遊樂中心）左邊；可以複製很多台（跟烤玉米一樣）
   type RetroArcadeRuntime = ReturnType<typeof createRetroArcade>;
@@ -901,6 +915,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     for (const { world } of shiitakeEntries) if (world.settings.enabled) roots.push(world.object);
     if (treasureRuntime?.settings.enabled) roots.push(treasureRuntime.object);
     if (happyFatRuntime?.settings.enabled) roots.push(happyFatRuntime.object);
+    if (bigBunRuntime?.settings.enabled) roots.push(bigBunRuntime.object);
     for (const { world } of retroArcadeEntries) if (world.settings.enabled) roots.push(world.object);
     // 水潭也是障礙：小豬繞著走，草叢、小石頭不會長在水面上
     if (pondRuntime?.settings.enabled) roots.push(pondRuntime.object);
@@ -1315,6 +1330,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         for (const { runtime } of shiitakeEntries) runtime.setIntroGrow(1);
         treasureRuntime?.setIntroGrow(1);
         happyFatRuntime?.setIntroGrow(1);
+        bigBunRuntime?.setIntroGrow(1);
         for (const { runtime } of retroArcadeEntries) runtime.setIntroGrow(1);
         pondRuntime?.setIntroGrow(1);
         slideRuntime.setIntroGrow(1);
@@ -1416,6 +1432,17 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         happyFatRuntime.setIntroGrow(easeOutBack(shopT, 1.8));
       }
     }
+    if (bigBunRuntime) {
+      bigBunRuntime.update(deltaTime);
+      if (!introDone) {
+        // 比 Happy Fat 晚一點「啵」地彈出來，彈性大一點像軟軟的麵糰
+        const bunStart = housesIntroEnd + 0.4;
+        const bunT = THREE.MathUtils.clamp((introElapsed - bunStart) / 0.9, 0, 1);
+        bigBunRuntime.setIntroGrow(easeOutBack(bunT, 2.4));
+      }
+    }
+    // 點心樓（bgRoom）：金幣自轉閃光、包子晃動。長出來的動畫跟著房子一起，不用另外算
+    chineseTempleRuntime.update(deltaTime);
     // 溜滑梯：房子長完才開始算（長大途中屋身一直在變，算了也白算），然後從三樓往水潭伸出去
     if (introDone || introElapsed >= housesIntroEnd) {
       slideRuntime.update(deltaTime);
@@ -1540,6 +1567,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     for (const { runtime } of shiitakeEntries) runtime.setIntroGrow(0);
     treasureRuntime?.setIntroGrow(0);
     happyFatRuntime?.setIntroGrow(0);
+    bigBunRuntime?.setIntroGrow(0);
     for (const { runtime } of retroArcadeEntries) runtime.setIntroGrow(0);
     pondRuntime?.setIntroGrow(0);
     slideRuntime.setIntroGrow(0);
@@ -1607,7 +1635,11 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       settings: projectRoomStyleSettings,
       apply: () => projectRoomStyle?.setEnabled(projectRoomStyleSettings.enabled),
     },
-    denpaCharacter: { settings: denpaCharacterRuntime.settings, apply: denpaCharacterRuntime.applySettings },
+    denpaCharacter: {
+      settings: denpaCharacterRuntime.settings,
+      apply: denpaCharacterRuntime.applySettings,
+      setSelected: denpaCharacterRuntime.setSelected,
+    },
     retroArcades,
     addRetroArcade,
     removeRetroArcade,
@@ -1622,6 +1654,22 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
           setNormal: happyFatRuntime.setNormal,
         } as WorldHappyFatShop)
       : null,
+    bigBun: bigBunRuntime
+      ? ({
+          id: 'big_bun',
+          label: '大包子',
+          object: bigBunRuntime.object,
+          settings: bigBunRuntime.settings,
+          apply: bigBunRuntime.applySettings,
+          getNormal: bigBunRuntime.getNormal,
+          setNormal: bigBunRuntime.setNormal,
+        } as WorldBigBun)
+      : null,
+    // 點心樓的顏色、包子擺動（位置、大小、旋轉在房子面板的 bgRoom）
+    chineseTemple: {
+      settings: chineseTempleRuntime.settings,
+      apply: chineseTempleRuntime.applySettings,
+    } as WorldChineseTemple,
     mainHallSlide: {
       object: slideRuntime.object,
       settings: slideRuntime.settings as MainHallSlideSettings,
@@ -1761,6 +1809,21 @@ export type WorldHappyFatShop = {
   apply: () => void;
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldBigBun = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: BigBunSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldChineseTemple = {
+  settings: ChineseTempleSettings;
+  apply: () => void;
 };
 
 export type WorldPond = {
@@ -2088,6 +2151,18 @@ function lightUpGlowDecals(model: THREE.Object3D) {
  * 長方體不刪：種在球面上的位置、拖曳點選、控制面板、入場長大，全都是靠它算的
  * 所以只把它「藏起來」，模型當成它的子物件，長方體怎麼移動、縮放，模型都會跟著走
  */
+/**
+ * 把程式拼出來的模型（點心樓）塞進房子：跟 attachHouseModel 一樣藏起長方體、把模型縮進長方體範圍，
+ * 只是模型已經在手上，不用等載入
+ */
+function attachChineseTemple(house: ReturnType<typeof createHouse>, model: THREE.Object3D) {
+  // 長方體不畫但還在：射線點得到，點選、拖曳、名牌都靠它
+  house.object.material.visible = false;
+  fitIntoHouseBox(model, house.settings);
+  house.object.add(model);
+  house.applySettings();
+}
+
 function attachHouseModel(
   house: ReturnType<typeof createHouse>,
   url: string,

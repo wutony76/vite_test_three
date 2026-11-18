@@ -50,6 +50,7 @@ KINDS = (
     "lemon_slice",
     "cartoon_pig", "pig_body", "pig_leg", "pig_ear", "pig_tail", "pig_face_dots", "piggy_body", "piggy_slot", "mushroom_cap", "mushroom_stem", "mushroom_cross", "chest_body", "chest_bands", "chest_lid", "chest_lock", "mush_body", "mush_house_cap", "mush_door", "mush_window", "mush_shelves", "mush_hangers", "mush_hanger", "mush_puddle", "mush_props", "mush_balcony", "mush_bunny_ears", "em_arc_shell", "em_arc_roof", "em_window", "em_sign", "em_chimney", "em_hanger", "em_corner_pillars", "piggy_top_coin",
     "ma_base", "ma_block", "ma_band", "ma_neon_ring", "ma_door", "ma_sign", "ma_window", "ma_spotted_cluster", "ma_big_mushroom", "ma_cabinet", "ma_mini_shrooms",
+    "dm_cabinet", "dm_screen", "dm_marquee", "dm_speakers", "dm_controls", "dm_stage", "dm_arrows", "dm_bar", "dm_neon",
     "rm_cabinet", "rm_side_art", "rm_marquee", "rm_box", "rm_bezel", "rm_controls", "rm_coin_door", "rm_camera", "rm_speaker", "rm_knob_box", "rm_candy_box", "rm_vent_box", "rm_feet",
     "pumpkin_body", "pumpkin_stem",
     "econoline_camper", "vehicle_wheel", "vehicle_bumper", "vehicle_grille",

@@ -52,6 +52,10 @@ export type DenpaCharacterSettings = {
   haloSize: number;
   /** 照亮附近屋頂的點光強度（0 = 不照） */
   light: number;
+  /** 點選 GameHall 時改用的發光強度、燈管顏色、照亮屋頂（取消選取就變回上面那組） */
+  selectedGlow: number;
+  selectedNeonColor: string;
+  selectedLight: number;
 };
 
 export type DenpaCharacterEffect = 'steady' | 'breathe' | 'flicker' | 'blink';
@@ -76,6 +80,10 @@ export const DENPA_CHARACTER_DEFAULT: DenpaCharacterSettings = {
   haloSize: 1.7,
   // 0.6 會把整片屋頂、香菇染成橘色；0.05 只在字附近透一點暖光
   light: 0.05,
+  // 點選 GameHall 時：換成綠色、燈管轉暗一點，但照亮屋頂變強 → 整個屋頂透出綠光，一看就知道選到它了
+  selectedGlow: 0.5,
+  selectedNeonColor: '#7ec841',
+  selectedLight: 0.35,
 };
 
 /** 0～1 的固定亂數：同一個整數永遠得到同一個值，閃爍的節奏才不會每一格都在亂跳 */
@@ -160,6 +168,11 @@ export function createDenpaCharacter(layout: DenpaCharacterSettings = DENPA_CHAR
 
   /** 套完效果的亮度倍率：update 每一格算一次 */
   let level = 1;
+  /** GameHall 是否被點選：選中時改用 selected* 那組設定 */
+  let selected = false;
+  const activeGlow = () => (selected ? settings.selectedGlow : settings.glow);
+  const activeColor = () => (selected ? settings.selectedNeonColor : settings.neonColor);
+  const activeLight = () => (selected ? settings.selectedLight : settings.light);
   const worldScale = new THREE.Vector3();
 
   function applySettings() {
@@ -174,26 +187,26 @@ export function createDenpaCharacter(layout: DenpaCharacterSettings = DENPA_CHAR
     );
     content.scale.setScalar(settings.size / modelHeight);
     if (neonMaterial) {
-      neonMaterial.color.set(settings.neonColor);
-      neonMaterial.emissive.set(settings.neonColor);
+      neonMaterial.color.set(activeColor());
+      neonMaterial.emissive.set(activeColor());
     }
     if (metalMesh) metalMesh.visible = settings.showMetal;
     // 光暈、點光放在字的中心，稍微往後一點（光從字後面透出來）
     halo.position.set(0, settings.size * 0.5, -settings.size * 0.05);
     halo.scale.setScalar(settings.size * settings.haloSize);
     pointLight.position.set(0, settings.size * 0.5, settings.size * 0.25);
-    pointLight.color.set(settings.neonColor);
-    haloMaterial.color.set(settings.neonColor);
+    pointLight.color.set(activeColor());
+    haloMaterial.color.set(activeColor());
     applyLevel();
   }
 
   /** 把目前的亮度倍率套到燈管、光暈、點光 */
   function applyLevel() {
-    if (neonMaterial) neonMaterial.emissiveIntensity = Math.max(0, settings.glow) * level;
+    if (neonMaterial) neonMaterial.emissiveIntensity = Math.max(0, activeGlow()) * level;
     halo.visible = settings.halo > 0;
     haloMaterial.opacity = Math.min(1, settings.halo * level);
-    pointLight.visible = settings.light > 0;
-    pointLight.intensity = settings.light * level;
+    pointLight.visible = activeLight() > 0;
+    pointLight.intensity = activeLight() * level;
   }
 
   /** 每一格呼叫：依效果改亮度 */
@@ -248,7 +261,14 @@ export function createDenpaCharacter(layout: DenpaCharacterSettings = DENPA_CHAR
 
   applySettings();
 
-  return { object: anchor, settings, applySettings, update };
+  /** GameHall 被點選／取消選取時呼叫：切換成 selected* 那組設定 */
+  function setSelected(value: boolean) {
+    if (selected === value) return;
+    selected = value;
+    applySettings();
+  }
+
+  return { object: anchor, settings, applySettings, update, setSelected };
 }
 
 export function formatDenpaCharacterSettingsForPaste(s: DenpaCharacterSettings) {
@@ -271,6 +291,9 @@ export function formatDenpaCharacterSettingsForPaste(s: DenpaCharacterSettings) 
     `  halo: ${s.halo.toFixed(2)},\n` +
     `  haloSize: ${s.haloSize.toFixed(2)},\n` +
     `  light: ${s.light.toFixed(2)},\n` +
+    `  selectedGlow: ${s.selectedGlow.toFixed(2)},\n` +
+    `  selectedNeonColor: '${s.selectedNeonColor}',\n` +
+    `  selectedLight: ${s.selectedLight.toFixed(2)},\n` +
     `};`
   );
 }

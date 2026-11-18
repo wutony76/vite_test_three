@@ -28,6 +28,7 @@ import {
   type WorldShiitake,
   type WorldTreasureChest,
   type WorldHappyFatShop,
+  type WorldBigBun,
   type WorldRetroArcade,
   type WorldPond,
   type WorldFrenchFries,
@@ -44,6 +45,8 @@ import { formatPondSettingsForPaste } from './objects/pond';
 import { formatMainHallSlideSettingsForPaste } from './objects/mainHallSlide';
 import { formatPigAdventureSettingsForPaste } from './objects/pigAdventure';
 import { formatHappyFatShopSettingsForPaste, HAPPY_FAT_SHOP_DEFAULT } from './objects/happyFatShop';
+import { CHINESE_TEMPLE_DEFAULT, formatChineseTempleSettingsForPaste } from './objects/chineseTemple';
+import { BIG_BUN_DEFAULT, formatBigBunSettingsForPaste } from './objects/bigBun';
 import { formatRetroArcadePlacementsForPaste } from './objects/retroArcade';
 import { formatGameHallRingsSettingsForPaste } from './objects/gameHallRings';
 import { formatDenpaCharacterSettingsForPaste } from './objects/denpaCharacter';
@@ -273,6 +276,8 @@ const {
   removeShiitake,
   treasureChest,
   happyFatShop,
+  chineseTemple,
+  bigBun,
   retroArcades,
   addRetroArcade,
   removeRetroArcade,
@@ -928,6 +933,8 @@ function clearHouseSelection() {
 
 /** 選中的那一棟自己發光，才分得出面板上的數字是哪一棟的 */
 function highlightHouse(entry: WorldHouse | null) {
+  // 點選 GameHall 時屋頂的「電」字換成選中那組設定（綠色）；選別棟或取消選取就變回來
+  denpaCharacter.setSelected(entry?.label === 'Gamehall');
   for (const house of houses) {
     const material = house.object.material;
     const active = entry !== null && house === entry;
@@ -2019,6 +2026,11 @@ function logDenpaCharacter() {
   denpaCharacterFolder.add(d, 'halo', 0, 1.5, 0.01).name('光暈強度').onChange(apply).onFinishChange(logDenpaCharacter);
   denpaCharacterFolder.add(d, 'haloSize', 0.5, 4, 0.05).name('光暈大小').onChange(apply).onFinishChange(logDenpaCharacter);
   denpaCharacterFolder.add(d, 'light', 0, 3, 0.05).name('照亮屋頂').onChange(apply).onFinishChange(logDenpaCharacter);
+  // 點選 GameHall 時改用的那組（取消選取就變回上面的設定）
+  const selectedFolder = denpaCharacterFolder.addFolder('點選 GameHall 時').close();
+  selectedFolder.add(d, 'selectedGlow', 0, 10, 0.1).name('發光強度').onChange(apply).onFinishChange(logDenpaCharacter);
+  selectedFolder.addColor(d, 'selectedNeonColor').name('燈管顏色').onChange(apply).onFinishChange(logDenpaCharacter);
+  selectedFolder.add(d, 'selectedLight', 0, 3, 0.05).name('照亮屋頂').onChange(apply).onFinishChange(logDenpaCharacter);
   denpaCharacterFolder.add({ log: logDenpaCharacter }, 'log').name('印出設定');
 }
 
@@ -2064,6 +2076,77 @@ if (happyFatFolder && happyFatShop) {
     )
     .name('還原預設顏色');
   happyFatFolder.add({ log: logHappyFat }, 'log').name('印出設定');
+}
+
+const bigBunFolder = bigBun ? gui.addFolder('大包子（金）') : null;
+function logBigBun() {
+  if (bigBun) console.log(formatBigBunSettingsForPaste(bigBun.settings));
+}
+if (bigBunFolder && bigBun) {
+  const b = bigBun.settings;
+  const apply = () => bigBun.apply();
+  bigBunFolder.add(b, 'enabled').name('顯示').onChange(apply).onFinishChange(logBigBun);
+  bigBunFolder.add(b, 'size', 0.03, 0.3, 0.005).name('大小（直徑）').onChange(apply).onFinishChange(logBigBun);
+  bigBunFolder.add(b, 'angleFromTopDegrees', 0, 88, 1).name('離頂端 (°)').onChange(apply).onFinishChange(logBigBun);
+  bigBunFolder.add(b, 'azimuthDegrees', -180, 180, 1).name('方位 (°)').onChange(apply).onFinishChange(logBigBun);
+  bigBunFolder.add(b, 'spinDegrees', -180, 180, 1).name('自身旋轉 (°)').onChange(apply).onFinishChange(logBigBun);
+  bigBunFolder.add(b, 'sink', -0.05, 0.12, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(logBigBun);
+  bigBunFolder.add(b, 'glow', 0, 3, 0.05).name('金字發光').onFinishChange(logBigBun);
+  const bigBunColorFolder = bigBunFolder.addFolder('顏色');
+  bigBunColorFolder.addColor(b.colors, 'bun').name('包子皮').onChange(apply).onFinishChange(logBigBun);
+  bigBunColorFolder.addColor(b.colors, 'text').name('金字').onChange(apply).onFinishChange(logBigBun);
+  bigBunColorFolder
+    .add(
+      {
+        reset: () => {
+          Object.assign(b.colors, BIG_BUN_DEFAULT.colors);
+          bigBunColorFolder.controllers.forEach((controller) => controller.updateDisplay());
+          apply();
+          logBigBun();
+        },
+      },
+      'reset',
+    )
+    .name('還原預設顏色');
+  bigBunFolder.add({ log: logBigBun }, 'log').name('印出設定');
+}
+
+// 點心樓 = bgRoom 那棟房子的外觀：位置、旋轉、大小在房子面板（點選它就會出現），這裡只管顏色和包子擺動
+const templeFolder = gui.addFolder('點心樓（bgRoom 外觀）');
+function logTemple() {
+  console.log(formatChineseTempleSettingsForPaste(chineseTemple.settings));
+}
+{
+  const t = chineseTemple.settings;
+  const apply = () => chineseTemple.apply();
+  templeFolder.add(t, 'lanternSwing', 0, 3, 0.05).name('包子擺動').onFinishChange(logTemple);
+  const templeColorFolder = templeFolder.addFolder('顏色');
+  const templeColorNames: [keyof typeof t.colors, string][] = [
+    ['roof', '屋瓦'],
+    ['ridge', '屋脊／封簷板'],
+    ['wood', '紅柱／門'],
+    ['wall', '白牆'],
+    ['gold', '金飾'],
+    ['steamer', '竹蒸籠台基'],
+    ['stairs', '石階'],
+  ];
+  for (const [key, label] of templeColorNames) {
+    templeColorFolder.addColor(t.colors, key).name(label).onChange(apply).onFinishChange(logTemple);
+  }
+  templeColorFolder
+    .add(
+      {
+        reset: () => {
+          Object.assign(t.colors, CHINESE_TEMPLE_DEFAULT.colors);
+          templeColorFolder.controllers.forEach((controller) => controller.updateDisplay());
+          apply();
+          logTemple();
+        },
+      },
+      'reset',
+    )
+    .name('還原預設顏色');
+  templeFolder.add({ log: logTemple }, 'log').name('印出設定');
 }
 
 // 寶箱（綠球上；裝滿漢堡、金色閃光）
@@ -2775,6 +2858,7 @@ const labelToCamera = new THREE.Vector3();
 const HOUSE_LABEL_DISPLAY: Record<string, { title: string; note?: string }> = {
   mainHall: { title: '龍兔的家', note: '（點擊進入會看到詳細資訊）' },
   projectRoom: { title: '工作間' },
+  bgRoom: { title: '點心樓' },
 };
 let renderedHouseLabel = '';
 
@@ -2875,6 +2959,7 @@ let surfaceDragTargets: Array<
   | WorldShiitake
   | WorldTreasureChest
   | WorldHappyFatShop
+  | WorldBigBun
   | WorldRetroArcade
   | WorldPond
 > = [
@@ -2883,6 +2968,7 @@ let surfaceDragTargets: Array<
   ...shiitakes,
   ...(treasureChest ? [treasureChest] : []),
   ...(happyFatShop ? [happyFatShop] : []),
+  ...(bigBun ? [bigBun] : []),
   ...retroArcades,
   ...(pond ? [pond] : []),
   ...(PUDDING_SCENE_EDIT ? puddings : []),
@@ -2901,6 +2987,7 @@ function refreshPuddingDragTargets() {
   surfaceDragTargets.push(...shiitakes);
   if (treasureChest) surfaceDragTargets.push(treasureChest);
   if (happyFatShop) surfaceDragTargets.push(happyFatShop);
+  if (bigBun) surfaceDragTargets.push(bigBun);
   surfaceDragTargets.push(...retroArcades);
   if (pond) surfaceDragTargets.push(pond);
   if (PUDDING_SCENE_EDIT) surfaceDragTargets.push(...puddings);
@@ -2961,6 +3048,7 @@ if (HOUSE_DRAG_ENABLED) {
       shiitakeFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       treasureFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       happyFatFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      bigBunFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       retroArcadeFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       pondFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
@@ -2969,6 +3057,7 @@ if (HOUSE_DRAG_ENABLED) {
       else if (shiitakes.some((item) => item.object === target.object)) logShiitakePlacements();
       else if (treasureChest && target.object === treasureChest.object) logTreasure();
       else if (happyFatShop && target.object === happyFatShop.object) logHappyFat();
+      else if (bigBun && target.object === bigBun.object) logBigBun();
       else if (retroArcades.some((item) => item.object === target.object)) {
         // 街機搬家：只更新它腳下的草（遮罩），不重撒
         groundDetail?.refreshMasks();

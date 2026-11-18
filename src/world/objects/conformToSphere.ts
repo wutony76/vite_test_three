@@ -51,10 +51,25 @@ export function conformGeometryToSphere(geometry: THREE.BufferGeometry, options:
 
 const ORIGINAL = 'sphereConformOriginal';
 
+/**
+ * 子物件標上 userData[SKIP_SPHERE_CONFORM] = true，它和底下所有子孫都不貼球。
+ * 給「程式拼出來的模型」用（例如點心樓）：那種模型每個零件的幾何都以自己中心為原點、再用 position 擺位置，
+ * 幾何座標不等於房子座標；拿去貼球會把每個零件的下半部誤判成地面、整個壓扁。
+ * glb 的頂點本來就在模型座標裡，不受影響。
+ */
+export const SKIP_SPHERE_CONFORM = 'skipSphereConform';
+
 /** 子物件（glb）依原始頂點重算貼球；不處理 root 本體，避免和長方體重複變形 */
 export function conformChildrenToSphere(root: THREE.Object3D, options: SphereConformOptions) {
-  root.traverse((node) => {
-    if (node === root) return;
+  // 不用 traverse：traverse 沒辦法跳過整棵子樹，這裡遇到標記就整枝不往下走
+  const visit = (node: THREE.Object3D) => {
+    if (node.userData[SKIP_SPHERE_CONFORM]) return;
+    conformNode(node);
+    for (const child of node.children) visit(child);
+  };
+  for (const child of root.children) visit(child);
+
+  function conformNode(node: THREE.Object3D) {
     if (!(node instanceof THREE.Mesh)) return;
     const geometry = node.geometry;
     const position = geometry.attributes.position;
@@ -68,5 +83,5 @@ export function conformChildrenToSphere(root: THREE.Object3D, options: SphereCon
     position.array.set(original);
 
     conformGeometryToSphere(geometry, options);
-  });
+  }
 }

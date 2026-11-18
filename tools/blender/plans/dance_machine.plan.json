@@ -1,0 +1,434 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "dance_machine",
+  "notes": "原創設計的雙人跳舞機「電波 STEP!」（沒有參考圖，依使用者要求自己設計，不仿任何現有機台）。後面高機台（大螢幕、頂上招牌、兩側喇叭塔），前面舞台兩組 3×3 踏板、上下左右箭頭發光，舞台前緣 U 形扶手。配色跟 GameHall（電 • 波 • 町）的霓虹一致。",
+  "dimensions": {
+    "w": 1.98,
+    "d": 2.9,
+    "h": 2.3
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {
+      "tertiary_density": 1,
+      "geometry_complexity": 12,
+      "bevel_quality": 0,
+      "bake": "none"
+    }
+  },
+  "style": {
+    "edge_wobble": 0.0
+  },
+  "budget": {
+    "max_tris": 6000,
+    "max_primitives": 28,
+    "max_texture_kb": 400,
+    "max_gpu_texture_mb": 8
+  },
+  "export": {
+    "path": "public/models/dance_machine/dance_machine.glb",
+    "compress": true,
+    "clickable": [
+      "stage"
+    ],
+    "anim_groups": {}
+  },
+  "materials": [
+    {
+      "name": "body_purple",
+      "hex": "#3B2E7E",
+      "roughness": 0.7
+    },
+    {
+      "name": "screen_glow",
+      "hex": "#1E2440",
+      "roughness": 0.7,
+      "emissive": true
+    },
+    {
+      "name": "sign_dark",
+      "hex": "#1E1B4B",
+      "roughness": 0.7
+    },
+    {
+      "name": "neon_cyan",
+      "hex": "#5FF2E6",
+      "roughness": 0.7,
+      "emissive": true
+    },
+    {
+      "name": "neon_magenta",
+      "hex": "#FF5FD8",
+      "roughness": 0.7,
+      "emissive": true
+    },
+    {
+      "name": "speaker_black",
+      "hex": "#1E1F24",
+      "roughness": 0.7
+    },
+    {
+      "name": "cone_grey",
+      "hex": "#4A4E58",
+      "roughness": 0.7
+    },
+    {
+      "name": "button_red",
+      "hex": "#E2453C",
+      "roughness": 0.7
+    },
+    {
+      "name": "button_yellow",
+      "hex": "#FFD84A",
+      "roughness": 0.7
+    },
+    {
+      "name": "stage_dark",
+      "hex": "#2B2B38",
+      "roughness": 0.7
+    },
+    {
+      "name": "metal",
+      "hex": "#9AA0AE",
+      "roughness": 0.4
+    },
+    {
+      "name": "arrow_yellow",
+      "hex": "#FFD84A",
+      "roughness": 0.7,
+      "emissive": true
+    },
+    {
+      "name": "arrow_cyan",
+      "hex": "#5FF2E6",
+      "roughness": 0.7,
+      "emissive": true
+    },
+    {
+      "name": "arrow_magenta",
+      "hex": "#FF5FD8",
+      "roughness": 0.7,
+      "emissive": true
+    },
+    {
+      "name": "arrow_lime",
+      "hex": "#BEFF78",
+      "roughness": 0.7,
+      "emissive": true
+    }
+  ],
+  "components": [
+    {
+      "id": "cabinet",
+      "kind": "dm_cabinet",
+      "tier": "primary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "body_purple",
+      "params": {},
+      "bounds": [
+        [
+          -0.55,
+          -0.12,
+          0.0
+        ],
+        [
+          0.55,
+          0.8,
+          2.3
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "深紫色高機台：頂上招牌箱往前突出、中段大螢幕往後微傾、螢幕下有一小段操作台。",
+      "confidence": 0.7
+    },
+    {
+      "id": "screen",
+      "kind": "dm_screen",
+      "tier": "primary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "screen_glow",
+      "params": {
+        "frame_material": "neon_cyan"
+      },
+      "bounds": [
+        [
+          -0.55,
+          -0.05,
+          1.0
+        ],
+        [
+          0.55,
+          0.2,
+          1.9
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "大螢幕（發光，decal：四欄彩色箭頭往上捲）＋青色燈管外框。",
+      "confidence": 0.7
+    },
+    {
+      "id": "marquee",
+      "kind": "dm_marquee",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "body_purple",
+      "params": {
+        "face_material": "sign_dark",
+        "tube_material": "neon_magenta"
+      },
+      "bounds": [
+        [
+          -0.55,
+          -0.12,
+          1.9
+        ],
+        [
+          0.55,
+          0.0,
+          2.3
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "頂上招牌：深色字面（decal：洋紅「電波」＋黃色「STEP!」），上緣一條洋紅燈管。",
+      "confidence": 0.7
+    },
+    {
+      "id": "speakers",
+      "kind": "dm_speakers",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "speaker_black",
+      "params": {
+        "cone_material": "cone_grey",
+        "tower_width": 0.34
+      },
+      "bounds": [
+        [
+          -0.9,
+          0.05,
+          0.0
+        ],
+        [
+          0.9,
+          0.65,
+          1.95
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "機身兩側的黑色喇叭塔，每座正面兩顆灰色喇叭。",
+      "confidence": 0.7
+    },
+    {
+      "id": "controls",
+      "kind": "dm_controls",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "button_red",
+      "params": {
+        "button_material": "button_red",
+        "middle_material": "button_yellow"
+      },
+      "bounds": [
+        [
+          -0.5,
+          -0.12,
+          0.97
+        ],
+        [
+          0.5,
+          -0.02,
+          1.05
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "螢幕下方操作台上，左右玩家各三顆按鈕（紅、黃、紅）。",
+      "confidence": 0.7
+    },
+    {
+      "id": "stage",
+      "kind": "dm_stage",
+      "tier": "primary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "stage_dark",
+      "params": {
+        "plate_material": "metal",
+        "height": 0.16,
+        "cell": 0.27,
+        "pad_x": [
+          -0.47,
+          0.47
+        ],
+        "pad_y": -0.78
+      },
+      "bounds": [
+        [
+          -0.98,
+          -1.45,
+          0.0
+        ],
+        [
+          0.98,
+          -0.12,
+          0.18
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "玩家踩的舞台：深色平台＋兩塊金屬踏板底（3×3 格的範圍）。",
+      "confidence": 0.7
+    },
+    {
+      "id": "arrows",
+      "kind": "dm_arrows",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "arrow_yellow",
+      "params": {
+        "cell": 0.27,
+        "pad_x": [
+          -0.47,
+          0.47
+        ],
+        "pad_y": -0.78,
+        "colors": [
+          "arrow_yellow",
+          "arrow_cyan",
+          "arrow_magenta",
+          "arrow_lime"
+        ]
+      },
+      "bounds": [
+        [
+          -0.9,
+          -1.2,
+          0.18
+        ],
+        [
+          0.9,
+          -0.36,
+          0.205
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "8 個發光箭頭：每位玩家上（黃，朝螢幕）、下（青）、左（洋紅）、右（萊姆綠）。",
+      "confidence": 0.7
+    },
+    {
+      "id": "bar",
+      "kind": "dm_bar",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "metal",
+      "params": {},
+      "bounds": [
+        [
+          -0.95,
+          -1.42,
+          0.16
+        ],
+        [
+          0.95,
+          -1.34,
+          1.05
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "舞台前緣的 U 形金屬扶手（玩家背後），中間一支直柱分開兩位玩家。",
+      "confidence": 0.7
+    },
+    {
+      "id": "neon",
+      "kind": "dm_neon",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "neon_cyan",
+      "params": {
+        "radius": 0.025,
+        "stage": [
+          -0.97,
+          -1.44,
+          0.97,
+          -0.13,
+          0.165
+        ],
+        "posts": [
+          [
+            -0.52,
+            -0.005,
+            0.05,
+            0.86
+          ],
+          [
+            0.52,
+            -0.005,
+            0.05,
+            0.86
+          ]
+        ]
+      },
+      "bounds": [
+        [
+          -0.99,
+          -1.47,
+          0.0
+        ],
+        [
+          0.99,
+          0.03,
+          0.9
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "青色燈管：舞台上緣一圈、機身正面下段兩側各一條直燈管。",
+      "confidence": 0.7
+    }
+  ],
+  "decals": [
+    {
+      "id": "marquee_glow",
+      "target": "marquee",
+      "face": "front",
+      "rect": [
+        [
+          -0.47,
+          1.96
+        ],
+        [
+          0.47,
+          2.204
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/dance_machine/decals/marquee.png"
+      }
+    },
+    {
+      "id": "screen_glow",
+      "target": "screen",
+      "face": "front",
+      "rect": [
+        [
+          -0.445,
+          1.09
+        ],
+        [
+          0.445,
+          1.82
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/dance_machine/decals/screen.png"
+      }
+    }
+  ]
+}
