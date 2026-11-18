@@ -1607,6 +1607,7 @@ if (pigFolder && pig) {
     adventureFolder.add(a, 'fetchChance', 0, 1, 0.05).name('小豬去撿機率').onFinishChange(logAdventure);
     adventureFolder.add(a, 'fishLifetimeSeconds', 2, 60, 1).name('魚排至少留幾秒').onFinishChange(logAdventure);
     adventureFolder.add(a, 'fishSize', 0.02, 0.12, 0.005).name('魚排大小').onFinishChange(logAdventure);
+    adventureFolder.add(a, 'fishThickness', 0.5, 4, 0.1).name('魚排厚度').onFinishChange(logAdventure);
     adventureFolder
       .add({ go: () => { if (!adventure.startNow()) console.warn(`[pig] 現在去不了溜滑梯：${adventure.getLastFailReason()}`); } }, 'go')
       .name('立刻去溜滑梯');

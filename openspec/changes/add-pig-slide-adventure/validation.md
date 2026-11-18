@@ -103,3 +103,7 @@ console 沒有錯誤。
 - **直接變成 0°**，之後走上岸的每一筆都是 0°，回到 idle 時是 0°。
 
 console 沒有錯誤。
+
+**魚排厚度**：
+- 落地後量魚排自身座標的尺寸：最長邊都是 0.05；厚度 1 倍時 0.0076，1.8 倍時 0.0137。
+- 並排截圖 `docs/Engineering Evidence/assets/pig-slide-fish-thickness.png`：左邊是 1.8，側面看得到厚度；右邊是 1，幾乎是一片。

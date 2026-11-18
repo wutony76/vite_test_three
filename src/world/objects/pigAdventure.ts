@@ -39,6 +39,8 @@ export type PigAdventureSettings = {
   fishLifetimeSeconds: number;
   /** 噴出來的魚排大小（最長邊，ground 單位）；小豬身長約 0.057 */
   fishSize: number;
+  /** 噴出來的魚排厚度倍率（1 = 模型原本的厚度；只加厚、不改長寬） */
+  fishThickness: number;
 };
 
 export const PIG_ADVENTURE_DEFAULT: PigAdventureSettings = {
@@ -52,6 +54,8 @@ export const PIG_ADVENTURE_DEFAULT: PigAdventureSettings = {
   fetchChance: 0.6,
   fishLifetimeSeconds: 10,
   fishSize: 0.05,
+  // 原本的厚度在這麼小的尺寸下看起來像一片薄紙，加厚一點才像一塊魚排
+  fishThickness: 1.8,
 };
 
 type PigRuntime = ReturnType<typeof createPig>;
@@ -355,6 +359,7 @@ export function createPigAdventure({
     const runtime = createFish({
       ...SALMON_STEAK_LAYOUT_DEFAULT,
       modelSize: settings.fishSize,
+      heightScale: settings.fishThickness,
       spinDegrees: Math.random() * 360 - 180,
     });
     ground.add(runtime.object);
@@ -691,6 +696,7 @@ export function formatPigAdventureSettingsForPaste(s: PigAdventureSettings) {
     `  fetchChance: ${s.fetchChance.toFixed(2)},\n` +
     `  fishLifetimeSeconds: ${s.fishLifetimeSeconds},\n` +
     `  fishSize: ${s.fishSize.toFixed(3)},\n` +
+    `  fishThickness: ${s.fishThickness.toFixed(2)},\n` +
     `};`
   );
 }
