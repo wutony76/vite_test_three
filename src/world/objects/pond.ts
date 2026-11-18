@@ -34,6 +34,10 @@ export type PondSettings = {
   waterShallow: string;
   /** 漣漪明顯程度（0 = 平靜無波） */
   ripple: number;
+  /** 彩虹色的濃度（0 = 原本的藍色水面，1 = 整片彩虹） */
+  rainbow: number;
+  /** 彩虹流動的速度（每秒繞幾圈色環；0 = 不動） */
+  rainbowSpeed: number;
   lilyPads: boolean;
   reeds: boolean;
 };
@@ -49,6 +53,8 @@ export const POND_DEFAULT: PondSettings = {
   waterDeep: '#2F8FBF',
   waterShallow: '#8FE3E6',
   ripple: 1,
+  rainbow: 0.75,
+  rainbowSpeed: 0.08,
   lilyPads: true,
   reeds: true,
 };
@@ -105,6 +111,8 @@ export function createPond({ groundRadius, up, front, envMap, layout = POND_DEFA
     uDeep: { value: new THREE.Color(settings.waterDeep) },
     uShallow: { value: new THREE.Color(settings.waterShallow) },
     uRipple: { value: settings.ripple },
+    uRainbow: { value: settings.rainbow ?? POND_DEFAULT.rainbow },
+    uRainbowSpeed: { value: settings.rainbowSpeed ?? POND_DEFAULT.rainbowSpeed },
   };
   const waterMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -134,7 +142,14 @@ export function createPond({ groundRadius, up, front, envMap, layout = POND_DEFA
         uniform vec3 uDeep;
         uniform vec3 uShallow;
         uniform float uRipple;
+        uniform float uRainbow;
+        uniform float uRainbowSpeed;
         varying vec2 vPond;
+        // 色相（0～1 繞一圈）→ RGB：飽和度、亮度固定，讓彩虹偏粉嫩、不刺眼
+        vec3 pondHue(float h) {
+          vec3 k = clamp(abs(fract(h + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+          return mix(vec3(1.0), k, 0.62);
+        }
         varying float vEdge;
         // 一圈一圈往外擴散的漣漪：中心點 c、波長、速度；離中心越遠越淡
         float pondRing(vec2 p, vec2 c, float phase) {
@@ -152,7 +167,15 @@ export function createPond({ groundRadius, up, front, envMap, layout = POND_DEFA
         vec3 pondColor = mix(uDeep, uShallow, smoothstep(0.45, 1.0, vEdge));
         // 漣漪：兩個錯開的中心，亮線疊在水色上
         float ripples = max(pondRing(vPond, vec2(0.28, -0.12), 0.0), pondRing(vPond, vec2(-0.30, 0.22), 0.45));
-        pondColor = mix(pondColor, vec3(0.93, 0.99, 1.0), ripples * 0.55 * uRipple);
+        // 彩虹：色相沿著繞水潭一圈的角度變化，再加上離中心的距離、時間，變成慢慢旋轉的漩渦色帶
+        // 中央深處淡一點（保留水的深度感），往岸邊越來越明顯
+        float pondAngle = atan(vPond.y, vPond.x) / 6.2831853;
+        float pondHueValue = pondAngle + length(vPond) * 0.55 - uTime * uRainbowSpeed;
+        vec3 rainbowColor = pondHue(pondHueValue);
+        pondColor = mix(pondColor, rainbowColor, uRainbow * mix(0.55, 1.0, smoothstep(0.1, 0.8, vEdge)));
+        // 漣漪亮線也帶一點彩虹色（色相比水面錯開半圈，看得出來）
+        vec3 rippleColor = mix(vec3(0.93, 0.99, 1.0), pondHue(pondHueValue + 0.5), uRainbow * 0.6);
+        pondColor = mix(pondColor, rippleColor, ripples * 0.55 * uRipple);
         // 岸邊一圈淡淡的白色水花，跟泥土交界比較柔和
         pondColor = mix(pondColor, vec3(0.95, 0.98, 0.97), smoothstep(0.86, 1.0, vEdge) * 0.45);
         diffuseColor.rgb = pondColor;
@@ -442,6 +465,8 @@ export function createPond({ groundRadius, up, front, envMap, layout = POND_DEFA
     waterUniforms.uDeep.value.set(settings.waterDeep);
     waterUniforms.uShallow.value.set(settings.waterShallow);
     waterUniforms.uRipple.value = settings.ripple;
+    waterUniforms.uRainbow.value = settings.rainbow;
+    waterUniforms.uRainbowSpeed.value = settings.rainbowSpeed;
     if (padGroup) padGroup.visible = settings.lilyPads;
     if (reedGroup) reedGroup.visible = settings.reeds;
   }
@@ -460,14 +485,19 @@ export function createPond({ groundRadius, up, front, envMap, layout = POND_DEFA
   const splashDrops: SplashDrop[] = [];
   const splashRings: SplashRing[] = [];
   const dropGeometry = new THREE.IcosahedronGeometry(1, 1);
-  const dropMaterial = new THREE.MeshStandardMaterial({
-    color: '#dff6ff',
-    emissive: '#9fdcef',
-    emissiveIntensity: 0.25,
-    roughness: 0.15,
-    transparent: true,
-    opacity: 0.9,
-  });
+  /** 彩色水珠：每顆一份材質，濺水時依序配上彩虹色（色相從隨機起點均勻繞一圈，每次濺出來的配色都不太一樣） */
+  function createDropMaterial() {
+    return new THREE.MeshStandardMaterial({
+      color: '#dff6ff',
+      emissive: '#9fdcef',
+      // 自發光高一點：小小的水珠背光時也要看得出顏色，不會暗成灰點
+      emissiveIntensity: 0.55,
+      roughness: 0.15,
+      transparent: true,
+      opacity: 0.92,
+    });
+  }
+  const dropHue = new THREE.Color();
   // 波紋是一圈細環，平躺在水面上（RingGeometry 原本在 XY 平面，轉成 XZ 平面）
   const ringGeometry = new THREE.RingGeometry(0.78, 1, 40);
   ringGeometry.rotateX(-Math.PI / 2);
@@ -478,7 +508,7 @@ export function createPond({ groundRadius, up, front, envMap, layout = POND_DEFA
     splashGroup = new THREE.Group();
     splashGroup.name = 'pond_splash';
     for (let i = 0; i < SPLASH_DROPS; i++) {
-      const mesh = new THREE.Mesh(dropGeometry, dropMaterial);
+      const mesh = new THREE.Mesh(dropGeometry, createDropMaterial());
       mesh.visible = false;
       mesh.raycast = () => {};
       splashGroup.add(mesh);
@@ -518,7 +548,13 @@ export function createPond({ groundRadius, up, front, envMap, layout = POND_DEFA
     // 切平面上的兩個方向，用來把水珠往四周撒
     const tangentA = new THREE.Vector3().crossVectors(radial, Math.abs(radial.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)).normalize();
     const tangentB = new THREE.Vector3().crossVectors(radial, tangentA).normalize();
-    for (const drop of splashDrops) {
+    const hueStart = Math.random();
+    splashDrops.forEach((drop, index) => {
+      // 彩虹色：飽和、偏亮，跟水潭的彩虹同一個調性
+      dropHue.setHSL((hueStart + index / splashDrops.length) % 1, 0.9, 0.62);
+      const material = drop.mesh.material as THREE.MeshStandardMaterial;
+      material.color.copy(dropHue);
+      material.emissive.copy(dropHue);
       const angle = Math.random() * Math.PI * 2;
       // 實測原本的大小（水珠 0.0035～0.0075、往上 0.22～0.48）在預設鏡頭下只看得到幾個小白點，放大約一倍
       const outward = (0.07 + Math.random() * 0.16) * strength;
@@ -534,7 +570,7 @@ export function createPond({ groundRadius, up, front, envMap, layout = POND_DEFA
       drop.age = 0;
       drop.life = 1.4;
       drop.mesh.visible = true;
-    }
+    });
     splashRings.forEach((ring, index) => {
       ring.mesh.position.copy(surfacePoint);
       ring.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
@@ -638,6 +674,8 @@ export function formatPondSettingsForPaste(s: PondSettings) {
     `  waterDeep: '${s.waterDeep}',\n` +
     `  waterShallow: '${s.waterShallow}',\n` +
     `  ripple: ${s.ripple.toFixed(2)},\n` +
+    `  rainbow: ${s.rainbow.toFixed(2)},\n` +
+    `  rainbowSpeed: ${s.rainbowSpeed.toFixed(2)},\n` +
     `  lilyPads: ${s.lilyPads},\n` +
     `  reeds: ${s.reeds},\n` +
     `};`

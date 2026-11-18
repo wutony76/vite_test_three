@@ -1953,6 +1953,8 @@ if (pondFolder && pond) {
   pondFolder.addColor(p, 'waterDeep').name('深處顏色').onChange(apply).onFinishChange(logPond);
   pondFolder.addColor(p, 'waterShallow').name('岸邊顏色').onChange(apply).onFinishChange(logPond);
   pondFolder.add(p, 'ripple', 0, 2, 0.05).name('漣漪').onChange(apply).onFinishChange(logPond);
+  pondFolder.add(p, 'rainbow', 0, 1, 0.01).name('彩虹濃度').onChange(apply).onFinishChange(logPond);
+  pondFolder.add(p, 'rainbowSpeed', 0, 0.5, 0.01).name('彩虹流動速度').onChange(apply).onFinishChange(logPond);
   pondFolder.add(p, 'lilyPads').name('荷葉').onChange(apply).onFinishChange(logPond);
   pondFolder.add(p, 'reeds').name('香蒲').onChange(apply).onFinishChange(logPond);
   pondFolder.add({ log: logPond }, 'log').name('印出設定');
