@@ -45,6 +45,8 @@ import { formatMainHallSlideSettingsForPaste } from './objects/mainHallSlide';
 import { formatPigAdventureSettingsForPaste } from './objects/pigAdventure';
 import { formatHappyFatShopSettingsForPaste, HAPPY_FAT_SHOP_DEFAULT } from './objects/happyFatShop';
 import { formatRetroArcadePlacementsForPaste } from './objects/retroArcade';
+import { formatGameHallRingsSettingsForPaste } from './objects/gameHallRings';
+import { formatDenpaCharacterSettingsForPaste } from './objects/denpaCharacter';
 import { formatFloatingIslandSettingsForPaste } from './objects/floatingIsland';
 import { formatFrenchFriesPlacementsForPaste } from './objects/frenchFries';
 import { formatFrenchFryStickPlacementsForPaste } from './objects/frenchFryStick';
@@ -244,6 +246,7 @@ const {
   introSettings,
   replayIntro,
   gameHallLights,
+  gameHallRings,
   puddings,
   addPudding,
   removePudding,
@@ -273,6 +276,7 @@ const {
   retroArcades,
   addRetroArcade,
   removeRetroArcade,
+  denpaCharacter,
   pond,
   mainHallSlide,
   mainHallDoor,
@@ -874,6 +878,25 @@ function bindHousePanel(entry: WorldHouse) {
     lightFolder.add(lights, 'speed', 0.1, 3, 0.05).name('變化速度').onFinishChange(logGameHallLights);
     lightFolder.controllers.forEach((c) => {
       if (c.property !== 'speed') c.onFinishChange(logGameHallLights);
+    });
+
+    // 背後的 4 層環形燈
+    const rings = gameHallRings.settings;
+    const applyRings = () => gameHallRings.applySettings();
+    const logRings = () => console.log(formatGameHallRingsSettingsForPaste(rings));
+    const ringFolder = houseFolder.addFolder('背後環形燈').close();
+    ringFolder.add(rings, 'enabled').name('顯示').onChange(applyRings).onFinishChange(logRings);
+    ringFolder.add(rings, 'outerRadius', 0.3, 2, 0.01).name('最外圈半徑').onChange(applyRings).onFinishChange(logRings);
+    ringFolder.add(rings, 'spacing', 0.03, 0.4, 0.005).name('每圈間距').onChange(applyRings).onFinishChange(logRings);
+    ringFolder.add(rings, 'tube', 0.005, 0.08, 0.001).name('燈管粗細').onChange(applyRings).onFinishChange(logRings);
+    ringFolder.add(rings, 'centerHeight', 0.3, 2.5, 0.01).name('中心高度').onChange(applyRings).onFinishChange(logRings);
+    ringFolder.add(rings, 'backOffset', -0.3, 1, 0.01).name('離建築多遠').onChange(applyRings).onFinishChange(logRings);
+    ringFolder.add(rings, 'layerDepth', 0, 0.3, 0.005).name('每層往後退').onChange(applyRings).onFinishChange(logRings);
+    ringFolder.add(rings, 'glow', 0, 4, 0.05).name('發光強度').onFinishChange(logRings);
+    ringFolder.add(rings, 'speed', 0, 4, 0.05).name('跑馬燈速度').onFinishChange(logRings);
+    ringFolder.add(rings, 'pulse', 0, 1, 0.01).name('明暗差').onFinishChange(logRings);
+    (['color1', 'color2', 'color3', 'color4'] as const).forEach((key, i) => {
+      ringFolder.addColor(rings, key).name(`第 ${i + 1} 圈顏色（外→內）`).onChange(applyRings).onFinishChange(logRings);
     });
   }
 }
@@ -1967,6 +1990,36 @@ function bindRetroArcadePanel(entry: WorldRetroArcade) {
   retroArcadeFolder.add(retroArcadeControls, 'remove').name('移除選中街機');
   retroArcadeFolder.add(retroArcadeControls, 'log').name('印出全部佈局 (console)');
   // 不預先選取：選中會整台發光，等使用者在場景上點了再選
+}
+
+// 「電」字霓虹（從舊招牌獨立出來的一個字，立在 GameHall 屋頂上；位置用 GameHall 長方體的座標）
+const denpaCharacterFolder = gui.addFolder('「電」字霓虹（GameHall 屋頂）');
+function logDenpaCharacter() {
+  console.log(formatDenpaCharacterSettingsForPaste(denpaCharacter.settings));
+}
+{
+  const d = denpaCharacter.settings;
+  const apply = () => denpaCharacter.apply();
+  denpaCharacterFolder.add(d, 'enabled').name('顯示').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'x', -0.8, 0.8, 0.005).name('左右').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'y', 0.5, 2, 0.005).name('高度（字底）').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'z', -0.6, 0.6, 0.005).name('前後').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'size', 0.05, 1, 0.005).name('縮放（字高）').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'spinDegrees', -180, 180, 1).name('自身旋轉 (°)').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'tiltDegrees', -90, 90, 1).name('前後傾斜 (°)').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'rollDegrees', -90, 90, 1).name('左右傾斜 (°)').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'glow', 0, 10, 0.1).name('發光強度').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.addColor(d, 'neonColor').name('燈管顏色').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'showMetal').name('金屬字座').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder
+    .add(d, 'effect', { 恆亮: 'steady', 呼吸: 'breathe', 霓虹閃爍: 'flicker', 一亮一滅: 'blink' })
+    .name('效果')
+    .onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'effectSpeed', 0, 3, 0.05).name('效果速度').onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'halo', 0, 1.5, 0.01).name('光暈強度').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'haloSize', 0.5, 4, 0.05).name('光暈大小').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add(d, 'light', 0, 3, 0.05).name('照亮屋頂').onChange(apply).onFinishChange(logDenpaCharacter);
+  denpaCharacterFolder.add({ log: logDenpaCharacter }, 'log').name('印出設定');
 }
 
 const happyFatFolder = happyFatShop ? gui.addFolder('Happy Fat 小店') : null;

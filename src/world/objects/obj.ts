@@ -4,6 +4,8 @@ import { createKetchup, KETCHUP_TUBE_OUTER_RADIUS } from './ketchup';
 import { createHouse, type HouseSettings } from './house';
 import { createCartoonRainbow } from './rainbow';
 import { createGameHallLights } from './gameHallLights';
+import { createGameHallRings } from './gameHallRings';
+import { createDenpaCharacter } from './denpaCharacter';
 import { createGroundFlowers, type GroundFlowers } from './groundFlowers';
 import {
   createGrilledCorn,
@@ -685,6 +687,12 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
   Gamehall.applySettings();
   ground.add(Gamehall.object);
   const gameHallLights = createGameHallLights();
+  // 背後 4 層同心霓虹燈環：掛在長方體底下，拖曳、縮放、入場長大都跟著建築走
+  const gameHallRings = createGameHallRings(() => Gamehall.settings.depth);
+  Gamehall.object.add(gameHallRings.object);
+  // 「電」字霓虹：從舊遊戲廳的「電 • 波 • 町」招牌取出「電」一個字，立在 GameHall 屋頂上（跟著 GameHall 走）
+  const denpaCharacterRuntime = createDenpaCharacter();
+  Gamehall.object.add(denpaCharacterRuntime.object);
 
   attachHouseModel(Gamehall, GAME_HALL_MODEL_URL, (model) => {
     gameHallLights.bind(model);
@@ -1316,6 +1324,8 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
 
     rainbow.update(deltaTime);
     gameHallLights?.update(time);
+    gameHallRings.update(time);
+    denpaCharacterRuntime.update(time);
 
     puddingEntries.forEach(({ runtime }, index) => {
       const puddingStart = introSettings.emptyHold + introSettings.ballSeconds * 0.72 + index * 0.08;
@@ -1396,6 +1406,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         const arcadeT = THREE.MathUtils.clamp((introElapsed - arcadeStart) / 0.8, 0, 1);
         runtime.setIntroGrow(easeOutBack(arcadeT, 2.2));
       });
+
     }
     if (happyFatRuntime) {
       happyFatRuntime.update(deltaTime);
@@ -1566,6 +1577,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     introSettings,
     replayIntro,
     gameHallLights,
+    gameHallRings,
     puddings,
     addPudding,
     removePudding,
@@ -1595,6 +1607,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       settings: projectRoomStyleSettings,
       apply: () => projectRoomStyle?.setEnabled(projectRoomStyleSettings.enabled),
     },
+    denpaCharacter: { settings: denpaCharacterRuntime.settings, apply: denpaCharacterRuntime.applySettings },
     retroArcades,
     addRetroArcade,
     removeRetroArcade,
