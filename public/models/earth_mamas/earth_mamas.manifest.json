@@ -1,0 +1,67 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "earth_mamas",
+  "glb": "earth_mamas.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
+  ],
+  "root": "earth_mamas_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 2092,
+    "primitives": 6,
+    "meshes": 6,
+    "materials": 3,
+    "file_bytes": 225596
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "warn",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "brick_rose": {
+        "class": "brick",
+        "pattern": "brick",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 2.0,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "brick",
+          "seed": 2856775990,
+          "hash": "aa46f136da51"
+        }
+      },
+      "plaster_cream": {
+        "class": "wood",
+        "pattern": "planks",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 2.4,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "planks",
+          "seed": 2925402716,
+          "hash": "ae5e1a5cd3f3"
+        }
+      }
+    },
+    "bake": {},
+    "decals": 0,
+    "gpu_texture_mb": 8.04,
+    "flat_ratio": 0.369,
+    "texture_count": 8,
+    "texture_kb": 118.3,
+    "images": 8,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 220.3
+  }
+}

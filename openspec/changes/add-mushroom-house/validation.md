@@ -66,3 +66,7 @@
 ## 第九版（背面時標籤換到右邊）
 
 - 瀏覽器：正面時標籤 class 是 is-side（左側）；鏡頭繞球轉 120° 和 180° 看到背面時是 is-side-right（右側）；console 沒有 error。
+
+## 第十版（mainHall、projectRoom 鎖定）
+
+- 瀏覽器：在 mainHall、projectRoom 上按住拖動 80 px，位置不變；同樣操作 bgRoom（洗衣店）會移動。點 mainHall 後面板標題是「房子 · mainHall（已鎖定）」，「進入」按鈕出現。console 沒有 error。

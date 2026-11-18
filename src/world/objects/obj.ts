@@ -51,6 +51,9 @@ import { createCampfire, type CampfireSettings } from './campfire';
 import { createShiitake, SHIITAKE_DEFAULT, SHIITAKE_PLACEMENTS, type ShiitakeSettings } from './shiitake';
 import { createTreasureChest, type TreasureChestSettings } from './treasureChest';
 import { createProjectRoomStyle } from './projectRoomStyle';
+import { createHappyFatShop, type HappyFatShopSettings } from './happyFatShop';
+import { createPond, type PondSettings } from './pond';
+import { createMainHallSlide, type MainHallSlideSettings } from './mainHallSlide';
 import { createFloatingIsland } from './floatingIsland';
 import { createGroundDetail, type GroundObstacle } from './groundDetail';
 
@@ -102,6 +105,7 @@ export const WORLD_GLTF_URLS = [
   `${import.meta.env.BASE_URL}models/treasure_chest/treasure_chest.glb`,
   `${import.meta.env.BASE_URL}models/burger/burger.glb`,
   `${import.meta.env.BASE_URL}models/mushroom_house/mushroom_house.glb`,
+  `${import.meta.env.BASE_URL}models/earth_mamas/earth_mamas.glb`,
 ] as const;
 
 // true = 載入網路下載的模型；false = 顯示原本的綠色球
@@ -116,6 +120,8 @@ const MODEL_SIZE = 2;
 type CreateObjsOptions = {
   // 環境貼圖：給番茄醬這類光滑材質反射用
   envMap: THREE.Texture;
+  // 中性（不染色）的環境貼圖：給荷包蛋用，避免蛋白反射出番茄醬的紅
+  eggEnvMap?: THREE.Texture;
   // 攝影機：噴濺要知道「畫面上方」在哪個方向
   camera: THREE.Camera;
 };
@@ -151,7 +157,7 @@ export const INTRO_BALL_EASE_OPTIONS = [
 
 export type IntroBallEase = (typeof INTRO_BALL_EASE_OPTIONS)[number];
 
-export function createObjs({ envMap, camera }: CreateObjsOptions) {
+export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
   preloadGltfs(WORLD_GLTF_URLS);
   const all = new THREE.Object3D();
 
@@ -213,6 +219,8 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
   let mainHallDoor: THREE.Object3D | null = null;
   // 節點原本的縮放：meshopt 壓縮可能讓節點縮放不是 1，套倍率時要「原本 × 倍率」
   const mainHallDoorBaseScale = new THREE.Vector3(1, 1, 1);
+  /** 香菇屋的屋身：溜滑梯要從它的三樓外牆出發 */
+  let mainHallBody: THREE.Mesh | null = null;
   function applyMainHallDoor() {
     if (!mainHallDoor) return;
     const s = Math.max(0.1, mainHallDoorSettings.scale);
@@ -226,6 +234,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     model.traverse((child) => {
       if (/_hanger_\d+$/.test(child.name)) mainHallHangers.push(child);
       if (child.name.endsWith('_door')) mainHallDoor = child;
+      if (child.name === 'mushroom_house_body' && (child as THREE.Mesh).isMesh) mainHallBody = child as THREE.Mesh;
     });
     if (mainHallDoor) mainHallDoorBaseScale.copy((mainHallDoor as THREE.Object3D).scale);
     applyMainHallDoor();
@@ -508,6 +517,7 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     if (!puddingAxes) return null;
     const runtime = createFriedEgg({
       ...puddingAxes,
+      envMap: eggEnvMap ?? puddingAxes.envMap,
       camera,
       layout: { ...layout },
       attachParent: options?.attachParent ?? null,
@@ -696,6 +706,35 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     treasureRuntime.setIntroGrow(0);
   }
 
+  // 街角小店「Happy Fat」：依參考圖改成香菇屋風格（半弧面屋頂）
+  const happyFatRuntime = puddingAxes
+    ? createHappyFatShop({ groundRadius: GROUND_RADIUS, up: puddingAxes.up, front: puddingAxes.front, envMap })
+    : null;
+  if (happyFatRuntime) {
+    ground.add(happyFatRuntime.object);
+    happyFatRuntime.setIntroGrow(0);
+  }
+
+  // 小水潭：程式產生的水面（漣漪、深淺）＋岸邊石頭、荷葉、香蒲
+  const pondRuntime = puddingAxes
+    ? createPond({ groundRadius: GROUND_RADIUS, up: puddingAxes.up, front: puddingAxes.front, envMap })
+    : null;
+  if (pondRuntime) {
+    ground.add(pondRuntime.object);
+    pondRuntime.setIntroGrow(0);
+  }
+
+  // 龍兔的家三樓 → 水潭邊的溜滑梯：兩端都會動（水潭可拖），每次重新算滑道曲線
+  const slideRuntime = createMainHallSlide({
+    ground,
+    groundRadius: GROUND_RADIUS,
+    getHouseBody: () => mainHallBody,
+    getPond: () =>
+      pondRuntime?.settings.enabled ? { normal: pondRuntime.getNormal(), size: pondRuntime.settings.size } : null,
+  });
+  ground.add(slideRuntime.object);
+  slideRuntime.setIntroGrow(0);
+
   // 香菇：種在綠球上，可以複製好幾顆；菇傘大小、菇柄高低、厚度各自在面板調
   type ShiitakeRuntime = ReturnType<typeof createShiitake>;
   const shiitakeEntries: Array<{ world: WorldShiitake; runtime: ShiitakeRuntime }> = [];
@@ -767,6 +806,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     // 香菇也是障礙：小豬會繞過它，草叢、小石頭也不會撒在它身上
     for (const { world } of shiitakeEntries) if (world.settings.enabled) roots.push(world.object);
     if (treasureRuntime?.settings.enabled) roots.push(treasureRuntime.object);
+    if (happyFatRuntime?.settings.enabled) roots.push(happyFatRuntime.object);
+    // 水潭也是障礙：小豬繞著走，草叢、小石頭不會長在水面上
+    if (pondRuntime?.settings.enabled) roots.push(pondRuntime.object);
     for (const { world } of puddingEntries) roots.push(world.object);
     for (const { world } of grilledCornEntries) roots.push(world.object);
     for (const { world } of salmonSteakEntries) roots.push(world.object);
@@ -882,6 +924,8 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
             groundInverseScratch.copy(ground.matrixWorld).invert();
             const list: GroundObstacle[] = [];
             for (const root of getPigObstacleRoots()) {
+              // 水潭不算撒點的障礙（改用下面的 getMasks）：不然水潭一動，整顆球的草全部重排
+              if (pondRuntime && root === pondRuntime.object) continue;
               const footprint = measureGroundFootprint(root);
               if (footprint) list.push(footprint);
             }
@@ -893,6 +937,13 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
               });
             }
             return list;
+          },
+          // 水潭：撒好之後才把範圍內的草藏起來（含岸邊石頭約 1.45 倍半徑）。
+          // 直接用設定算範圍，不量模型：第一次撒草時水潭還在開場動畫前、縮放是 0，量到的只是一個點
+          getMasks: () => {
+            if (!pondRuntime?.settings.enabled) return [];
+            const s = pondRuntime.settings;
+            return [{ normal: pondRuntime.getNormal(), radiusRad: Math.atan((s.size * 1.45) / GROUND_RADIUS) }];
           },
           getRibbon: () => {
             ground.updateMatrixWorld(true);
@@ -1115,6 +1166,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
         campfireRuntime?.setIntroGrow(1);
         for (const { runtime } of shiitakeEntries) runtime.setIntroGrow(1);
         treasureRuntime?.setIntroGrow(1);
+        happyFatRuntime?.setIntroGrow(1);
+        pondRuntime?.setIntroGrow(1);
+        slideRuntime.setIntroGrow(1);
         floatingIsland.setIntroGrow(1);
       }
     }
@@ -1194,6 +1248,32 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     mainHallHangers.forEach((hanger, index) => {
       hanger.rotation.y = Math.sin(time * 0.9 + index * 1.3) * THREE.MathUtils.degToRad(20);
     });
+    if (happyFatRuntime) {
+      happyFatRuntime.update(deltaTime);
+      if (!introDone) {
+        const shopStart = housesIntroEnd + 0.25;
+        const shopT = THREE.MathUtils.clamp((introElapsed - shopStart) / 0.9, 0, 1);
+        happyFatRuntime.setIntroGrow(easeOutBack(shopT, 1.8));
+      }
+    }
+    // 溜滑梯：房子長完才開始算（長大途中屋身一直在變，算了也白算），然後從三樓往水潭伸出去
+    if (introDone || introElapsed >= housesIntroEnd) {
+      slideRuntime.update(deltaTime);
+      if (!introDone) {
+        const slideStart = housesIntroEnd + 0.6;
+        const slideT = THREE.MathUtils.clamp((introElapsed - slideStart) / 1.2, 0, 1);
+        slideRuntime.setIntroGrow(1 - Math.pow(1 - slideT, 2));
+      }
+    }
+    if (pondRuntime) {
+      pondRuntime.update(deltaTime);
+      if (!introDone) {
+        // 水潭在房子之後「攤開」：從中心長到原本大小
+        const pondStart = housesIntroEnd + 0.35;
+        const pondT = THREE.MathUtils.clamp((introElapsed - pondStart) / 0.8, 0, 1);
+        pondRuntime.setIntroGrow(easeOutBack(pondT, 1.6));
+      }
+    }
     if (treasureRuntime) {
       treasureRuntime.update(deltaTime);
       if (!introDone) {
@@ -1298,6 +1378,9 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
     campfireRuntime?.setIntroGrow(0);
     for (const { runtime } of shiitakeEntries) runtime.setIntroGrow(0);
     treasureRuntime?.setIntroGrow(0);
+    happyFatRuntime?.setIntroGrow(0);
+    pondRuntime?.setIntroGrow(0);
+    slideRuntime.setIntroGrow(0);
     floatingIsland.setIntroGrow(0);
   }
 
@@ -1361,6 +1444,33 @@ export function createObjs({ envMap, camera }: CreateObjsOptions) {
       settings: projectRoomStyleSettings,
       apply: () => projectRoomStyle?.setEnabled(projectRoomStyleSettings.enabled),
     },
+    happyFatShop: happyFatRuntime
+      ? ({
+          id: 'happy_fat_shop',
+          label: 'Happy Fat',
+          object: happyFatRuntime.object,
+          settings: happyFatRuntime.settings,
+          apply: happyFatRuntime.applySettings,
+          getNormal: happyFatRuntime.getNormal,
+          setNormal: happyFatRuntime.setNormal,
+        } as WorldHappyFatShop)
+      : null,
+    mainHallSlide: {
+      object: slideRuntime.object,
+      settings: slideRuntime.settings as MainHallSlideSettings,
+      apply: slideRuntime.applySettings,
+    },
+    pond: pondRuntime
+      ? ({
+          id: 'pond',
+          label: '小水潭',
+          object: pondRuntime.object,
+          settings: pondRuntime.settings,
+          apply: pondRuntime.applySettings,
+          getNormal: pondRuntime.getNormal,
+          setNormal: pondRuntime.setNormal,
+        } as WorldPond)
+      : null,
     treasureChest: treasureRuntime
       ? ({
           id: 'treasure_chest',
@@ -1450,6 +1560,26 @@ export type WorldPig = {
   /** 立刻跑去篝火看烤雞（測試用） */
   visitNow: () => boolean;
   isVisiting: () => boolean;
+};
+
+export type WorldHappyFatShop = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: HappyFatShopSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldPond = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: PondSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
 };
 
 export type WorldTreasureChest = {

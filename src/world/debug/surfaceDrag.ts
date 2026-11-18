@@ -37,6 +37,11 @@ type SurfaceDragOptions = {
   onClick?: (target: SurfaceDragTarget) => void;
   /** 點在空白處（沒有點到 targets）且幾乎沒拖移 */
   onBackgroundClick?: () => void;
+  /**
+   * 鎖定的物件：點一下照樣算點擊（選取、進入），但不會被抓起來拖走；
+   * 按住拖動時改成轉動畫面（OrbitControls 照常運作），游標也不顯示「可以抓」的手掌
+   */
+  isLocked?: (target: SurfaceDragTarget) => boolean;
 };
 
 // 超過這個距離就當成在拖房子，不播轉場。單位是像素
@@ -54,7 +59,10 @@ export function enableSurfaceDrag({
   onDragEnd,
   onClick,
   onBackgroundClick,
+  isLocked,
 }: SurfaceDragOptions) {
+  // 按在鎖定物件上：記下來，放開時沒怎麼移動就當成點擊
+  let lockedPending: SurfaceDragTarget | null = null;
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   // 射線換到 ground 的座標系：球心就是原點，算球面交點比較單純
@@ -119,6 +127,14 @@ export function enableSurfaceDrag({
     }
     backgroundClickPending = false;
 
+    if (isLocked?.(target)) {
+      // 鎖定：不抓、不停 OrbitControls（按住拖動就是轉畫面），放開時再判斷是不是點擊
+      lockedPending = target;
+      downX = event.clientX;
+      downY = event.clientY;
+      return;
+    }
+
     getPointerNormal(pointerNormal);
     grabOffset.setFromUnitVectors(pointerNormal, target.getNormal());
 
@@ -137,7 +153,8 @@ export function enableSurfaceDrag({
     updatePointer(event);
     if (!active) {
       // 沒在拖曳時，滑過物件就把游標變成手掌，提示「這個可以拖」
-      domElement.style.cursor = findTarget() ? 'grab' : '';
+      const hover = findTarget();
+      domElement.style.cursor = hover ? (isLocked?.(hover) ? 'pointer' : 'grab') : '';
       return;
     }
     if (!dragged) {
@@ -150,6 +167,18 @@ export function enableSurfaceDrag({
   }
 
   function onPointerUp(event: PointerEvent) {
+    if (lockedPending) {
+      const target = lockedPending;
+      lockedPending = null;
+      const dx = event.clientX - downX;
+      const dy = event.clientY - downY;
+      if (dx * dx + dy * dy <= CLICK_DISTANCE * CLICK_DISTANCE) {
+        onDragStart?.(target); // 讓面板、選取切到這一棟（跟一般點擊同一條路）
+        onDragEnd?.(target);
+        onClick?.(target);
+      }
+      return;
+    }
     if (!active) {
       if (backgroundClickPending) {
         backgroundClickPending = false;

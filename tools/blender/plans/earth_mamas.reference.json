@@ -1,0 +1,40 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "earth_mamas",
+  "image": {"path": "tools/img/earth_mamas.jpg", "width": 736, "height": 736},
+  "medium": "手繪的兩層街角小店（EARTH MAMA'S）概念圖，略帶 3/4 的正面視角",
+  "view": {"type": "three_quarter", "source": "observed", "confidence": 0.8},
+  "scale_anchor": {"component": "door", "axis": "height", "meters": 2.1},
+  "silhouette": {
+    "outline": [[0.23, 0.06], [0.56, 0.36], [0.76, 0.55], [0.72, 0.9], [0.25, 0.9], [0.24, 0.6], [0.23, 0.06]],
+    "source": "observed", "confidence": 0.7
+  },
+  "palette": [
+    {"name": "brick", "hex": "#B2453B", "usage": "一樓紅磚", "sample": [0.26, 0.86, 0.3, 0.9]},
+    {"name": "wood_orange", "hex": "#D67A45", "usage": "二樓以上的木板牆", "sample": [0.3, 0.3, 0.4, 0.45]},
+    {"name": "roof", "hex": "#6E2A2E", "usage": "斜屋頂", "sample": [0.45, 0.2, 0.6, 0.35]},
+    {"name": "teal_frame", "hex": "#4FA3A0", "usage": "窗框、門框", "sample": [0.45, 0.58, 0.52, 0.64]},
+    {"name": "awning_red", "hex": "#C2504A", "usage": "左邊雨遮條紋", "sample": [0.26, 0.74, 0.4, 0.78]},
+    {"name": "awning_blue", "hex": "#5F6E8E", "usage": "右邊雨遮條紋", "sample": [0.6, 0.74, 0.68, 0.78]},
+    {"name": "sign_brown", "hex": "#7A3B26", "usage": "大招牌", "sample": [0.24, 0.5, 0.42, 0.6]},
+    {"name": "chimney_stone", "hex": "#6E7480", "usage": "石頭煙囪", "sample": [0.52, 0.22, 0.56, 0.38]}
+  ],
+  "components": [
+    {"id": "gf_shell", "kind": "wall_block", "tier": "primary", "bbox": [0.25, 0.71, 0.72, 0.9], "material_hint": "brick", "source": "observed", "confidence": 0.85},
+    {"id": "upper_shell", "kind": "em_arc_shell", "tier": "primary", "bbox": [0.24, 0.1, 0.72, 0.7], "material_hint": "wood_orange", "source": "observed", "confidence": 0.8},
+    {"id": "roof", "kind": "em_arc_roof", "tier": "primary", "bbox": [0.23, 0.06, 0.76, 0.55], "material_hint": "roof", "source": "observed", "confidence": 0.75},
+    {"id": "door", "kind": "door", "tier": "primary", "bbox": [0.47, 0.75, 0.53, 0.89], "material_hint": "teal_frame", "source": "observed", "confidence": 0.85},
+    {"id": "sign", "kind": "em_sign", "tier": "secondary", "bbox": [0.24, 0.48, 0.43, 0.65], "material_hint": "sign_brown", "source": "observed", "confidence": 0.85},
+    {"id": "chimney", "kind": "em_chimney", "tier": "secondary", "bbox": [0.52, 0.22, 0.57, 0.4], "material_hint": "chimney_stone", "source": "observed", "confidence": 0.8}
+  ],
+  "surfaces": [
+    {"id": "brick_surface", "region": [[0.26, 0.82], [0.32, 0.82], [0.32, 0.9], [0.26, 0.9]], "class": "brick", "pattern": "brick", "base_hex": "#B2453B", "scale_m": 0.25, "components": ["gf_shell"], "source": "observed", "confidence": 0.7},
+    {"id": "plank_surface", "region": [[0.28, 0.2], [0.4, 0.2], [0.4, 0.45], [0.28, 0.45]], "class": "wood", "pattern": "planks", "base_hex": "#D67A45", "scale_m": 0.6, "components": ["upper_shell"], "source": "observed", "confidence": 0.7}
+  ],
+  "hidden": [{"id": "back_side", "assumption": "背面同樣的牆面，加兩扇窗，屋頂弧面延續到背面", "source": "inferred", "confidence": 0.6}],
+  "excluded": [
+    {"reason": "使用者要求把斜屋頂改成半弧面屋頂，所以不照原圖的直斜面", "what": "slanted_roof"},
+    {"reason": "畫框外的簽名", "what": "signature"},
+    {"reason": "垃圾箱、地上的雜物：畫面上太小", "what": "dumpster_clutter"}
+  ]
+}

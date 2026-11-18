@@ -112,6 +112,13 @@ type CreateGroundDetailOptions = {
   getPathNodes: () => THREE.Vector3[];
   /** 撒道具要避開的東西（房子、食物、篝火） */
   getObstacles: () => GroundObstacle[];
+  /**
+   * 撒完之後才「遮住」的範圍（例如水潭）：落在裡面的草、道具只是隱藏，不影響撒點。
+   * 和 getObstacles 的差別：
+   *   getObstacles 會改變撒點過程 → 東西一動，整顆球的草全部重新排列；
+   *   getMasks 只決定哪些已經撒好的要藏起來 → 東西搬走，原本的草原樣長回來，其他地方完全不動。
+   */
+  getMasks?: () => GroundObstacle[];
   /** 番茄醬緞帶：ground 座標 → 緞帶座標的矩陣、圈半徑、管子半徑 */
   getRibbon: () => GroundRibbon | null;
   getRibbonTopColatitude: () => number | null;
@@ -279,6 +286,7 @@ export function createGroundDetail({
   front,
   getPathNodes,
   getObstacles,
+  getMasks,
   getRibbon,
   getRibbonTopColatitude,
   settings: initial = GROUND_DETAIL_DEFAULT,
@@ -701,7 +709,44 @@ export function createGroundDetail({
     scatterProps(rocks, settings.rockCount, 3, 1, 0.003);
     scatterProps(mushrooms, settings.mushroomCount, 4, 1, 0.001);
     scatterProps(bushes, settings.bushCount, 2, 1, 0.004);
+    // 記下撒好的原始位置：遮罩只是把某些藏起來，之後要能原樣還原
+    for (const mesh of [tufts, rocks, mushrooms, bushes]) {
+      scatteredMatrices.set(mesh, mesh.instanceMatrix.array.slice(0, mesh.count * 16) as Float32Array);
+    }
     scattered = true;
+    applyMasks();
+  }
+
+  const scatteredMatrices = new Map<THREE.InstancedMesh, Float32Array>();
+  const maskDir = new THREE.Vector3();
+
+  /**
+   * 依 getMasks 把落在範圍內的草、道具藏起來（縮放設成 0），其他的還原成撒好時的樣子。
+   * 不重新撒點，所以只有遮罩附近會變，整顆球其他地方的佈局完全不動。
+   */
+  function applyMasks() {
+    const masks = getMasks?.() ?? [];
+    for (const [mesh, original] of scatteredMatrices) {
+      const target = mesh.instanceMatrix.array as Float32Array;
+      const count = Math.min(mesh.count, original.length / 16);
+      for (let i = 0; i < count; i++) {
+        const o = i * 16;
+        // matrix 的第 12～14 個數字是位置；球心在原點，所以正規化就是地表方向
+        maskDir.set(original[o + 12], original[o + 13], original[o + 14]).normalize();
+        const hidden = masks.some((mask) => maskDir.angleTo(mask.normal) < mask.radiusRad);
+        if (hidden) {
+          for (let k = 0; k < 16; k++) target[o + k] = 0;
+          // 不整個歸零：位置會跑到球心，影響包圍球（視錐剔除）的計算；保留位置、只把縮放歸零
+          target[o + 12] = original[o + 12];
+          target[o + 13] = original[o + 13];
+          target[o + 14] = original[o + 14];
+          target[o + 15] = 1;
+        } else {
+          for (let k = 0; k < 16; k++) target[o + k] = original[o + k];
+        }
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    }
   }
 
   // ── 設定與更新 ──
@@ -798,6 +843,8 @@ export function createGroundDetail({
     apply,
     update,
     rescatter,
+    /** 遮罩範圍（例如水潭）移動後呼叫：只更新哪些要藏，不重新撒 */
+    refreshMasks: applyMasks,
     refreshPaths,
     copyAutoToCustom,
     /** 自訂路線本體（編輯器直接改這個陣列裡的向量，改完呼叫 refreshPaths） */

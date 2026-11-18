@@ -112,3 +112,13 @@
   - 同向（看得到正面）：標籤放在畫面上房子的左邊，`.is-side`（小尾巴在右）。
   - 反向（看到背面）：標籤放在右邊，`.is-side-right`（小尾巴在左）。
 - 左右邊緣仍然是把房子兩個角投影到畫面上，取畫面上比較左或比較右的那個。
+
+## 13. 使用者回饋：mainHall、projectRoom 關閉編輯（鎖定）
+
+- `main.ts` 新增 `LOCKED_HOUSES = { mainHall, projectRoom }`。
+- `surfaceDrag.ts` 新增 `isLocked` 選項。鎖定的物件：
+  - 按下時不抓、不停 OrbitControls，按住拖動就是轉畫面。
+  - 放開時移動距離在點擊範圍內，就照一般點擊流程通知（`onDragStart`、`onDragEnd`、`onClick`），所以選取、標籤、「進入」都照常。
+  - 滑鼠移上去顯示 `pointer`，不顯示可以抓的手掌。
+- 房子面板選到鎖定的房子時，標題加上「（已鎖定）」，不建立調整滑桿。
+- 要解鎖，就從 `LOCKED_HOUSES` 拿掉名字。

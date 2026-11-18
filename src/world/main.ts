@@ -27,6 +27,8 @@ import {
   type WorldCampfire,
   type WorldShiitake,
   type WorldTreasureChest,
+  type WorldHappyFatShop,
+  type WorldPond,
   type WorldFrenchFries,
   type WorldFrenchFryStick,
   type WorldSalmonSteak,
@@ -37,6 +39,9 @@ import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
 import { CAMPFIRE_CHICKEN_SPIN_AXES, formatCampfireSettingsForPaste } from './objects/campfire';
 import { formatShiitakePlacementsForPaste } from './objects/shiitake';
 import { formatTreasureChestSettingsForPaste } from './objects/treasureChest';
+import { formatPondSettingsForPaste } from './objects/pond';
+import { formatMainHallSlideSettingsForPaste } from './objects/mainHallSlide';
+import { formatHappyFatShopSettingsForPaste, HAPPY_FAT_SHOP_DEFAULT } from './objects/happyFatShop';
 import { formatFloatingIslandSettingsForPaste } from './objects/floatingIsland';
 import { formatFrenchFriesPlacementsForPaste } from './objects/frenchFries';
 import { formatFrenchFryStickPlacementsForPaste } from './objects/frenchFryStick';
@@ -104,6 +109,9 @@ roomEnvironment.traverse((object) => {
   if ('emissive' in mesh.material) mesh.material.emissive.multiply(ENV_TINT);
 });
 const envMap = pmremGenerator.fromScene(roomEnvironment, 0.04).texture;
+// 荷包蛋用的中性環境：上面那張染紅的會讓蛋白反射出紅／灰綠色，蛋黃的高光也會變成暗紅
+// 另外產一張不染色的，蛋白才是乾淨的白、蛋黃上才有白色的濕亮反光
+const eggEnvMap = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 // scene.background = new THREE.Color(0xDCE0E6);
 // scene.background = new THREE.Color(0xff00ff);
 
@@ -257,11 +265,14 @@ const {
   addShiitake,
   removeShiitake,
   treasureChest,
+  happyFatShop,
+  pond,
+  mainHallSlide,
   mainHallDoor,
   projectRoomStyle,
   floatingIsland,
   groundDetail,
-} = createObjs({ envMap, camera });
+} = createObjs({ envMap, eggEnvMap, camera });
 
 /** 一次關掉整類食物（仍保留佈局，取消勾選即再顯示） */
 const foodVisibility = {
@@ -805,6 +816,14 @@ const houseFolder = gui.addFolder('房子');
 // 一開始先顯示第一棟，還沒點過房子時面板也有東西可調
 let selectedHouse: WorldHouse | null = houses[0];
 
+/**
+ * 鎖定的房子：不能在畫面上拖動、面板也不顯示調整滑桿（避免不小心改到已經定案的擺放）。
+ * 點選、顯示標籤、按「進入」都照常。要解鎖就從這裡拿掉名字。
+ */
+const LOCKED_HOUSES = new Set(['mainHall', 'projectRoom']);
+const isHouseLocked = (target: { object: THREE.Object3D }) =>
+  houses.some((house) => house.object === target.object && LOCKED_HOUSES.has(house.label));
+
 function bindHousePanel(entry: WorldHouse) {
   // 已經是這一棟就不要拆掉滑桿重建：拖曳中每一格都會碰面板，重建會讓數字閃一下
   const alreadyShowing = entry === selectedHouse && houseFolder.controllers.length > 0;
@@ -814,6 +833,11 @@ function bindHousePanel(entry: WorldHouse) {
 
   houseFolder.title(`房子 · ${entry.label}`);
   for (const controller of [...houseFolder.controllers]) controller.destroy();
+  for (const folder of [...houseFolder.folders]) folder.destroy();
+  if (LOCKED_HOUSES.has(entry.label)) {
+    houseFolder.title(`房子 · ${entry.label}（已鎖定）`);
+    return;
+  }
 
   const settings = entry.settings;
   const apply = () => entry.apply();
@@ -829,7 +853,8 @@ function bindHousePanel(entry: WorldHouse) {
 
   if (entry.label === 'Gamehall') {
     const lights = gameHallLights.settings;
-    const lightFolder = houseFolder.addFolder('招牌與燈');
+    // 點房子才動態建立的子分組，也跟其他分組一樣預設收合
+    const lightFolder = houseFolder.addFolder('招牌與燈').close();
     lightFolder.add(lights, 'neonMaster', 0, 1, 0.01).name('霓虹總亮度');
     lightFolder.add(lights, 'neonEmissive', 0, 1.5, 0.01).name('霓虹發光');
     lightFolder.add(lights, 'neonPoint', 0, 1.2, 0.01).name('霓虹點光');
@@ -1064,6 +1089,16 @@ if (eggSunFolder && eggSunEntry && eggSunEntry.settings.mode === 'sun') {
     .name('蛋白環境反射')
     .onChange(applyVisuals)
     .onFinishChange(logEggSun);
+  const eggSliders: Array<['whiteGlow' | 'yolkGlow' | 'yolkClearcoat' | 'yolkClearcoatRoughness' | 'yolkRimStrength', number, number, number, string]> = [
+    ['whiteGlow', 0, 0.6, 0.01, '蛋白自發光'],
+    ['yolkGlow', 0, 0.8, 0.01, '蛋黃自發光'],
+    ['yolkClearcoat', 0, 1, 0.01, '蛋黃油亮清漆'],
+    ['yolkClearcoatRoughness', 0, 0.5, 0.01, '清漆粗糙度'],
+    ['yolkRimStrength', 0, 1, 0.01, '蛋黃邊緣橘'],
+  ];
+  for (const [key, min, max, step, name] of eggSliders) {
+    eggSunFolder.add(sun, key, min, max, step).name(name).onChange(applyVisuals).onFinishChange(logEggSun);
+  }
   eggSunFolder.add({ log: logEggSun }, 'log').name('印出設定 (console)');
 }
 
@@ -1497,7 +1532,6 @@ if (pigFolder && pig) {
   cloudFolder.add(pig.cloud, 'weightRain', 0, 10, 0.5).name('權重：下雨').onFinishChange(logCloud);
   cloudFolder.add(pig.cloud, 'weightThunder', 0, 10, 0.5).name('權重：打雷').onFinishChange(logCloud);
   cloudFolder.add(pig.cloud, 'weightStorm', 0, 10, 0.5).name('權重：暴雨').onFinishChange(logCloud);
-  pigFolder.open();
 }
 
 // 畫面風格統一：全場色調統一（陰影偏淡紫、整體往粉色靠）＋寫實貼圖降對比
@@ -1739,7 +1773,116 @@ gui
   .name('套用香菇屋風格')
   .onChange(projectRoomStyle.apply);
 
+// 街角小店「Happy Fat」（綠球上；半弧面屋頂的香菇屋風格）
+const happyFatFolder = happyFatShop ? gui.addFolder('Happy Fat 小店') : null;
+function logHappyFat() {
+  if (happyFatShop) console.log(formatHappyFatShopSettingsForPaste(happyFatShop.settings));
+}
+if (happyFatFolder && happyFatShop) {
+  const h = happyFatShop.settings;
+  const apply = () => happyFatShop.apply();
+  happyFatFolder.add(h, 'enabled').name('顯示').onChange(apply).onFinishChange(logHappyFat);
+  happyFatFolder.add(h, 'size', 0.05, 0.6, 0.005).name('整體大小').onChange(apply).onFinishChange(logHappyFat);
+  happyFatFolder.add(h, 'depth', 0.5, 3, 0.05).name('建築厚度（前後）').onChange(apply).onFinishChange(logHappyFat);
+  happyFatFolder.add(h, 'angleFromTopDegrees', 0, 88, 1).name('離頂端 (°)').onChange(apply).onFinishChange(logHappyFat);
+  happyFatFolder.add(h, 'azimuthDegrees', -180, 180, 1).name('方位 (°)').onChange(apply).onFinishChange(logHappyFat);
+  happyFatFolder.add(h, 'spinDegrees', -180, 180, 1).name('自身旋轉 (°)').onChange(apply).onFinishChange(logHappyFat);
+  happyFatFolder.add(h, 'sink', -0.05, 0.12, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(logHappyFat);
+  happyFatFolder.add(h, 'smokeEnabled').name('煙囪冒煙').onFinishChange(logHappyFat);
+  happyFatFolder.add(h, 'smokeOpacity', 0, 1, 0.05).name('煙濃度').onFinishChange(logHappyFat);
+  happyFatFolder.add(h, 'smokeRise', 0.3, 3, 0.05).name('煙飄高度').onFinishChange(logHappyFat);
+  const happyFatColorFolder = happyFatFolder.addFolder('顏色');
+  const colorNames: [keyof typeof h.colors, string][] = [
+    ['groundWall', '一樓磚牆'],
+    ['upperWall', '二樓牆'],
+    ['cornice', '腰線'],
+    ['roof', '屋頂'],
+    ['chimney', '煙囪'],
+  ];
+  for (const [key, label] of colorNames) {
+    happyFatColorFolder.addColor(h.colors, key).name(label).onChange(apply).onFinishChange(logHappyFat);
+  }
+  happyFatColorFolder
+    .add(
+      {
+        reset: () => {
+          Object.assign(h.colors, HAPPY_FAT_SHOP_DEFAULT.colors);
+          happyFatColorFolder.controllers.forEach((controller) => controller.updateDisplay());
+          apply();
+          logHappyFat();
+        },
+      },
+      'reset',
+    )
+    .name('還原預設顏色');
+  happyFatFolder.add({ log: logHappyFat }, 'log').name('印出設定');
+}
+
 // 寶箱（綠球上；裝滿漢堡、金色閃光）
+// 小水潭（綠球上；拖曳或改大小後只更新水潭範圍的草，其他地方不動）
+const pondFolder = pond ? gui.addFolder('小水潭') : null;
+function logPond() {
+  if (pond) console.log(formatPondSettingsForPaste(pond.settings));
+}
+/** 只更新水潭範圍的遮罩，不重新撒：整顆球其他地方的草、小道具佈局保持不變 */
+function rescatterAroundPond() {
+  groundDetail?.refreshMasks();
+}
+if (pondFolder && pond) {
+  const p = pond.settings;
+  const apply = () => pond.apply();
+  const applyAndRescatter = () => {
+    apply();
+    rescatterAroundPond();
+    logPond();
+  };
+  pondFolder.add(p, 'enabled').name('顯示').onChange(apply).onFinishChange(applyAndRescatter);
+  pondFolder.add(p, 'size', 0.03, 0.2, 0.005).name('大小（半徑）').onChange(apply).onFinishChange(applyAndRescatter);
+  pondFolder.add(p, 'angleFromTopDegrees', 0, 88, 1).name('離頂端 (°)').onChange(apply).onFinishChange(applyAndRescatter);
+  pondFolder.add(p, 'azimuthDegrees', -180, 180, 1).name('方位 (°)').onChange(apply).onFinishChange(applyAndRescatter);
+  pondFolder.add(p, 'spinDegrees', -180, 180, 1).name('自身旋轉 (°)').onChange(apply).onFinishChange(logPond);
+  pondFolder.add(p, 'sink', -0.01, 0.02, 0.0005).name('下沉（負=浮起）').onChange(apply).onFinishChange(logPond);
+  pondFolder.addColor(p, 'waterDeep').name('深處顏色').onChange(apply).onFinishChange(logPond);
+  pondFolder.addColor(p, 'waterShallow').name('岸邊顏色').onChange(apply).onFinishChange(logPond);
+  pondFolder.add(p, 'ripple', 0, 2, 0.05).name('漣漪').onChange(apply).onFinishChange(logPond);
+  pondFolder.add(p, 'lilyPads').name('荷葉').onChange(apply).onFinishChange(logPond);
+  pondFolder.add(p, 'reeds').name('香蒲').onChange(apply).onFinishChange(logPond);
+  pondFolder.add({ log: logPond }, 'log').name('印出設定');
+}
+
+// 龍兔的家三樓 → 水潭的溜滑梯（終點跟著水潭走）
+const slideFolder = gui.addFolder('溜滑梯（龍兔的家 → 水潭）');
+function logSlide() {
+  console.log(formatMainHallSlideSettingsForPaste(mainHallSlide.settings));
+}
+{
+  const sl = mainHallSlide.settings;
+  const apply = () => mainHallSlide.apply();
+  // 放開滑桿時：出口高度、平台寬度、洞高可能被自動修正（頂到菇傘、比滑道還窄），重新顯示實際的值再印出
+  const finish = () => {
+    mainHallSlide.apply();
+    slideFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
+    logSlide();
+  };
+  slideFolder.add(sl, 'enabled').name('顯示').onChange(apply).onFinishChange(finish);
+  // 上限 7.2：實際能多高由程式量菇傘底面決定，超過會自動降到最高可行高度
+  slideFolder.add(sl, 'startHeight', 4.5, 7.2, 0.05).name('出口高度（模型 y）').onChange(apply).onFinishChange(finish);
+  slideFolder.add(sl, 'exitAngleDegrees', -120, 120, 1).name('出口繞房子 (°)').onChange(apply).onFinishChange(finish);
+  slideFolder.add(sl, 'platformLength', 0.3, 4, 0.05).name('頂端平台長度（木平台）').onChange(apply).onFinishChange(finish);
+  slideFolder.add(sl, 'platformWidth', 0.1, 5, 0.05).name('頂端平台寬度（木平台）').onChange(apply).onFinishChange(finish);
+  slideFolder.add(sl, 'doorWidth', 0.3, 2.5, 0.05).name('平台洞寬').onChange(apply).onFinishChange(finish);
+  slideFolder.add(sl, 'doorHeight', 0.3, 2, 0.05).name('平台洞高').onChange(apply).onFinishChange(finish);
+  slideFolder.add(sl, 'chuteFlatLength', 0.1, 5, 0.05).name('滑道平台長度（平段）').onChange(apply).onFinishChange(finish);
+  slideFolder.add(sl, 'heightArc', -1, 1, 0.05).name('側面弧度（+凹 / −鼓）').onChange(apply).onFinishChange(finish);
+  slideFolder.add(sl, 'heightSmooth', 0, 1, 0.05).name('側面平滑（兩端緩衝）').onChange(apply).onFinishChange(finish);
+  slideFolder.add(sl, 'curve', -0.5, 0.5, 0.01).name('側彎').onChange(apply).onFinishChange(finish);
+  slideFolder.add(sl, 'width', 0.4, 1.6, 0.05).name('寬度').onChange(apply).onFinishChange(finish);
+  slideFolder.add(sl, 'endInset', 0, 0.8, 0.01).name('終點伸進水潭').onChange(apply).onFinishChange(finish);
+  slideFolder.addColor(sl, 'chuteColor').name('滑道顏色').onChange(apply).onFinishChange(finish);
+  slideFolder.addColor(sl, 'supportColor').name('平台欄杆顏色').onChange(apply).onFinishChange(finish);
+  slideFolder.add({ log: logSlide }, 'log').name('印出設定');
+}
+
 const treasureFolder = treasureChest ? gui.addFolder('寶箱') : null;
 function logTreasure() {
   if (treasureChest) console.log(formatTreasureChestSettingsForPaste(treasureChest.settings));
@@ -2356,26 +2499,10 @@ foodVisibilityFolder.add(foodVisibility, 'showSalmon').name('魚排').onChange(a
 foodVisibilityFolder.add(foodVisibility, 'showFrenchFries').name('薯條（盒）').onChange(applyFoodGroupVisibility);
 foodVisibilityFolder.add(foodVisibility, 'showFrenchFryStick').name('單根薯條').onChange(applyFoodGroupVisibility);
 
-// 進場時各分組與根面板都收合，需要時再手動展開
-[
-  lightFolder,
-  introFolder,
-  rainbowFolder,
-  rainbowColorFolder,
-  flowerFolder,
-  ringFolder,
-  sharkFolder,
-  waveFolder,
-  transitionFolder,
-  houseFolder,
-  puddingFolder,
-  cornFolder,
-  salmonFolder,
-  lemonFolder,
-  foodVisibilityFolder,
-]
-  .filter((folder): folder is GUI => folder != null)
-  .forEach((folder) => folder.close());
+// 進場時所有分組（含子分組）與根面板都收合，需要時再手動展開。
+// 用 foldersRecursive() 抓全部，不手動列清單：之前列清單會漏掉新加的分組（Happy Fat、寶箱、香菇…），
+// 它們就預設是展開的。
+gui.foldersRecursive().forEach((folder) => folder.close());
 gui.close();
 
 // 選中那棟的名字：用 HTML 畫在畫面上，而不是貼在 3D 房子上
@@ -2497,11 +2624,15 @@ let surfaceDragTargets: Array<
   | WorldCampfire
   | WorldShiitake
   | WorldTreasureChest
+  | WorldHappyFatShop
+  | WorldPond
 > = [
   ...houses,
   ...(campfire ? [campfire] : []),
   ...shiitakes,
   ...(treasureChest ? [treasureChest] : []),
+  ...(happyFatShop ? [happyFatShop] : []),
+  ...(pond ? [pond] : []),
   ...(PUDDING_SCENE_EDIT ? puddings : []),
   ...(CORN_SCENE_EDIT && foodVisibility.showCorn ? grilledCorns : []),
   ...friedEggsOnSphere(),
@@ -2517,6 +2648,8 @@ function refreshPuddingDragTargets() {
   if (campfire) surfaceDragTargets.push(campfire);
   surfaceDragTargets.push(...shiitakes);
   if (treasureChest) surfaceDragTargets.push(treasureChest);
+  if (happyFatShop) surfaceDragTargets.push(happyFatShop);
+  if (pond) surfaceDragTargets.push(pond);
   if (PUDDING_SCENE_EDIT) surfaceDragTargets.push(...puddings);
   if (CORN_SCENE_EDIT && foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
   if (foodVisibility.showSalmon) surfaceDragTargets.push(...salmonSteaks);
@@ -2528,6 +2661,7 @@ function refreshPuddingDragTargets() {
 if (HOUSE_DRAG_ENABLED) {
   enableSurfaceDrag({
     targets: surfaceDragTargets,
+    isLocked: isHouseLocked,
     ground,
     groundRadius,
     camera,
@@ -2571,11 +2705,19 @@ if (HOUSE_DRAG_ENABLED) {
       campfireFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       shiitakeFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       treasureFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      happyFatFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      pondFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
     onDragEnd: (target) => {
       if (campfire && target.object === campfire.object) logCampfire();
       else if (shiitakes.some((item) => item.object === target.object)) logShiitakePlacements();
       else if (treasureChest && target.object === treasureChest.object) logTreasure();
+      else if (happyFatShop && target.object === happyFatShop.object) logHappyFat();
+      else if (pond && target.object === pond.object) {
+        // 水潭搬家後：舊位置的草原樣長回來、新位置的草藏起來（不重撒，其他地方不動）
+        rescatterAroundPond();
+        logPond();
+      }
       else if (houses.some((house) => house.object === target.object)) logHouse();
       else if (PUDDING_SCENE_EDIT && puddings.some((item) => item.object === target.object)) logPuddingPlacements();
       else if (CORN_SCENE_EDIT && grilledCorns.some((item) => item.object === target.object)) logCornPlacements();

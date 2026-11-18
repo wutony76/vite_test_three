@@ -27,7 +27,98 @@ const EGG_FACE_CAMERA = new THREE.Quaternion().setFromEuler(
   new THREE.Euler(Math.PI / 2, Math.PI, 0),
 );
 
+/**
+ * 蛋黃自發光顏色。注意不要改成 emissiveMap = map：
+ * 這顆 glb 的蛋白貼圖只有正中心（被蛋黃蓋住的地方）是白的，外圍大片是焦褐色，照貼圖發光整顆蛋會變土黃；
+ * 蛋黃貼圖偏深橘，照貼圖發光會變紅。所以維持單色發光，只把強度降下來，讓燈光和反射透出立體感。
+ */
 const EGG_YOLK_EMISSIVE = new THREE.Color(0xffa41c);
+const YOLK_RIM_TINT = new THREE.Color(1.0, 0.62, 0.22);
+
+/**
+ * 把 glb 裡的蛋黃（MeshStandardMaterial）換成 MeshPhysicalMaterial：
+ *   1. clearcoat：表面多一層透明清漆，反射出銳利的白色高光，像參考圖那種「濕亮」的蛋黃
+ *   2. 固定高光點：蛋黃是正對鏡頭的小圓頂，反射到的多半是鏡頭背後的空環境，清漆高光很難出現在畫面上
+ *      所以在畫面座標的左上方固定打一個高光點（跟參考圖一樣），強度、銳利度跟著清漆參數走
+ *   3. 邊緣壓暗：用法線和視線的夾角算出「離輪廓多近」，越靠邊越乘上深橘色，做出中心黃 → 邊緣橘的漸層
+ *
+ * 2、3 不用模型自己的法線：這顆蛋黃是 low-poly 平面著色，每個面一個法線，高光和漸層會碎成一塊一塊的寶石面。
+ * 改用「平滑圓頂」的法線：依蛋黃的包圍盒算出一顆剛好蓋住它的球，法線 = 頂點位置 − 球心。
+ */
+function toYolkPhysical(
+  m: THREE.MeshStandardMaterial,
+  geometry: THREE.BufferGeometry,
+  rimUniform: { value: number },
+  highlight: { strength: { value: number }; sharpness: { value: number } },
+) {
+  // 圓頂：底面半徑 r、高 h，球的半徑 R = (r² + h²) / 2h，球心在頂點往下 R
+  geometry.computeBoundingBox();
+  const box = geometry.boundingBox!;
+  const size = box.getSize(new THREE.Vector3());
+  const r = Math.max(size.x, size.z) * 0.5;
+  const h = Math.max(size.y, r * 0.2);
+  const domeR = (r * r + h * h) / (2 * h);
+  const center = box.getCenter(new THREE.Vector3());
+  const domeCenter = new THREE.Vector3(center.x, box.max.y - domeR, center.z);
+  const p = new THREE.MeshPhysicalMaterial({
+    name: m.name,
+    color: m.color.clone(),
+    map: m.map,
+    normalMap: m.normalMap,
+    normalScale: m.normalScale.clone(),
+    aoMap: m.aoMap,
+    aoMapIntensity: m.aoMapIntensity,
+    roughnessMap: m.roughnessMap,
+    metalnessMap: m.metalnessMap,
+    side: m.side,
+  });
+  p.onBeforeCompile = (shader) => {
+    shader.uniforms.uYolkRim = rimUniform;
+    shader.uniforms.uYolkRimTint = { value: YOLK_RIM_TINT };
+    shader.uniforms.uYolkSpec = highlight.strength;
+    shader.uniforms.uYolkSpecSharp = highlight.sharpness;
+    shader.uniforms.uYolkDomeCenter = { value: domeCenter };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uYolkDomeCenter;\nvarying vec3 vYolkDomeNormal;')
+      .replace(
+        '#include <begin_vertex>',
+        // 轉成鏡頭座標，跟片段著色器裡的 normal、vViewPosition 同一個座標系
+        '#include <begin_vertex>\nvYolkDomeNormal = normalize(normalMatrix * normalize(position - uYolkDomeCenter));',
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform float uYolkRim;\nuniform vec3 uYolkRimTint;\nuniform float uYolkSpec;\nuniform float uYolkSpecSharp;\nvarying vec3 vYolkDomeNormal;',
+      )
+      // 放在 emissivemap 之後：自發光已經算好，可以跟底色一起壓暗
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        {
+          // 正對鏡頭 = 0（蛋黃中心），貼著輪廓 = 1（蛋黃邊緣）
+          float yolkEdge = 1.0 - saturate(dot(normalize(vYolkDomeNormal), normalize(vViewPosition)));
+          vec3 yolkRimMul = mix(vec3(1.0), uYolkRimTint, smoothstep(0.4, 1.0, yolkEdge) * uYolkRim);
+          diffuseColor.rgb *= yolkRimMul;
+          totalEmissiveRadiance *= yolkRimMul;
+        }`,
+      )
+      // 最後才加：直接疊在輸出顏色上，不受自發光、色調影響，才會是乾淨的白色亮點
+      .replace(
+        '#include <opaque_fragment>',
+        `{
+          // 鏡頭座標：x 右、y 上、z 朝鏡頭。法線越接近左上方這個方向越亮
+          float yolkSpot = pow(saturate(dot(normalize(vYolkDomeNormal), normalize(vec3(-0.38, 0.42, 0.82)))), uYolkSpecSharp);
+          outgoingLight += vec3(1.0, 0.97, 0.9) * yolkSpot * uYolkSpec;
+        }
+        #include <opaque_fragment>`,
+      );
+  };
+  // 改了 shader 字串，要給不同的快取鍵，否則 three.js 可能拿到沒改過的那份程式
+  p.customProgramCacheKey = () => 'fried-egg-yolk-rim';
+  // cloneGltfInstance 已經每個實例各自 clone 材質，舊的可以安全釋放
+  m.dispose();
+  return p;
+}
 
 export type FriedEggSettings = FriedEggLayout;
 
@@ -154,6 +245,10 @@ export function createFriedEgg({
   }
 
   const mapsTuned = new WeakSet<THREE.MeshStandardMaterial>();
+  /** 蛋黃邊緣壓暗強度：shader 直接讀這個物件，改 value 不用重新編譯 */
+  const yolkRimUniform = { value: 0 };
+  /** 蛋黃固定高光點：strength 跟清漆、sharpness 跟清漆粗糙度（越粗糙光點越大越淡） */
+  const yolkHighlight = { strength: { value: 0 }, sharpness: { value: 80 } };
 
   function configureEggMaps(m: THREE.MeshStandardMaterial, isWhite: boolean, sun: boolean) {
     if (m.map) {
@@ -175,6 +270,7 @@ export function createFriedEgg({
     if (!model) return;
     const boost = isSunLayout(settings) ? settings.emissiveBoost : 1;
     const sun = isSunLayout(settings);
+    yolkRimUniform.value = isSunLayout(settings) ? settings.yolkRimStrength : 0.5;
     model.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
@@ -200,14 +296,23 @@ export function createFriedEgg({
           }
           m.color.setRGB(1, 1, 1);
           m.emissive.setHex(0xffffff);
-          m.emissiveIntensity = sun ? 0.38 * boost : 0.08;
+          m.emissiveIntensity = sun ? settings.whiteGlow * boost : 0.08;
         } else {
           m.metalness = 0;
           m.roughness = sun ? 0.18 : 0.28;
           m.envMapIntensity = sun ? 0.52 : 0.4;
           m.color.setRGB(1, 1, 1);
           m.emissive.copy(EGG_YOLK_EMISSIVE);
-          m.emissiveIntensity = sun ? 0.52 * boost : 0.22;
+          m.emissiveIntensity = sun ? settings.yolkGlow * boost : 0.22;
+          const p = m as THREE.MeshPhysicalMaterial;
+          if (p.isMeshPhysicalMaterial) {
+            p.clearcoat = sun ? settings.yolkClearcoat : 0.6;
+            p.clearcoatRoughness = sun ? settings.yolkClearcoatRoughness : 0.1;
+          }
+          const coat = sun ? settings.yolkClearcoat : 0.6;
+          const coatRough = sun ? settings.yolkClearcoatRoughness : 0.1;
+          yolkHighlight.strength.value = coat * 0.9;
+          yolkHighlight.sharpness.value = THREE.MathUtils.lerp(60, 8, THREE.MathUtils.clamp(coatRough / 0.5, 0, 1));
         }
       }
     });
@@ -219,14 +324,18 @@ export function createFriedEgg({
       if (!mesh.isMesh) return;
       mesh.castShadow = false;
       mesh.receiveShadow = false;
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const material of materials) {
-        if (!('roughness' in material)) continue;
-        const m = material as THREE.MeshStandardMaterial;
+      const isArray = Array.isArray(mesh.material);
+      const materials = (isArray ? mesh.material : [mesh.material]) as THREE.Material[];
+      const next = materials.map((material) => {
+        if (!('roughness' in material)) return material;
+        let m = material as THREE.MeshStandardMaterial;
         const white = isEggWhite(mesh, m);
+        if (isEggYolk(mesh, m)) m = toYolkPhysical(m, mesh.geometry, yolkRimUniform, yolkHighlight);
         if (envMap) m.envMap = envMap;
         configureEggMaps(m, white, isSunLayout(settings));
-      }
+        return m;
+      });
+      mesh.material = isArray ? next : next[0];
     });
     applyVisuals();
   }
@@ -349,6 +458,11 @@ function formatSunBlock(id: string, settings: FriedEggSunLayout, trailingComma: 
     `    whiteMetalness: ${settings.whiteMetalness.toFixed(2)},\n` +
     `    whiteRoughness: ${settings.whiteRoughness.toFixed(2)},\n` +
     `    whiteEnvIntensity: ${settings.whiteEnvIntensity.toFixed(2)},\n` +
+    `    whiteGlow: ${settings.whiteGlow.toFixed(2)},\n` +
+    `    yolkGlow: ${settings.yolkGlow.toFixed(2)},\n` +
+    `    yolkClearcoat: ${settings.yolkClearcoat.toFixed(2)},\n` +
+    `    yolkClearcoatRoughness: ${settings.yolkClearcoatRoughness.toFixed(2)},\n` +
+    `    yolkRimStrength: ${settings.yolkRimStrength.toFixed(2)},\n` +
     `  }${trailingComma ? ',' : ''}`
   );
 }

@@ -271,6 +271,17 @@ def test_mushroom_house_parts_are_closed():
         _closed_single(built[cid][1], islands=islands)
 
 
+def test_earth_mamas_curved_shell_and_arc_roof():
+    """Happy Fat 小店（只留主體）：有弧度的二樓牆是 1 個封閉島；半弧面屋頂三段（前邊、本體、後邊）都封閉；
+    一樓轉角圓柱、煙囪也都是封閉的。"""
+    _doc, _lay, built = _build_all("earth_mamas.plan.json")
+    _closed_single(built["gf_shell"][1])
+    _closed_single(built["upper_shell"][1])
+    _closed_single(built["roof"][1], islands=3)
+    _closed_single(built["corner_pillars"][1], islands=4)
+    _closed_single(built["chimney"][1], islands=2)
+
+
 def test_registry_covers_plans():
     kinds = implemented_kinds()
     for plan in PLAN_FILES:

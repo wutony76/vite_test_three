@@ -1,0 +1,256 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "earth_mamas",
+  "reference": "earth_mamas",
+  "notes": "依 tools/img/earth_mamas.jpg 的街角小店，改成 mainHall（龍兔的家）的香菇屋風格：一樓赤陶磚＋鈷藍框店面、二樓以上淡天空藍木板牆（有弧度）、樓層間可可棕腰線、原本的長斜屋頂改成「半弧面屋頂」（四分之一橢圓，蜂蜜黃、焦橘色邊，像菇傘）、招牌字「Happy Fat」（使用者指定）、鈷藍框窗、圓窗、菇傘煙囪、屋簷垂下香菇串。正面朝 -Y，原點在底座中心地面。 配色刻意和 mainHall（奶白／粉紅／草綠）、projectRoom（奶油黃／薰衣草紫／湖水綠）區分：淡天空藍牆、蜂蜜黃屋頂、鈷藍窗框、赤陶磚、紅傘白柄香菇串。 使用者要求只留主體（屋頂、煙囪、牆壁），門窗、招牌、雨遮、香菇串、周邊小物都拿掉。",
+  "dimensions": {
+    "w": 9.0,
+    "d": 6.0,
+    "h": 11.6
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {
+      "tertiary_density": 1,
+      "geometry_complexity": 12,
+      "bevel_quality": 0,
+      "bake": "none"
+    }
+  },
+  "style": {
+    "edge_wobble": 0.0
+  },
+  "materials": [
+    {
+      "name": "brick_rose",
+      "hex": "#C98B6B",
+      "roughness": 0.85,
+      "surface": {
+        "class": "brick",
+        "pattern": "brick",
+        "scale_m": 0.25,
+        "palette": [
+          "#A86B4E",
+          "#C98B6B",
+          "#E2AE8E"
+        ],
+        "tier": "standard",
+        "wear": 0.3,
+        "dirt": 0.2
+      }
+    },
+    {
+      "name": "plaster_cream",
+      "hex": "#D6ECF2",
+      "roughness": 0.85,
+      "surface": {
+        "class": "wood",
+        "pattern": "planks",
+        "scale_m": 0.6,
+        "palette": [
+          "#B9DCE6",
+          "#D6ECF2",
+          "#F1FAFC"
+        ],
+        "tier": "standard",
+        "wear": 0.2,
+        "dirt": 0.1
+      }
+    },
+    {
+      "name": "roof_coral",
+      "hex": "#F2C14E",
+      "roughness": 0.6
+    },
+    {
+      "name": "roof_rim",
+      "hex": "#D98B2B",
+      "roughness": 0.7
+    },
+    {
+      "name": "moss",
+      "hex": "#8A5A3C",
+      "roughness": 0.9
+    },
+    {
+      "name": "stone",
+      "hex": "#9AA0A8",
+      "roughness": 0.9
+    }
+  ],
+  "budget": {
+    "max_tris": 8000,
+    "max_primitives": 16,
+    "max_texture_kb": 1200,
+    "max_gpu_texture_mb": 24
+  },
+  "components": [
+    {
+      "id": "gf_shell",
+      "kind": "wall_block",
+      "tier": "primary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "brick_rose",
+      "params": {},
+      "bounds": [
+        [
+          -2.8,
+          -1.8,
+          0.12
+        ],
+        [
+          2.8,
+          1.8,
+          3.2
+        ]
+      ],
+      "source": "observed",
+      "assumption": "一樓磚牆（使用者要求只留主體：門窗開口一起拿掉，變成完整的牆面）。",
+      "confidence": 0.85
+    },
+    {
+      "id": "corner_pillars",
+      "kind": "em_corner_pillars",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "trim",
+      "material": "brick_rose",
+      "params": {
+        "radius": 0.34
+      },
+      "bounds": [
+        [
+          -2.95,
+          -1.95,
+          0.12
+        ],
+        [
+          2.95,
+          1.95,
+          3.2
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "使用者要求牆有弧度：一樓有門窗開口不能整面彎，所以在四個轉角加圓柱，把轉角包成圓弧。",
+      "confidence": 0.7
+    },
+    {
+      "id": "cornice",
+      "kind": "beam",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "trim",
+      "material": "moss",
+      "bounds": [
+        [
+          -2.95,
+          -1.95,
+          3.2
+        ],
+        [
+          2.95,
+          1.95,
+          3.5
+        ]
+      ],
+      "source": "observed",
+      "assumption": "一、二樓之間的腰線（改成香菇屋的青苔綠）。",
+      "confidence": 0.8
+    },
+    {
+      "id": "upper_shell",
+      "kind": "em_arc_shell",
+      "tier": "primary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "plaster_cream",
+      "params": {
+        "eave_z": 6.4,
+        "left_x": -2.6,
+        "right_x": 2.6
+      },
+      "bounds": [
+        [
+          -2.6,
+          -1.748,
+          3.5
+        ],
+        [
+          2.6,
+          1.748,
+          10.6
+        ]
+      ],
+      "source": "observed",
+      "assumption": "二樓以上的牆（使用者要求有弧度）：俯看圓角（超橢圓）、側看中段鼓起 8%，頂部跟著半弧面屋頂；奶白木板牆。",
+      "confidence": 0.75
+    },
+    {
+      "id": "roof",
+      "kind": "em_arc_roof",
+      "tier": "primary",
+      "method": "component",
+      "profile": "trim",
+      "material": "roof_coral",
+      "params": {
+        "rim_material": "roof_rim",
+        "eave_z": 6.4,
+        "left_x": -2.6,
+        "right_x": 2.6,
+        "top_z": 10.6,
+        "thickness": 0.4,
+        "overhang": 0.35
+      },
+      "bounds": [
+        [
+          -2.97,
+          -1.97,
+          6.38
+        ],
+        [
+          3.37,
+          1.97,
+          11.02
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "使用者要求：斜屋頂改成半弧面屋頂。四分之一橢圓的厚弧板，前後、右側出簷，邊緣一圈深色（像菇傘的邊）。 由「前深色邊＋屋頂本體＋後深色邊」三段組成（中間留 1 mm 縫），所以用 trim profile（允許多個島）。",
+      "confidence": 0.75
+    },
+    {
+      "id": "chimney",
+      "kind": "em_chimney",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "stone",
+      "params": {
+        "cap_material": "roof_coral",
+        "rim_material": "roof_rim"
+      },
+      "bounds": [
+        [
+          0.45,
+          0.3,
+          8.6
+        ],
+        [
+          1.35,
+          1.2,
+          11.3
+        ]
+      ],
+      "source": "observed",
+      "assumption": "屋頂上的石頭煙囪，頂端戴一頂小菇傘（香菇屋風格）。",
+      "confidence": 0.75
+    }
+  ],
+  "export": {
+    "path": "public/models/earth_mamas/earth_mamas.glb",
+    "compress": true,
+    "clickable": [],
+    "anim_groups": {}
+  },
+  "decals": []
+}

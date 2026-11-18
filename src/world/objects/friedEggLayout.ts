@@ -43,6 +43,16 @@ export type FriedEggSunLayout = {
   whiteMetalness: number;
   whiteRoughness: number;
   whiteEnvIntensity: number;
+  /** 蛋白自發光（乘 emissiveBoost 前） */
+  whiteGlow: number;
+  /** 蛋黃自發光（乘 emissiveBoost 前） */
+  yolkGlow: number;
+  /** 蛋黃表面那層「油亮」清漆：0 = 關，1 = 最亮 */
+  yolkClearcoat: number;
+  /** 清漆粗糙度：越小高光越銳利 */
+  yolkClearcoatRoughness: number;
+  /** 蛋黃邊緣往深橘壓暗的強度（中心黃 → 邊緣橘） */
+  yolkRimStrength: number;
 };
 
 export type FriedEggLayout = FriedEggSphereLayout | FriedEggAttachLayout | FriedEggSunLayout;
@@ -64,6 +74,12 @@ export const FRIED_EGG_SUN_DEFAULT: FriedEggSunLayout = {
   whiteMetalness: 0,
   whiteRoughness: 0.38,
   whiteEnvIntensity: 0.62,
+  /** 舊版蛋白 0.38、蛋黃 0.52（× boost），整片過曝成平面；降一點，讓燈光和反射透出立體感 */
+  whiteGlow: 0.3,
+  yolkGlow: 0.38,
+  yolkClearcoat: 1,
+  yolkClearcoatRoughness: 0.06,
+  yolkRimStrength: 0.6,
 };
 
 export type FriedEggPlacement = FriedEggLayout & { id: string };
