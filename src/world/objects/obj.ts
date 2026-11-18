@@ -53,6 +53,13 @@ import { createShiitake, SHIITAKE_DEFAULT, SHIITAKE_PLACEMENTS, type ShiitakeSet
 import { createTreasureChest, type TreasureChestSettings } from './treasureChest';
 import { createProjectRoomStyle } from './projectRoomStyle';
 import { createHappyFatShop, type HappyFatShopSettings } from './happyFatShop';
+import {
+  createRetroArcade,
+  RETRO_ARCADE_DEFAULT,
+  RETRO_ARCADE_PLACEMENTS,
+  type RetroArcadePlacement,
+  type RetroArcadeSettings,
+} from './retroArcade';
 import { createPond, type PondSettings } from './pond';
 import { createMainHallSlide, type MainHallSlideSettings } from './mainHallSlide';
 import { createFloatingIsland } from './floatingIsland';
@@ -65,7 +72,9 @@ const MODEL_URL = `${import.meta.env.BASE_URL}models/chicken_leg/chicken_leg.glb
 
 // projectRoom 的外觀：用 Blender 做的 low poly 房子（匯出時已拿掉底下那塊平的地面，才能種在球面上）
 const PROJECT_ROOM_MODEL_URL = `${import.meta.env.BASE_URL}models/project_room/project_room.glb`;
-const GAME_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/game_hall/gameHall.glb`;
+// GameHall 的外觀：「電 • 波 • 町」香菇電子遊樂中心（依參考圖用 mainHall 香菇屋的風格簡化），plan 在 tools/blender/plans/mushroom_arcade.plan.json
+// 換回原本的遊戲廳：改成 `${import.meta.env.BASE_URL}models/game_hall/gameHall.glb`，並把下面 Gamehall 的長寬高、spinDegrees 改回註解裡的值
+const GAME_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/mushroom_arcade/mushroom_arcade.glb`;
 // 電波町霓虹小店（頂樓「電・波・町」霓虹招牌，plan 在 tools/blender/plans/neon_shop.plan.json）
 // 想換到 Gamehall：把上一行改成下面這個網址，並把 Gamehall 的 spinDegrees 改成 189（招牌面才會朝向鏡頭）
 // `${import.meta.env.BASE_URL}models/neon_shop/neon_shop.glb`
@@ -657,15 +666,20 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
   attachHouseModel(twRoom, TW_HALL_MODEL_URL);
 
   const Gamehall = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
+  // 換成「電 • 波 • 町」香菇電子遊樂中心：長方體比例改成跟模型一樣（寬 9.1、高 10.2、深 6.6 → 1.25 : 1.40 : 0.91；
+  // 改成兩層樓（二樓弧形牆＋半弧屋頂，高度跟一樓一樣），模型變矮；比例沒跟著改的話整棟會被最緊的那一邊卡住），
+  // fitIntoHouseBox 是「三邊都不超出」的等比縮放，比例不合會被最緊的那一邊縮小。
+  // 原本遊戲廳模型的值：spinDegrees 99、height 0.95、depth 1.15
   Object.assign(Gamehall.settings, {
     angleFromTopDegrees: 24,
-    azimuthDegrees: 49,
-    spinDegrees: 99,
+    azimuthDegrees: 56,
+    // 使用者在面板上調好的角度（原本掃描出的最正面是 90°）
+    spinDegrees: 88,
     sink: 0,
     scale: 0.15,
     width: 1.25,
-    height: 0.95,
-    depth: 1.15,
+    height: 1.4,
+    depth: 0.91,
     color: '#9fe571',
   });
   Gamehall.applySettings();
@@ -717,6 +731,74 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
   if (happyFatRuntime) {
     ground.add(happyFatRuntime.object);
     happyFatRuntime.setIntroGrow(0);
+  }
+
+  // 復古街機：第一台放在 GameHall（電 • 波 • 町 遊樂中心）左邊；可以複製很多台（跟烤玉米一樣）
+  type RetroArcadeRuntime = ReturnType<typeof createRetroArcade>;
+  const retroArcadeEntries: Array<{ world: WorldRetroArcade; runtime: RetroArcadeRuntime }> = [];
+  const retroArcades: WorldRetroArcade[] = [];
+
+  function spawnRetroArcade(id: string, layout: RetroArcadeSettings, grown = false) {
+    if (!puddingAxes) return null;
+    const runtime = createRetroArcade({
+      groundRadius: GROUND_RADIUS,
+      up: puddingAxes.up,
+      front: puddingAxes.front,
+      envMap,
+      layout,
+    });
+    ground.add(runtime.object);
+    const n = Number(id.match(/(\d+)$/)?.[1] ?? retroArcadeEntries.length + 1);
+    const world: WorldRetroArcade = {
+      id,
+      label: `復古街機 ${n}`,
+      object: runtime.object,
+      settings: runtime.settings,
+      apply: runtime.applySettings,
+      getNormal: runtime.getNormal,
+      setNormal: runtime.setNormal,
+      setHighlighted: runtime.setHighlighted,
+    };
+    retroArcadeEntries.push({ world, runtime });
+    retroArcades.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  if (puddingAxes) {
+    for (const placement of RETRO_ARCADE_PLACEMENTS) {
+      const { id, ...layout } = placement;
+      spawnRetroArcade(id, layout);
+    }
+  }
+
+  function nextRetroArcadeId() {
+    let n = retroArcadeEntries.length + 1;
+    let id = `retro_arcade_${n}`;
+    while (retroArcades.some((item) => item.id === id)) {
+      n += 1;
+      id = `retro_arcade_${n}`;
+    }
+    return id;
+  }
+
+  function addRetroArcade(seed?: Partial<RetroArcadePlacement>): WorldRetroArcade | null {
+    if (!puddingAxes) return null;
+    const { id: _ignored, ...rest } = seed ?? {};
+    const base: RetroArcadeSettings = { ...RETRO_ARCADE_DEFAULT, ...rest, enabled: true };
+    // 往旁邊錯開 8°：不錯開的話新的一台會跟原本那台完全疊在一起，看起來像沒新增
+    base.azimuthDegrees = wrapDegrees((seed?.azimuthDegrees ?? RETRO_ARCADE_DEFAULT.azimuthDegrees) + 8);
+    return spawnRetroArcade(nextRetroArcadeId(), base, introDone);
+  }
+
+  function removeRetroArcade(entry: WorldRetroArcade) {
+    const index = retroArcadeEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    retroArcadeEntries[index].runtime.dispose();
+    retroArcadeEntries.splice(index, 1);
+    const arcadeIndex = retroArcades.indexOf(entry);
+    if (arcadeIndex >= 0) retroArcades.splice(arcadeIndex, 1);
+    return true;
   }
 
   // 小水潭：程式產生的水面（漣漪、深淺）＋岸邊石頭、荷葉、香蒲
@@ -811,6 +893,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     for (const { world } of shiitakeEntries) if (world.settings.enabled) roots.push(world.object);
     if (treasureRuntime?.settings.enabled) roots.push(treasureRuntime.object);
     if (happyFatRuntime?.settings.enabled) roots.push(happyFatRuntime.object);
+    for (const { world } of retroArcadeEntries) if (world.settings.enabled) roots.push(world.object);
     // 水潭也是障礙：小豬繞著走，草叢、小石頭不會長在水面上
     if (pondRuntime?.settings.enabled) roots.push(pondRuntime.object);
     for (const { world } of puddingEntries) roots.push(world.object);
@@ -962,8 +1045,9 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
             groundInverseScratch.copy(ground.matrixWorld).invert();
             const list: GroundObstacle[] = [];
             for (const root of getPigObstacleRoots()) {
-              // 水潭不算撒點的障礙（改用下面的 getMasks）：不然水潭一動，整顆球的草全部重排
+              // 水潭、街機不算撒點的障礙（改用下面的 getMasks）：不然它們一動，整顆球的草全部重排
               if (pondRuntime && root === pondRuntime.object) continue;
+              if (retroArcades.some((item) => item.object === root)) continue;
               const footprint = measureGroundFootprint(root);
               if (footprint) list.push(footprint);
             }
@@ -979,9 +1063,17 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
           // 水潭：撒好之後才把範圍內的草藏起來（含岸邊石頭約 1.45 倍半徑）。
           // 直接用設定算範圍，不量模型：第一次撒草時水潭還在開場動畫前、縮放是 0，量到的只是一個點
           getMasks: () => {
-            if (!pondRuntime?.settings.enabled) return [];
-            const s = pondRuntime.settings;
-            return [{ normal: pondRuntime.getNormal(), radiusRad: Math.atan((s.size * 1.45) / GROUND_RADIUS) }];
+            const masks: GroundObstacle[] = [];
+            if (pondRuntime?.settings.enabled) {
+              const s = pondRuntime.settings;
+              masks.push({ normal: pondRuntime.getNormal(), radiusRad: Math.atan((s.size * 1.45) / GROUND_RADIUS) });
+            }
+            // 街機：腳下的草藏起來（佔地約是最長邊的一半）
+            for (const { world } of retroArcadeEntries) {
+              if (!world.settings.enabled) continue;
+              masks.push({ normal: world.getNormal(), radiusRad: Math.atan((world.settings.size * 0.55) / GROUND_RADIUS) });
+            }
+            return masks;
           },
           getRibbon: () => {
             ground.updateMatrixWorld(true);
@@ -1215,6 +1307,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         for (const { runtime } of shiitakeEntries) runtime.setIntroGrow(1);
         treasureRuntime?.setIntroGrow(1);
         happyFatRuntime?.setIntroGrow(1);
+        for (const { runtime } of retroArcadeEntries) runtime.setIntroGrow(1);
         pondRuntime?.setIntroGrow(1);
         slideRuntime.setIntroGrow(1);
         floatingIsland.setIntroGrow(1);
@@ -1296,6 +1389,14 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     mainHallHangers.forEach((hanger, index) => {
       hanger.rotation.y = Math.sin(time * 0.9 + index * 1.3) * THREE.MathUtils.degToRad(20);
     });
+    if (!introDone) {
+      // 跟 Happy Fat 差不多時候「碰」地長出來，每台錯開 0.1 秒
+      retroArcadeEntries.forEach(({ runtime }, index) => {
+        const arcadeStart = housesIntroEnd + 0.4 + index * 0.1;
+        const arcadeT = THREE.MathUtils.clamp((introElapsed - arcadeStart) / 0.8, 0, 1);
+        runtime.setIntroGrow(easeOutBack(arcadeT, 2.2));
+      });
+    }
     if (happyFatRuntime) {
       happyFatRuntime.update(deltaTime);
       if (!introDone) {
@@ -1428,6 +1529,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     for (const { runtime } of shiitakeEntries) runtime.setIntroGrow(0);
     treasureRuntime?.setIntroGrow(0);
     happyFatRuntime?.setIntroGrow(0);
+    for (const { runtime } of retroArcadeEntries) runtime.setIntroGrow(0);
     pondRuntime?.setIntroGrow(0);
     slideRuntime.setIntroGrow(0);
     floatingIsland.setIntroGrow(0);
@@ -1493,6 +1595,9 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       settings: projectRoomStyleSettings,
       apply: () => projectRoomStyle?.setEnabled(projectRoomStyleSettings.enabled),
     },
+    retroArcades,
+    addRetroArcade,
+    removeRetroArcade,
     happyFatShop: happyFatRuntime
       ? ({
           id: 'happy_fat_shop',
@@ -1621,6 +1726,18 @@ export type WorldPig = {
     getPhase: () => string;
     getLastFailReason: () => string;
   } | null;
+};
+
+export type WorldRetroArcade = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: RetroArcadeSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+  /** 面板選中時整台發光 */
+  setHighlighted: (value: boolean) => void;
 };
 
 export type WorldHappyFatShop = {

@@ -1,0 +1,96 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "mushroom_arcade",
+  "glb": "mushroom_arcade.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_materials_emissive_strength"
+  ],
+  "root": "mushroom_arcade_Root",
+  "clickable": [
+    "mushroom_arcade_door"
+  ],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 15052,
+    "primitives": 43,
+    "meshes": 29,
+    "materials": 7,
+    "file_bytes": 712488
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "warn",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "wall_cream": {
+        "class": "plaster",
+        "pattern": "plaster",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.8,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "plaster",
+          "seed": 221338377,
+          "hash": "0d315b09a32b"
+        }
+      },
+      "wall_upper": {
+        "class": "plaster",
+        "pattern": "plaster",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.8,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "plaster",
+          "seed": 1186714445,
+          "hash": "46bbd34de3db"
+        }
+      },
+      "wall_ground": {
+        "class": "plaster",
+        "pattern": "plaster",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.8,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "plaster",
+          "seed": 3846432650,
+          "hash": "e543e78a97d5"
+        }
+      },
+      "trim_wood": {
+        "class": "wood",
+        "pattern": "planks",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 1.4,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "planks",
+          "seed": 1702370467,
+          "hash": "65781ca327eb"
+        }
+      }
+    },
+    "bake": {},
+    "decals": 9,
+    "gpu_texture_mb": 24.37,
+    "flat_ratio": 0.413,
+    "texture_count": 12,
+    "texture_kb": 82.8,
+    "images": 12,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 695.8
+  }
+}

@@ -282,6 +282,42 @@ def test_earth_mamas_curved_shell_and_arc_roof():
     _closed_single(built["chimney"][1], islands=2)
 
 
+def test_mushroom_arcade_parts_are_closed():
+    """香菇電子遊樂中心（兩層樓）：一樓圓角屋身、二樓弧形牆（Happy Fat 同款）、底座都是 1 個封閉島；貼牆的門窗面板（逐點貼彎曲牆面）也都封閉；
+    發光斑點香菇的斑點是換材質的面，不增加島數（三朵 = 3 個島）；大香菇的吊飾各是 1 個旋轉體。"""
+    _doc, _lay, built = _build_all("mushroom_arcade.plan.json")
+    _closed_single(built["base"][1])
+    _closed_single(built["gf_shell"][1])
+    _closed_single(built["uf_shell"][1])
+    _closed_single(built["gf_band"][1], islands=2)
+    # 二樓改成弧形牆後，霓虹只剩一樓腰帶那一圈
+    _closed_single(built["neon_lines"][1], islands=1)
+    _closed_single(built["door"][1], islands=3)
+    _closed_single(built["shop_window"][1], islands=5)
+    _closed_single(built["main_sign"][1], islands=3)
+    _closed_single(built["roof_sign"][1], islands=3)  # 掛在二樓弧形牆上，沒有支腳
+    _closed_single(built["glow_shrooms"][1], islands=3)
+    _closed_single(built["cap_left"][1], islands=4)
+    _closed_single(built["cap_right"][1], islands=3)
+    _closed_single(built["cabinet"][1], islands=8)
+    _closed_single(built["mini_shrooms"][1], islands=6)
+    # 斑點真的有：有些面換成 spot_white，但島數沒有增加
+    assert "spot_white" in built["glow_shrooms"][1].mats
+
+
+def test_retro_arcade_parts_are_closed():
+    """復古街機：機身是 1 個封閉島；斜螢幕框（斜面上的六面體）、左側 kitbash 的旋轉體都封閉，島數照設計。"""
+    _doc, _lay, built = _build_all("retro_arcade.plan.json")
+    _closed_single(built["cabinet"][1])
+    _closed_single(built["side_art"][1], islands=2)
+    _closed_single(built["bezel"][1], islands=2)
+    _closed_single(built["controls"][1], islands=7)
+    _closed_single(built["camera"][1], islands=3)
+    _closed_single(built["speaker"][1], islands=6)
+    _closed_single(built["candy_box"][1], islands=5)
+    _closed_single(built["feet"][1], islands=4)
+
+
 def test_registry_covers_plans():
     kinds = implemented_kinds()
     for plan in PLAN_FILES:

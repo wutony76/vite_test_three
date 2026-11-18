@@ -1,0 +1,368 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "retro_arcade",
+  "image": {
+    "path": "tools/img/game_machine.jpg",
+    "width": 1000,
+    "height": 1000
+  },
+  "medium": "向量貼紙風的復古街機插畫（青綠機身、奶油色螢幕框與操作台、橘色彩繪側板、左側掛滿相機／喇叭／旋鈕盒等 kitbash），3/4 視角",
+  "view": {
+    "type": "three_quarter",
+    "source": "observed",
+    "confidence": 0.85
+  },
+  "scale_anchor": {
+    "component": "cabinet",
+    "axis": "height",
+    "meters": 1.8
+  },
+  "silhouette": {
+    "outline": [
+      [
+        0.19,
+        0.1
+      ],
+      [
+        0.42,
+        0.04
+      ],
+      [
+        0.7,
+        0.06
+      ],
+      [
+        0.82,
+        0.52
+      ],
+      [
+        0.8,
+        0.62
+      ],
+      [
+        0.72,
+        0.95
+      ],
+      [
+        0.32,
+        0.95
+      ],
+      [
+        0.19,
+        0.6
+      ],
+      [
+        0.19,
+        0.1
+      ]
+    ],
+    "source": "observed",
+    "confidence": 0.75
+  },
+  "palette": [
+    {
+      "name": "teal",
+      "hex": "#2FB3C0",
+      "usage": "機身",
+      "sample": [
+        0.47,
+        0.55,
+        0.52,
+        0.6
+      ]
+    },
+    {
+      "name": "cream",
+      "hex": "#F3E2C3",
+      "usage": "螢幕框、操作台、頂上招牌箱、喇叭外圈",
+      "sample": [
+        0.6,
+        0.55,
+        0.7,
+        0.58
+      ]
+    },
+    {
+      "name": "orange",
+      "hex": "#F07A2A",
+      "usage": "下半部彩繪側板、相機、操作台前緣",
+      "sample": [
+        0.6,
+        0.85,
+        0.66,
+        0.9
+      ]
+    },
+    {
+      "name": "red",
+      "hex": "#E8433C",
+      "usage": "搖桿球、頂上紅盒、按鈕",
+      "sample": [
+        0.53,
+        0.48,
+        0.56,
+        0.5
+      ]
+    },
+    {
+      "name": "dark_grey",
+      "hex": "#3C4048",
+      "usage": "旋鈕盒、投幣門、喇叭網",
+      "sample": [
+        0.3,
+        0.52,
+        0.36,
+        0.56
+      ]
+    },
+    {
+      "name": "screen",
+      "hex": "#2A1622",
+      "usage": "螢幕（深色）",
+      "sample": [
+        0.45,
+        0.33,
+        0.58,
+        0.43
+      ]
+    }
+  ],
+  "components": [
+    {
+      "id": "cabinet",
+      "kind": "rm_cabinet",
+      "tier": "primary",
+      "bbox": [
+        0.3,
+        0.04,
+        0.82,
+        0.95
+      ],
+      "material_hint": "teal",
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "side_art",
+      "kind": "rm_side_art",
+      "tier": "secondary",
+      "bbox": [
+        0.5,
+        0.62,
+        0.71,
+        0.93
+      ],
+      "material_hint": "orange",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "marquee",
+      "kind": "rm_marquee",
+      "tier": "secondary",
+      "bbox": [
+        0.4,
+        0.05,
+        0.7,
+        0.23
+      ],
+      "material_hint": "cream",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "red_box",
+      "kind": "rm_box",
+      "tier": "tertiary",
+      "bbox": [
+        0.58,
+        0.12,
+        0.7,
+        0.19
+      ],
+      "material_hint": "red",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "bezel",
+      "kind": "rm_bezel",
+      "tier": "secondary",
+      "bbox": [
+        0.4,
+        0.23,
+        0.63,
+        0.52
+      ],
+      "material_hint": "cream",
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "controls",
+      "kind": "rm_controls",
+      "tier": "secondary",
+      "bbox": [
+        0.42,
+        0.45,
+        0.82,
+        0.62
+      ],
+      "material_hint": "cream",
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "coin_door",
+      "kind": "rm_coin_door",
+      "tier": "tertiary",
+      "bbox": [
+        0.54,
+        0.63,
+        0.7,
+        0.78
+      ],
+      "material_hint": "dark_grey",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "camera",
+      "kind": "rm_camera",
+      "tier": "secondary",
+      "bbox": [
+        0.19,
+        0.09,
+        0.34,
+        0.26
+      ],
+      "material_hint": "orange",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "speaker",
+      "kind": "rm_speaker",
+      "tier": "secondary",
+      "bbox": [
+        0.21,
+        0.25,
+        0.38,
+        0.43
+      ],
+      "material_hint": "cream",
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "knob_box",
+      "kind": "rm_knob_box",
+      "tier": "tertiary",
+      "bbox": [
+        0.29,
+        0.46,
+        0.41,
+        0.62
+      ],
+      "material_hint": "dark_grey",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "candy_box",
+      "kind": "rm_candy_box",
+      "tier": "tertiary",
+      "bbox": [
+        0.29,
+        0.63,
+        0.44,
+        0.72
+      ],
+      "material_hint": "dark_grey",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "vent_box",
+      "kind": "rm_vent_box",
+      "tier": "tertiary",
+      "bbox": [
+        0.3,
+        0.7,
+        0.45,
+        0.86
+      ],
+      "material_hint": "cream",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "feet",
+      "kind": "rm_feet",
+      "tier": "tertiary",
+      "bbox": [
+        0.32,
+        0.92,
+        0.72,
+        0.96
+      ],
+      "material_hint": "dark_grey",
+      "source": "observed",
+      "confidence": 0.7
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "teal_paint",
+      "region": [
+        [
+          0.46,
+          0.52
+        ],
+        [
+          0.54,
+          0.52
+        ],
+        [
+          0.54,
+          0.62
+        ],
+        [
+          0.46,
+          0.62
+        ]
+      ],
+      "class": "painted",
+      "pattern": "painted",
+      "base_hex": "#2FB3C0",
+      "scale_m": 0.4,
+      "components": [
+        "cabinet"
+      ],
+      "source": "observed",
+      "confidence": 0.7
+    }
+  ],
+  "hidden": [
+    {
+      "id": "right_back",
+      "assumption": "右側與背面：同樣的青綠機身，右側下半也有橘色彩繪側板，沒有 kitbash",
+      "source": "inferred",
+      "confidence": 0.6
+    }
+  ],
+  "excluded": [
+    {
+      "reason": "右下角的「Vector Sticker」浮水印",
+      "what": "watermark"
+    },
+    {
+      "reason": "側板上的卡通臉、塗鴉細節：用簡化的橘色側板表現，不做",
+      "what": "side_graffiti"
+    },
+    {
+      "reason": "電線、小貼紙、刮痕：畫面上太小",
+      "what": "wires_stickers"
+    }
+  ]
+}

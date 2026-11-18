@@ -1,0 +1,1080 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "mushroom_arcade",
+  "reference": "mushroom_arcade",
+  "notes": "依 tools/img/mushroom_arcade.png 的香菇風電子遊樂中心，參考第二張香菇屋（mainHall）的風格適當簡化：圓角奶油色灰泥牆（兩層：一樓圓角方塊、二樓是 Happy Fat 同款弧形牆＋半弧屋頂）、木腰帶＋青苔邊、青色霓虹燈條、綠色八角拱門、像素框窗（窗內用發光 decal 表現店內）、霓虹招牌字「電 • 波 • 町 / ARCADE」（使用者指定把參考圖的「電子遊樂中心」改成「電 • 波 • 町」）「GAME START!」、屋頂一叢白點發光紫香菇、兩朵垂掛小香菇串的大紫香菇、右側街機台、底座小紫菇。拿掉樓梯、水管、側門、屋頂雜物。正面朝 -Y，原點在底座中心地面。 配色（使用者第三張參考後重配，避免同色系太多）：深藍牆、木頭色屋頂與腰帶、金黃門框與招牌框、洋紅霓虹燈條、青色像素窗框、珊瑚紅大香菇、青色發光小香菇、水泥灰底座。原本的奶油色配色記在 memory 的 project-gamehall-palette。",
+  "dimensions": {
+    "w": 9.1,
+    "d": 6.6,
+    "h": 10.2
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {
+      "tertiary_density": 1,
+      "geometry_complexity": 12,
+      "bevel_quality": 0,
+      "bake": "none"
+    }
+  },
+  "style": {
+    "edge_wobble": 0.0
+  },
+  "budget": {
+    "max_tris": 18000,
+    "max_primitives": 48,
+    "max_texture_kb": 1800,
+    "max_gpu_texture_mb": 26
+  },
+  "export": {
+    "path": "public/models/mushroom_arcade/mushroom_arcade.glb",
+    "compress": true,
+    "clickable": [
+      "door"
+    ],
+    "anim_groups": {}
+  },
+  "materials": [
+    {
+      "name": "wall_cream",
+      "hex": "#2F3A8F",
+      "roughness": 0.88,
+      "surface": {
+        "class": "plaster",
+        "pattern": "plaster",
+        "scale_m": 0.8,
+        "palette": [
+          "#212A6B",
+          "#2F3A8F",
+          "#4656B3"
+        ],
+        "tier": "prop",
+        "wear": 0.12,
+        "dirt": 0.06
+      }
+    },
+    {
+      "name": "wall_upper",
+      "hex": "#499883",
+      "roughness": 0.88,
+      "surface": {
+        "class": "plaster",
+        "pattern": "plaster",
+        "scale_m": 0.8,
+        "palette": [
+          "#36746A",
+          "#499883",
+          "#64B5A0"
+        ],
+        "tier": "prop",
+        "wear": 0.12,
+        "dirt": 0.06
+      }
+    },
+    {
+      "name": "wall_ground",
+      "hex": "#1E6F78",
+      "roughness": 0.88,
+      "surface": {
+        "class": "plaster",
+        "pattern": "plaster",
+        "scale_m": 0.8,
+        "palette": [
+          "#154F57",
+          "#1E6F78",
+          "#2E949E"
+        ],
+        "tier": "prop",
+        "wear": 0.12,
+        "dirt": 0.06
+      }
+    },
+    {
+      "name": "trim_wood",
+      "hex": "#8A5A3C",
+      "roughness": 0.8,
+      "surface": {
+        "class": "wood",
+        "pattern": "planks",
+        "scale_m": 0.35,
+        "palette": [
+          "#5E3A24",
+          "#8A5A3C",
+          "#B07A52"
+        ],
+        "tier": "prop",
+        "wear": 0.3,
+        "dirt": 0.2
+      }
+    },
+    {
+      "name": "door_wood",
+      "hex": "#3E2A85",
+      "roughness": 0.8
+    },
+    {
+      "name": "frame_green",
+      "hex": "#F2C14E",
+      "roughness": 0.75
+    },
+    {
+      "name": "moss",
+      "hex": "#FF6FB5",
+      "roughness": 0.9
+    },
+    {
+      "name": "neon_cyan",
+      "hex": "#5FF2E6",
+      "roughness": 0.3,
+      "emissive": true,
+      "emission_strength": 2.0
+    },
+    {
+      "name": "neon_magenta",
+      "hex": "#FF5FD8",
+      "roughness": 0.4,
+      "emissive": true,
+      "emission_strength": 1.6
+    },
+    {
+      "name": "interior_glow",
+      "hex": "#6B5BC8",
+      "roughness": 0.4,
+      "emissive": true,
+      "emission_strength": 0.7
+    },
+    {
+      "name": "glass_dark",
+      "hex": "#1A1838",
+      "roughness": 0.35
+    },
+    {
+      "name": "sign_dark",
+      "hex": "#1E1B4B",
+      "roughness": 0.6
+    },
+    {
+      "name": "cap_purple",
+      "hex": "#E2574C",
+      "roughness": 0.55
+    },
+    {
+      "name": "cap_rim",
+      "hex": "#A33A32",
+      "roughness": 0.6
+    },
+    {
+      "name": "cap_under",
+      "hex": "#F6C9A8",
+      "roughness": 0.75
+    },
+    {
+      "name": "stem_cream",
+      "hex": "#F1E6D6",
+      "roughness": 0.8
+    },
+    {
+      "name": "glow_purple",
+      "hex": "#3FE0E8",
+      "roughness": 0.45,
+      "emissive": true,
+      "emission_strength": 0.9
+    },
+    {
+      "name": "spot_white",
+      "hex": "#F6F2FF",
+      "roughness": 0.4,
+      "emissive": true,
+      "emission_strength": 1.2
+    },
+    {
+      "name": "string",
+      "hex": "#5A4A44",
+      "roughness": 0.9
+    },
+    {
+      "name": "base_lavender",
+      "hex": "#8E8E96",
+      "roughness": 0.9
+    },
+    {
+      "name": "screen_dark",
+      "hex": "#1E2440",
+      "roughness": 0.3,
+      "emissive": true,
+      "emission_strength": 0.4
+    },
+    {
+      "name": "button_red",
+      "hex": "#E2453C",
+      "roughness": 0.4
+    },
+    {
+      "name": "roof_rim",
+      "hex": "#5E3A24",
+      "roughness": 0.75
+    }
+  ],
+  "components": [
+    {
+      "id": "base",
+      "kind": "ma_base",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "base_lavender",
+      "bounds": [
+        [
+          -4.3,
+          -3.3,
+          0.0
+        ],
+        [
+          4.3,
+          3.3,
+          0.25
+        ]
+      ],
+      "source": "observed",
+      "assumption": "圓角方形的薰衣草灰底座平台（參考圖整棟站在一塊平台上）。",
+      "confidence": 0.75,
+      "params": {
+        "round_p": 5.0
+      }
+    },
+    {
+      "id": "gf_shell",
+      "kind": "ma_block",
+      "tier": "primary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "wall_ground",
+      "params": {
+        "round_p": 6.0,
+        "belly": 0.05
+      },
+      "bounds": [
+        [
+          -3.6,
+          -2.6,
+          0.25
+        ],
+        [
+          2.9,
+          2.6,
+          3.5
+        ]
+      ],
+      "source": "observed",
+      "assumption": "一樓：圓角方塊屋身（俯視是超橢圓，轉角圓潤，參考第二張香菇屋的圓潤牆面），奶油色灰泥；右側讓出位置給街機台。（使用者要求一樓牆色和二樓區分：一樓深青綠，二樓深藍）",
+      "confidence": 0.75
+    },
+    {
+      "id": "gf_band",
+      "kind": "ma_band",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "trim",
+      "material": "trim_wood",
+      "params": {
+        "lip_material": "moss",
+        "round_p": 6.0
+      },
+      "bounds": [
+        [
+          -3.75,
+          -2.75,
+          3.45
+        ],
+        [
+          3.05,
+          2.75,
+          3.85
+        ]
+      ],
+      "source": "observed",
+      "assumption": "一二樓之間一圈木腰帶（參考圖的木樑），下緣一條青苔色細邊。",
+      "confidence": 0.75
+    },
+    {
+      "id": "uf_shell",
+      "kind": "em_arc_shell",
+      "tier": "primary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "wall_upper",
+      "params": {
+        "left_x": -3.3,
+        "right_x": 2.7,
+        "eave_z": 5.4,
+        "top_z": 7.6,
+        "overhang": 0.35,
+        "thickness": 0.4,
+        "depth": 2.2
+      },
+      "bounds": [
+        [
+          -3.3,
+          -2.4,
+          3.85
+        ],
+        [
+          2.7,
+          2.4,
+          7.6
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "二樓（使用者要求：原本三樓的弧形造型就是二樓，這棟是兩層樓）：Happy Fat 同款的弧形牆（俯看圓角、側看鼓肚），頂部跟著半弧屋頂，坐在一樓的木腰帶上；深藍。（使用者要求二樓高度跟一樓一樣：牆平均高約 3.3，屋簷 5.4、最高 7.6）",
+      "confidence": 0.75
+    },
+    {
+      "id": "arc_roof",
+      "kind": "em_arc_roof",
+      "tier": "primary",
+      "method": "component",
+      "profile": "trim",
+      "material": "trim_wood",
+      "params": {
+        "left_x": -3.3,
+        "right_x": 2.7,
+        "eave_z": 5.4,
+        "top_z": 7.6,
+        "overhang": 0.35,
+        "thickness": 0.4,
+        "depth": 2.2,
+        "rim_material": "roof_rim"
+      },
+      "bounds": [
+        [
+          -3.65,
+          -2.55,
+          5.38
+        ],
+        [
+          3.45,
+          2.55,
+          8.02
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "使用者要求：二樓的半弧屋頂（跟 Happy Fat 同造型）（四分之一橢圓厚弧板，左高右低、前後與右側出簷），木頭色（使用者要求屋頂保留原來的木頭色），前後一條深木色邊。三段（前邊、本體、後邊）所以用 trim profile。",
+      "confidence": 0.75
+    },
+    {
+      "id": "neon_lines",
+      "kind": "ma_neon_ring",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "neon_magenta",
+      "params": {
+        "rings": [
+          {
+            "bounds": [
+              [
+                -3.75,
+                -2.75,
+                3.45
+              ],
+              [
+                3.05,
+                2.75,
+                3.85
+              ]
+            ],
+            "z": 3.47
+          }
+        ]
+      },
+      "bounds": [
+        [
+          -3.8,
+          -2.8,
+          3.4
+        ],
+        [
+          3.1,
+          2.8,
+          3.55
+        ]
+      ],
+      "source": "observed",
+      "assumption": "青色／洋紅霓虹燈條：沿一樓腰帶下緣繞一圈。",
+      "confidence": 0.75
+    },
+    {
+      "id": "door",
+      "kind": "ma_door",
+      "tier": "primary",
+      "method": "component",
+      "profile": "opening",
+      "material": "frame_green",
+      "params": {
+        "neon_material": "neon_cyan",
+        "inner_material": "interior_glow",
+        "wall_bounds": [
+          [
+            -3.6,
+            -2.6,
+            0.25
+          ],
+          [
+            2.9,
+            2.6,
+            3.5
+          ]
+        ]
+      },
+      "bounds": [
+        [
+          -1.55,
+          -2.96,
+          0.25
+        ],
+        [
+          0.25,
+          -2.27,
+          2.75
+        ]
+      ],
+      "source": "observed",
+      "assumption": "正面偏左的大門：綠色八角拱形門框、內圈一道青色霓虹、門裡是發光的店內（decal：藍色遊戲機）。",
+      "confidence": 0.85
+    },
+    {
+      "id": "main_sign",
+      "kind": "ma_sign",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "trim_wood",
+      "params": {
+        "frame_material": "frame_green",
+        "face_material": "sign_dark",
+        "wall_bounds": [
+          [
+            -3.6,
+            -2.6,
+            0.25
+          ],
+          [
+            2.9,
+            2.6,
+            3.5
+          ]
+        ]
+      },
+      "bounds": [
+        [
+          -2.25,
+          -3.15,
+          2.85
+        ],
+        [
+          1.0,
+          -2.42,
+          4.05
+        ]
+      ],
+      "source": "observed",
+      "assumption": "大門上方的大招牌：木板＋綠框，霓虹字「電 • 波 • 町 / ARCADE」（使用者指定）（decal）。",
+      "confidence": 0.85
+    },
+    {
+      "id": "shop_window",
+      "kind": "ma_window",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "opening",
+      "material": "neon_cyan",
+      "params": {
+        "glass_material": "interior_glow",
+        "mullion_material": "trim_wood",
+        "columns": 3,
+        "wall_bounds": [
+          [
+            -3.6,
+            -2.6,
+            0.25
+          ],
+          [
+            2.9,
+            2.6,
+            3.5
+          ]
+        ]
+      },
+      "bounds": [
+        [
+          0.5,
+          -2.95,
+          0.55
+        ],
+        [
+          2.6,
+          -1.83,
+          2.9
+        ]
+      ],
+      "source": "observed",
+      "assumption": "一樓右邊的大落地窗：青色像素框、深色窗格、窗裡發光（decal：夾娃娃機、遊戲機）。",
+      "confidence": 0.75
+    },
+    {
+      "id": "left_window",
+      "kind": "ma_window",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "opening",
+      "material": "neon_cyan",
+      "params": {
+        "glass_material": "interior_glow",
+        "mullion_material": "trim_wood",
+        "columns": 1,
+        "wall_bounds": [
+          [
+            -3.6,
+            -2.6,
+            0.25
+          ],
+          [
+            2.9,
+            2.6,
+            3.5
+          ]
+        ]
+      },
+      "bounds": [
+        [
+          -3.3,
+          -2.95,
+          0.75
+        ],
+        [
+          -2.05,
+          -1.83,
+          2.45
+        ]
+      ],
+      "source": "observed",
+      "assumption": "一樓左邊的窗：青色像素框、窗裡發光（decal：遊戲機）。",
+      "confidence": 0.75
+    },
+    {
+      "id": "upper_window",
+      "kind": "ma_window",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "opening",
+      "material": "trim_wood",
+      "params": {
+        "glass_material": "interior_glow",
+        "mullion_material": "trim_wood",
+        "columns": 4,
+        "arc_wall": {
+          "left_x": -3.3,
+          "right_x": 2.7,
+          "eave_z": 5.4,
+          "top_z": 7.6,
+          "overhang": 0.35,
+          "thickness": 0.4,
+          "depth": 2.2,
+          "z0": 3.85
+        }
+      },
+      "bounds": [
+        [
+          -0.3,
+          -2.65,
+          4.15
+        ],
+        [
+          2.3,
+          -1.62,
+          5.85
+        ]
+      ],
+      "source": "observed",
+      "assumption": "二樓正面的大窗：木框、窗格、窗裡發光（decal：賽車機、遊戲機）。",
+      "confidence": 0.75
+    },
+    {
+      "id": "upper_left_window",
+      "kind": "ma_window",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "opening",
+      "material": "neon_cyan",
+      "params": {
+        "glass_material": "interior_glow",
+        "mullion_material": "trim_wood",
+        "columns": 2,
+        "arc_wall": {
+          "left_x": -3.3,
+          "right_x": 2.7,
+          "eave_z": 5.4,
+          "top_z": 7.6,
+          "overhang": 0.35,
+          "thickness": 0.4,
+          "depth": 2.2,
+          "z0": 3.85
+        }
+      },
+      "bounds": [
+        [
+          -3.0,
+          -2.65,
+          4.15
+        ],
+        [
+          -1.75,
+          -1.53,
+          5.5
+        ]
+      ],
+      "source": "observed",
+      "assumption": "二樓左邊的窗：青色像素框、窗裡是像素圖示（decal：手把、搖桿、星星、月亮）。",
+      "confidence": 0.75
+    },
+    {
+      "id": "vert_sign",
+      "kind": "ma_sign",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "trim_wood",
+      "params": {
+        "frame_material": "frame_green",
+        "face_material": "sign_dark"
+      },
+      "bounds": [
+        [
+          -3.8,
+          -1.75,
+          3.95
+        ],
+        [
+          -3.1,
+          -1.45,
+          5.95
+        ]
+      ],
+      "source": "observed",
+      "assumption": "二樓左側牆伸出來的直立招牌「ARCADE」（decal），面朝正面。",
+      "confidence": 0.75
+    },
+    {
+      "id": "roof_sign",
+      "kind": "ma_sign",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "trim_wood",
+      "params": {
+        "frame_material": "frame_green",
+        "face_material": "sign_dark",
+        "arc_wall": {
+          "left_x": -3.3,
+          "right_x": 2.7,
+          "eave_z": 5.4,
+          "top_z": 7.6,
+          "overhang": 0.35,
+          "thickness": 0.4,
+          "depth": 2.2,
+          "z0": 3.85
+        }
+      },
+      "bounds": [
+        [
+          -3.0,
+          -2.9,
+          5.85
+        ],
+        [
+          -1.0,
+          -1.67,
+          6.9
+        ]
+      ],
+      "source": "observed",
+      "assumption": "「GAME START!」招牌，掛在二樓左窗上方的弧形牆上（decal）。",
+      "confidence": 0.75
+    },
+    {
+      "id": "invader_sign",
+      "kind": "ma_sign",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "sign_dark",
+      "params": {
+        "frame_material": "neon_cyan",
+        "face_material": "sign_dark",
+        "arc_wall": {
+          "left_x": -3.3,
+          "right_x": 2.7,
+          "eave_z": 5.4,
+          "top_z": 7.6,
+          "overhang": 0.35,
+          "thickness": 0.4,
+          "depth": 2.2,
+          "z0": 3.85
+        }
+      },
+      "bounds": [
+        [
+          -1.45,
+          -2.9,
+          4.25
+        ],
+        [
+          -0.55,
+          -2.15,
+          5.45
+        ]
+      ],
+      "source": "observed",
+      "assumption": "像素外星人招牌，掛在二樓兩扇窗中間的弧形牆上（青色發光 decal）。",
+      "confidence": 0.75
+    },
+    {
+      "id": "glow_shrooms",
+      "kind": "ma_spotted_cluster",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "glow_purple",
+      "params": {
+        "stem_material": "stem_cream",
+        "spot_material": "spot_white",
+        "rim_material": "cap_rim",
+        "on_roof": {
+          "left_x": -3.3,
+          "right_x": 2.7,
+          "eave_z": 5.4,
+          "top_z": 7.6,
+          "overhang": 0.35,
+          "thickness": 0.4,
+          "depth": 2.2
+        }
+      },
+      "bounds": [
+        [
+          -1.7,
+          -1.2,
+          7.5
+        ],
+        [
+          0.5,
+          1.0,
+          10.0
+        ]
+      ],
+      "source": "observed",
+      "assumption": "原設計的三朵發光小香菇（白點），種在半弧屋頂上：每朵的底部照屋頂曲線算高度。",
+      "confidence": 0.8
+    },
+    {
+      "id": "cap_left",
+      "kind": "ma_big_mushroom",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "cap_purple",
+      "params": {
+        "stem_material": "stem_cream",
+        "rim_material": "cap_rim",
+        "under_material": "cap_under",
+        "string_material": "string",
+        "hangers": 3,
+        "on_roof": {
+          "left_x": -3.3,
+          "right_x": 2.7,
+          "eave_z": 5.4,
+          "top_z": 7.6,
+          "overhang": 0.35,
+          "thickness": 0.4,
+          "depth": 2.2
+        }
+      },
+      "bounds": [
+        [
+          -3.2,
+          -0.3,
+          7.9
+        ],
+        [
+          -1.4,
+          1.5,
+          10.0
+        ]
+      ],
+      "source": "observed",
+      "assumption": "原設計的大香菇（垂三串小香菇），種在半弧屋頂左邊最高處。",
+      "confidence": 0.75
+    },
+    {
+      "id": "cap_right",
+      "kind": "ma_big_mushroom",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "cap_purple",
+      "params": {
+        "stem_material": "stem_cream",
+        "rim_material": "cap_rim",
+        "under_material": "cap_under",
+        "string_material": "string",
+        "hangers": 2
+      },
+      "bounds": [
+        [
+          2.75,
+          -2.4,
+          3.3
+        ],
+        [
+          4.75,
+          -0.4,
+          5.7
+        ]
+      ],
+      "source": "observed",
+      "assumption": "右側街機台上方的紫香菇（長在街機台頂上），傘邊垂兩串小香菇。",
+      "confidence": 0.75
+    },
+    {
+      "id": "cabinet",
+      "kind": "ma_cabinet",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "wall_cream",
+      "params": {
+        "trim_material": "cap_rim",
+        "screen_material": "screen_dark",
+        "button_material": "button_red"
+      },
+      "bounds": [
+        [
+          3.05,
+          -2.3,
+          0.25
+        ],
+        [
+          4.15,
+          -1.0,
+          3.3
+        ]
+      ],
+      "source": "observed",
+      "assumption": "右前方的大街機台：奶油色機身、紫色側板、發光螢幕（螢幕是斜的，直接用發光材質，不貼 decal）、紅色搖桿與按鈕。",
+      "confidence": 0.75
+    },
+    {
+      "id": "mini_shrooms",
+      "kind": "ma_mini_shrooms",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "cap_purple",
+      "params": {
+        "stem_material": "stem_cream"
+      },
+      "bounds": [
+        [
+          -4.2,
+          -3.2,
+          0.2
+        ],
+        [
+          4.2,
+          3.2,
+          0.95
+        ]
+      ],
+      "source": "observed",
+      "assumption": "底座四周散落的紫色小香菇（每叢 1～2 朵）。",
+      "confidence": 0.75
+    }
+  ],
+  "decals": [
+    {
+      "id": "main_sign_glow",
+      "target": "main_sign",
+      "face": "front",
+      "rect": [
+        [
+          -1.925,
+          3.025
+        ],
+        [
+          0.675,
+          3.875
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/mushroom_arcade/decals/main_sign.png"
+      }
+    },
+    {
+      "id": "door_glow",
+      "target": "door",
+      "face": "front",
+      "rect": [
+        [
+          -1.19,
+          0.33
+        ],
+        [
+          -0.11,
+          1.75
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/mushroom_arcade/decals/door_inside.png"
+      },
+      "pixels_per_meter": 300
+    },
+    {
+      "id": "shop_glow",
+      "target": "shop_window",
+      "face": "front",
+      "rect": [
+        [
+          0.66,
+          0.84
+        ],
+        [
+          2.44,
+          2.74
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/mushroom_arcade/decals/shop_window.png"
+      },
+      "pixels_per_meter": 300
+    },
+    {
+      "id": "left_glow",
+      "target": "left_window",
+      "face": "front",
+      "rect": [
+        [
+          -3.14,
+          1.04
+        ],
+        [
+          -2.21,
+          2.29
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/mushroom_arcade/decals/left_window.png"
+      },
+      "pixels_per_meter": 300
+    },
+    {
+      "id": "upper_glow",
+      "target": "upper_window",
+      "face": "front",
+      "rect": [
+        [
+          -0.14,
+          4.44
+        ],
+        [
+          2.14,
+          5.69
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/mushroom_arcade/decals/upper_window.png"
+      },
+      "pixels_per_meter": 300
+    },
+    {
+      "id": "icons_glow",
+      "target": "upper_left_window",
+      "face": "front",
+      "rect": [
+        [
+          -2.84,
+          4.44
+        ],
+        [
+          -1.91,
+          5.35
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/mushroom_arcade/decals/pixel_icons.png"
+      },
+      "pixels_per_meter": 300
+    },
+    {
+      "id": "vert_sign_glow",
+      "target": "vert_sign",
+      "face": "front",
+      "rect": [
+        [
+          -3.615,
+          4.15
+        ],
+        [
+          -3.285,
+          5.75
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/mushroom_arcade/decals/vert_sign.png"
+      }
+    },
+    {
+      "id": "roof_sign_glow",
+      "target": "roof_sign",
+      "face": "front",
+      "rect": [
+        [
+          -2.8,
+          6.03
+        ],
+        [
+          -1.2,
+          6.7
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/mushroom_arcade/decals/game_start.png"
+      }
+    },
+    {
+      "id": "invader_glow",
+      "target": "invader_sign",
+      "face": "front",
+      "rect": [
+        [
+          -1.28,
+          4.42
+        ],
+        [
+          -0.72,
+          5.18
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/mushroom_arcade/decals/invader.png"
+      }
+    }
+  ]
+}

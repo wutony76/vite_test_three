@@ -28,6 +28,7 @@ import {
   type WorldShiitake,
   type WorldTreasureChest,
   type WorldHappyFatShop,
+  type WorldRetroArcade,
   type WorldPond,
   type WorldFrenchFries,
   type WorldFrenchFryStick,
@@ -43,6 +44,7 @@ import { formatPondSettingsForPaste } from './objects/pond';
 import { formatMainHallSlideSettingsForPaste } from './objects/mainHallSlide';
 import { formatPigAdventureSettingsForPaste } from './objects/pigAdventure';
 import { formatHappyFatShopSettingsForPaste, HAPPY_FAT_SHOP_DEFAULT } from './objects/happyFatShop';
+import { formatRetroArcadePlacementsForPaste } from './objects/retroArcade';
 import { formatFloatingIslandSettingsForPaste } from './objects/floatingIsland';
 import { formatFrenchFriesPlacementsForPaste } from './objects/frenchFries';
 import { formatFrenchFryStickPlacementsForPaste } from './objects/frenchFryStick';
@@ -268,6 +270,9 @@ const {
   removeShiitake,
   treasureChest,
   happyFatShop,
+  retroArcades,
+  addRetroArcade,
+  removeRetroArcade,
   pond,
   mainHallSlide,
   mainHallDoor,
@@ -1882,6 +1887,88 @@ gui
   .onChange(projectRoomStyle.apply);
 
 // 街角小店「Happy Fat」（綠球上；半弧面屋頂的香菇屋風格）
+// 復古街機（GameHall 左邊；點選或拖曳選取後調整，可複製）——選取、編輯方式跟烤玉米、檸檬片一樣
+const retroArcadeFolder = gui.addFolder('復古街機');
+let selectedRetroArcade: WorldRetroArcade | null = null;
+
+function logRetroArcade() {
+  if (retroArcades.length === 0) return;
+  const text = formatRetroArcadePlacementsForPaste(retroArcades.map((a) => ({ id: a.id, settings: a.settings })));
+  console.log(text);
+  return text;
+}
+
+/** 選中的那台整台發光，其他台還原：一眼看得出現在在調哪一台 */
+function highlightRetroArcade(entry: WorldRetroArcade | null) {
+  for (const arcade of retroArcades) arcade.setHighlighted(arcade === entry);
+}
+
+const RETRO_ARCADE_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+
+/** 清掉上一台的滑桿（按鈕保留）。滑桿都放同一層：子資料夾不會被清掉，每換一台就多疊一個 */
+function clearRetroArcadePanelSliders() {
+  retroArcadeFolder.title('復古街機');
+  for (const controller of [...retroArcadeFolder.controllers]) {
+    if (RETRO_ARCADE_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+function bindRetroArcadePanel(entry: WorldRetroArcade) {
+  const alreadyShowing =
+    entry === selectedRetroArcade && retroArcadeFolder.controllers.length > RETRO_ARCADE_PANEL_ACTIONS.size;
+  selectedRetroArcade = entry;
+  highlightRetroArcade(entry);
+  if (alreadyShowing) return;
+
+  // 先清再設標題：反過來的話清除時會把標題改回「復古街機」，看不出選了哪台
+  clearRetroArcadePanelSliders();
+  retroArcadeFolder.title(`復古街機 · ${entry.label}`);
+  const ra = entry.settings;
+  const apply = () => entry.apply();
+  retroArcadeFolder.add(ra, 'enabled').name('顯示').onChange(apply).onFinishChange(logRetroArcade);
+  retroArcadeFolder.add(ra, 'size', 0.02, 0.3, 0.005).name('整體大小').onChange(apply).onFinishChange(logRetroArcade);
+  retroArcadeFolder.add(ra, 'angleFromTopDegrees', 0, 88, 1).name('離頂端 (°)').onChange(apply).onFinishChange(logRetroArcade);
+  retroArcadeFolder.add(ra, 'azimuthDegrees', -180, 180, 1).name('方位 (°)').onChange(apply).onFinishChange(logRetroArcade);
+  retroArcadeFolder.add(ra, 'spinDegrees', -180, 180, 1).name('自身旋轉 (°)').onChange(apply).onFinishChange(logRetroArcade);
+  retroArcadeFolder.add(ra, 'sink', -0.03, 0.05, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(logRetroArcade);
+  retroArcadeFolder.add(ra, 'screenGlow', 0, 3, 0.05).name('螢幕發光').onChange(apply).onFinishChange(logRetroArcade);
+}
+
+{
+  const retroArcadeControls = {
+    add() {
+      // 從選中的那台複製（大小、角度、螢幕亮度都一樣），往旁邊錯開一點
+      const created = addRetroArcade(selectedRetroArcade ? { ...selectedRetroArcade.settings } : undefined);
+      if (!created) return;
+      bindRetroArcadePanel(created);
+      refreshPuddingDragTargets();
+      // 新的一台腳下的草也要藏起來
+      groundDetail?.refreshMasks();
+      logRetroArcade();
+    },
+    remove() {
+      if (!selectedRetroArcade) return;
+      if (!removeRetroArcade(selectedRetroArcade)) return;
+      selectedRetroArcade = null;
+      clearRetroArcadePanelSliders();
+      // 移除後自動選最後一台（跟烤玉米一樣），不用再去場景上點
+      const next = retroArcades[retroArcades.length - 1];
+      if (next) bindRetroArcadePanel(next);
+      refreshPuddingDragTargets();
+      groundDetail?.refreshMasks();
+      logRetroArcade();
+    },
+    log() {
+      logRetroArcade();
+    },
+  };
+  retroArcadeFolder.add(retroArcadeControls, 'add').name('複製街機');
+  retroArcadeFolder.add(retroArcadeControls, 'remove').name('移除選中街機');
+  retroArcadeFolder.add(retroArcadeControls, 'log').name('印出全部佈局 (console)');
+  // 不預先選取：選中會整台發光，等使用者在場景上點了再選
+}
+
 const happyFatFolder = happyFatShop ? gui.addFolder('Happy Fat 小店') : null;
 function logHappyFat() {
   if (happyFatShop) console.log(formatHappyFatShopSettingsForPaste(happyFatShop.settings));
@@ -2735,6 +2822,7 @@ let surfaceDragTargets: Array<
   | WorldShiitake
   | WorldTreasureChest
   | WorldHappyFatShop
+  | WorldRetroArcade
   | WorldPond
 > = [
   ...houses,
@@ -2742,6 +2830,7 @@ let surfaceDragTargets: Array<
   ...shiitakes,
   ...(treasureChest ? [treasureChest] : []),
   ...(happyFatShop ? [happyFatShop] : []),
+  ...retroArcades,
   ...(pond ? [pond] : []),
   ...(PUDDING_SCENE_EDIT ? puddings : []),
   ...(CORN_SCENE_EDIT && foodVisibility.showCorn ? grilledCorns : []),
@@ -2759,6 +2848,7 @@ function refreshPuddingDragTargets() {
   surfaceDragTargets.push(...shiitakes);
   if (treasureChest) surfaceDragTargets.push(treasureChest);
   if (happyFatShop) surfaceDragTargets.push(happyFatShop);
+  surfaceDragTargets.push(...retroArcades);
   if (pond) surfaceDragTargets.push(pond);
   if (PUDDING_SCENE_EDIT) surfaceDragTargets.push(...puddings);
   if (CORN_SCENE_EDIT && foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
@@ -2792,6 +2882,8 @@ if (HOUSE_DRAG_ENABLED) {
         const cornEntry = grilledCorns.find((item) => item.object === target.object);
         if (cornEntry) bindCornPanel(cornEntry);
       }
+      const retroArcadeEntry = retroArcades.find((item) => item.object === target.object);
+      if (retroArcadeEntry) bindRetroArcadePanel(retroArcadeEntry);
       const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
       if (salmonEntry) bindSalmonPanel(salmonEntry);
       const shiitakeEntry = shiitakes.find((item) => item.object === target.object);
@@ -2816,6 +2908,7 @@ if (HOUSE_DRAG_ENABLED) {
       shiitakeFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       treasureFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       happyFatFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      retroArcadeFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       pondFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
     onDragEnd: (target) => {
@@ -2823,6 +2916,11 @@ if (HOUSE_DRAG_ENABLED) {
       else if (shiitakes.some((item) => item.object === target.object)) logShiitakePlacements();
       else if (treasureChest && target.object === treasureChest.object) logTreasure();
       else if (happyFatShop && target.object === happyFatShop.object) logHappyFat();
+      else if (retroArcades.some((item) => item.object === target.object)) {
+        // 街機搬家：只更新它腳下的草（遮罩），不重撒
+        groundDetail?.refreshMasks();
+        logRetroArcade();
+      }
       else if (pond && target.object === pond.object) {
         // 水潭搬家後：舊位置的草原樣長回來、新位置的草藏起來（不重撒，其他地方不動）
         rescatterAroundPond();
@@ -2846,6 +2944,8 @@ if (HOUSE_DRAG_ENABLED) {
         const cornEntry = grilledCorns.find((item) => item.object === target.object);
         if (cornEntry) bindCornPanel(cornEntry);
       }
+      const retroArcadeEntry = retroArcades.find((item) => item.object === target.object);
+      if (retroArcadeEntry) bindRetroArcadePanel(retroArcadeEntry);
       const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
       if (salmonEntry) bindSalmonPanel(salmonEntry);
       const shiitakeEntry = shiitakes.find((item) => item.object === target.object);

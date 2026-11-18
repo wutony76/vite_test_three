@@ -1,0 +1,57 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "retro_arcade",
+  "glb": "retro_arcade.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_materials_emissive_strength"
+  ],
+  "root": "retro_arcade_Root",
+  "clickable": [
+    "retro_arcade_controls"
+  ],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 1752,
+    "primitives": 14,
+    "meshes": 13,
+    "materials": 3,
+    "file_bytes": 95904
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "warn",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "teal": {
+        "class": "painted",
+        "pattern": "painted",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.4,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "painted",
+          "seed": 841093945,
+          "hash": "322213398ee4"
+        }
+      }
+    },
+    "bake": {},
+    "decals": 0,
+    "gpu_texture_mb": 0.71,
+    "flat_ratio": 0.552,
+    "texture_count": 4,
+    "texture_kb": 3.7,
+    "images": 4,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 93.7
+  }
+}

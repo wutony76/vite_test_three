@@ -1,0 +1,571 @@
+{
+  "schema": "lowpoly.reference/1",
+  "id": "mushroom_arcade",
+  "image": {
+    "path": "tools/img/mushroom_arcade.png",
+    "width": 1200,
+    "height": 896
+  },
+  "medium": "3D 渲染的香菇風電子遊樂中心（兩層樓街角店＋屋頂平台），3/4 俯視角；第二張參考（tools/img/mushroom_house.jpg 的香菇屋）只用來決定簡化方向：圓潤奶油色牆、木框綠邊、垂掛小香菇",
+  "view": {
+    "type": "three_quarter",
+    "source": "observed",
+    "confidence": 0.8
+  },
+  "scale_anchor": {
+    "component": "door",
+    "axis": "height",
+    "meters": 2.3
+  },
+  "silhouette": {
+    "outline": [
+      [
+        0.06,
+        0.78
+      ],
+      [
+        0.13,
+        0.36
+      ],
+      [
+        0.22,
+        0.08
+      ],
+      [
+        0.38,
+        0.06
+      ],
+      [
+        0.5,
+        0.06
+      ],
+      [
+        0.62,
+        0.1
+      ],
+      [
+        0.8,
+        0.22
+      ],
+      [
+        0.95,
+        0.27
+      ],
+      [
+        0.97,
+        0.8
+      ],
+      [
+        0.7,
+        0.98
+      ],
+      [
+        0.3,
+        0.95
+      ],
+      [
+        0.06,
+        0.78
+      ]
+    ],
+    "source": "observed",
+    "confidence": 0.65
+  },
+  "palette": [
+    {
+      "name": "wall_cream",
+      "hex": "#E2D6CC",
+      "usage": "牆身（暖灰奶油色）",
+      "sample": [
+        0.2,
+        0.62,
+        0.3,
+        0.68
+      ]
+    },
+    {
+      "name": "trim_wood",
+      "hex": "#8A5A3C",
+      "usage": "樓層木腰帶、招牌木板",
+      "sample": [
+        0.45,
+        0.33,
+        0.6,
+        0.36
+      ]
+    },
+    {
+      "name": "frame_green",
+      "hex": "#7E9A3E",
+      "usage": "招牌、窗戶的綠框",
+      "sample": [
+        0.23,
+        0.3,
+        0.26,
+        0.33
+      ]
+    },
+    {
+      "name": "neon_cyan",
+      "hex": "#5FF2E6",
+      "usage": "青色霓虹燈條、像素外框",
+      "sample": [
+        0.45,
+        0.38,
+        0.6,
+        0.39
+      ]
+    },
+    {
+      "name": "neon_magenta",
+      "hex": "#FF5FD8",
+      "usage": "「電 • 波 • 町」霓虹字",
+      "sample": [
+        0.34,
+        0.6,
+        0.5,
+        0.64
+      ]
+    },
+    {
+      "name": "neon_yellow",
+      "hex": "#FFD84A",
+      "usage": "ARCADE、GAME START! 字",
+      "sample": [
+        0.36,
+        0.65,
+        0.48,
+        0.68
+      ]
+    },
+    {
+      "name": "cap_purple",
+      "hex": "#9A5BC0",
+      "usage": "大香菇傘",
+      "sample": [
+        0.24,
+        0.07,
+        0.34,
+        0.14
+      ]
+    },
+    {
+      "name": "glow_purple",
+      "hex": "#A24DF5",
+      "usage": "屋頂發光的斑點香菇",
+      "sample": [
+        0.5,
+        0.1,
+        0.56,
+        0.16
+      ]
+    },
+    {
+      "name": "interior_purple",
+      "hex": "#6B5BC8",
+      "usage": "店內（窗裡）的紫色燈光",
+      "sample": [
+        0.55,
+        0.47,
+        0.65,
+        0.55
+      ]
+    },
+    {
+      "name": "base_lavender",
+      "hex": "#A9A7C2",
+      "usage": "底座平台",
+      "sample": [
+        0.15,
+        0.85,
+        0.3,
+        0.9
+      ]
+    }
+  ],
+  "components": [
+    {
+      "id": "base",
+      "kind": "ma_base",
+      "tier": "secondary",
+      "bbox": [
+        0.06,
+        0.72,
+        0.97,
+        0.98
+      ],
+      "material_hint": "base_lavender",
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "gf_shell",
+      "kind": "ma_block",
+      "tier": "primary",
+      "bbox": [
+        0.13,
+        0.55,
+        0.75,
+        0.88
+      ],
+      "material_hint": "wall_cream",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "uf_shell",
+      "kind": "ma_block",
+      "tier": "primary",
+      "bbox": [
+        0.14,
+        0.32,
+        0.75,
+        0.58
+      ],
+      "material_hint": "wall_cream",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "gf_band",
+      "kind": "ma_band",
+      "tier": "secondary",
+      "bbox": [
+        0.15,
+        0.55,
+        0.75,
+        0.6
+      ],
+      "material_hint": "trim_wood",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "roof_band",
+      "kind": "ma_band",
+      "tier": "secondary",
+      "bbox": [
+        0.18,
+        0.32,
+        0.75,
+        0.37
+      ],
+      "material_hint": "trim_wood",
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "neon_lines",
+      "kind": "ma_neon_ring",
+      "tier": "tertiary",
+      "bbox": [
+        0.15,
+        0.38,
+        0.75,
+        0.62
+      ],
+      "material_hint": "neon_cyan",
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "door",
+      "kind": "ma_door",
+      "tier": "primary",
+      "bbox": [
+        0.36,
+        0.69,
+        0.5,
+        0.86
+      ],
+      "material_hint": "frame_green",
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "main_sign",
+      "kind": "ma_sign",
+      "tier": "secondary",
+      "bbox": [
+        0.32,
+        0.56,
+        0.52,
+        0.7
+      ],
+      "material_hint": "trim_wood",
+      "source": "observed",
+      "confidence": 0.85
+    },
+    {
+      "id": "shop_window",
+      "kind": "ma_window",
+      "tier": "secondary",
+      "bbox": [
+        0.52,
+        0.68,
+        0.7,
+        0.88
+      ],
+      "material_hint": "neon_cyan",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "left_window",
+      "kind": "ma_window",
+      "tier": "secondary",
+      "bbox": [
+        0.18,
+        0.69,
+        0.28,
+        0.83
+      ],
+      "material_hint": "neon_cyan",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "upper_window",
+      "kind": "ma_window",
+      "tier": "secondary",
+      "bbox": [
+        0.41,
+        0.45,
+        0.7,
+        0.62
+      ],
+      "material_hint": "trim_wood",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "upper_left_window",
+      "kind": "ma_window",
+      "tier": "secondary",
+      "bbox": [
+        0.17,
+        0.43,
+        0.33,
+        0.6
+      ],
+      "material_hint": "neon_cyan",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "vert_sign",
+      "kind": "ma_sign",
+      "tier": "tertiary",
+      "bbox": [
+        0.13,
+        0.4,
+        0.16,
+        0.53
+      ],
+      "material_hint": "trim_wood",
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "roof_sign",
+      "kind": "ma_sign",
+      "tier": "tertiary",
+      "bbox": [
+        0.62,
+        0.23,
+        0.76,
+        0.32
+      ],
+      "material_hint": "trim_wood",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "invader_sign",
+      "kind": "ma_sign",
+      "tier": "tertiary",
+      "bbox": [
+        0.63,
+        0.1,
+        0.72,
+        0.2
+      ],
+      "material_hint": "neon_cyan",
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "glow_shrooms",
+      "kind": "ma_spotted_cluster",
+      "tier": "secondary",
+      "bbox": [
+        0.44,
+        0.06,
+        0.62,
+        0.33
+      ],
+      "material_hint": "glow_purple",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "cap_left",
+      "kind": "ma_big_mushroom",
+      "tier": "secondary",
+      "bbox": [
+        0.22,
+        0.04,
+        0.38,
+        0.22
+      ],
+      "material_hint": "cap_purple",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "cap_right",
+      "kind": "ma_big_mushroom",
+      "tier": "secondary",
+      "bbox": [
+        0.79,
+        0.22,
+        0.95,
+        0.41
+      ],
+      "material_hint": "cap_purple",
+      "source": "observed",
+      "confidence": 0.8
+    },
+    {
+      "id": "cabinet",
+      "kind": "ma_cabinet",
+      "tier": "secondary",
+      "bbox": [
+        0.76,
+        0.36,
+        0.93,
+        0.81
+      ],
+      "material_hint": "wall_cream",
+      "source": "observed",
+      "confidence": 0.75
+    },
+    {
+      "id": "mini_shrooms",
+      "kind": "ma_mini_shrooms",
+      "tier": "tertiary",
+      "bbox": [
+        0.09,
+        0.73,
+        0.95,
+        0.94
+      ],
+      "material_hint": "cap_purple",
+      "source": "observed",
+      "confidence": 0.7
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "wall_plaster",
+      "region": [
+        [
+          0.18,
+          0.62
+        ],
+        [
+          0.32,
+          0.62
+        ],
+        [
+          0.32,
+          0.68
+        ],
+        [
+          0.18,
+          0.68
+        ]
+      ],
+      "class": "plaster",
+      "pattern": "plaster",
+      "base_hex": "#E2D6CC",
+      "scale_m": 0.8,
+      "components": [
+        "gf_shell",
+        "uf_shell"
+      ],
+      "source": "observed",
+      "confidence": 0.7
+    },
+    {
+      "id": "trim_planks",
+      "region": [
+        [
+          0.45,
+          0.33
+        ],
+        [
+          0.6,
+          0.33
+        ],
+        [
+          0.6,
+          0.36
+        ],
+        [
+          0.45,
+          0.36
+        ]
+      ],
+      "class": "wood",
+      "pattern": "planks",
+      "base_hex": "#8A5A3C",
+      "scale_m": 0.35,
+      "components": [
+        "gf_band",
+        "roof_band",
+        "main_sign"
+      ],
+      "source": "observed",
+      "confidence": 0.65
+    }
+  ],
+  "hidden": [
+    {
+      "id": "back_side",
+      "assumption": "背面同樣的奶油色牆，沒有開口；木腰帶、霓虹燈條繞一整圈",
+      "source": "inferred",
+      "confidence": 0.6
+    }
+  ],
+  "excluded": [
+    {
+      "reason": "使用者要求適當簡化（參考第二張香菇屋）：屋頂左側的長樓梯拿掉",
+      "what": "roof_stairs"
+    },
+    {
+      "reason": "簡化：左牆的綠色水管、配電箱拿掉",
+      "what": "pipes_boxes"
+    },
+    {
+      "reason": "簡化：右側小木門、牆上的漩渦浮雕拿掉，右側只保留街機台",
+      "what": "side_door_reliefs"
+    },
+    {
+      "reason": "簡化：屋頂後方的白色小屋、像素小鬼拿掉，只留一隻青色像素外星人招牌",
+      "what": "roof_clutter"
+    },
+    {
+      "reason": "店內的人物、遊戲機只用窗內的發光貼圖（decal）表現，不做幾何",
+      "what": "interior_props"
+    },
+    {
+      "reason": "牆上的星星、愛心、金幣等像素圖示用貼圖（decal）表現，不做幾何",
+      "what": "pixel_icons_geometry"
+    },
+    {
+      "reason": "使用者指定：招牌中文改成「電 • 波 • 町」，不照參考圖的「電子遊樂中心」",
+      "what": "sign_text_電子遊樂中心"
+    }
+  ]
+}

@@ -1,0 +1,456 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "retro_arcade",
+  "reference": "retro_arcade",
+  "notes": "依 tools/img/game_machine.jpg 的向量貼紙風復古街機重新建模（取代舊的粗略版 game_machine）：青綠機身（側面輪廓擠出）、奶油色斜螢幕框、往前伸的操作台與兩支紅球搖桿、頂上招牌箱與紅色小盒、下方投幣門、兩側下半部橘色彩繪側板，左側掛著相機、喇叭圓盤、旋鈕盒、糖果按鈕盒、通風箱。正面朝 -Y，原點在機身底面中心。",
+  "dimensions": {
+    "w": 1.62,
+    "d": 1.7,
+    "h": 1.85
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {
+      "tertiary_density": 1,
+      "geometry_complexity": 12,
+      "bevel_quality": 0,
+      "bake": "none"
+    }
+  },
+  "style": {
+    "edge_wobble": 0.0
+  },
+  "budget": {
+    "max_tris": 6000,
+    "max_primitives": 24,
+    "max_texture_kb": 400,
+    "max_gpu_texture_mb": 8
+  },
+  "export": {
+    "path": "public/models/retro_arcade/retro_arcade.glb",
+    "compress": true,
+    "clickable": [
+      "controls"
+    ],
+    "anim_groups": {}
+  },
+  "materials": [
+    {
+      "name": "teal",
+      "hex": "#2FB3C0",
+      "roughness": 0.6,
+      "surface": {
+        "class": "painted",
+        "pattern": "painted",
+        "scale_m": 0.4,
+        "palette": [
+          "#1F8794",
+          "#2FB3C0",
+          "#6FD8E0"
+        ],
+        "tier": "prop",
+        "wear": 0.15,
+        "dirt": 0.05
+      }
+    },
+    {
+      "name": "cream",
+      "hex": "#F3E2C3",
+      "roughness": 0.65
+    },
+    {
+      "name": "orange",
+      "hex": "#F07A2A",
+      "roughness": 0.6
+    },
+    {
+      "name": "red",
+      "hex": "#E8433C",
+      "roughness": 0.35
+    },
+    {
+      "name": "dark_grey",
+      "hex": "#3C4048",
+      "roughness": 0.6
+    },
+    {
+      "name": "black",
+      "hex": "#1E1F24",
+      "roughness": 0.5
+    },
+    {
+      "name": "screen_dark",
+      "hex": "#2A1622",
+      "roughness": 0.3,
+      "emissive": true,
+      "emission_strength": 0.35
+    },
+    {
+      "name": "lens",
+      "hex": "#22252B",
+      "roughness": 0.25
+    },
+    {
+      "name": "candy_green",
+      "hex": "#5FCB5F",
+      "roughness": 0.4
+    },
+    {
+      "name": "candy_yellow",
+      "hex": "#F7D046",
+      "roughness": 0.4
+    },
+    {
+      "name": "candy_blue",
+      "hex": "#4DA3F0",
+      "roughness": 0.4
+    },
+    {
+      "name": "candy_pink",
+      "hex": "#F06292",
+      "roughness": 0.4
+    }
+  ],
+  "components": [
+    {
+      "id": "cabinet",
+      "kind": "rm_cabinet",
+      "tier": "primary",
+      "method": "component",
+      "profile": "building_shell",
+      "material": "teal",
+      "bounds": [
+        [
+          -0.45,
+          -0.5,
+          0.05
+        ],
+        [
+          0.45,
+          0.45,
+          1.85
+        ]
+      ],
+      "source": "observed",
+      "assumption": "青綠機身：側面輪廓（背面直、頂上招牌箱往前突、螢幕往內凹、操作台下方、踢腳板）沿 x 擠出，1 個封閉島。",
+      "confidence": 0.8
+    },
+    {
+      "id": "side_art",
+      "kind": "rm_side_art",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "orange",
+      "bounds": [
+        [
+          -0.47,
+          -0.5,
+          0.05
+        ],
+        [
+          0.47,
+          0.45,
+          0.88
+        ]
+      ],
+      "source": "observed",
+      "assumption": "兩側下半部的橘色彩繪側板（薄板，貼在機身兩側），簡化掉卡通塗鴉。",
+      "confidence": 0.8
+    },
+    {
+      "id": "marquee",
+      "kind": "rm_marquee",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "cream",
+      "params": {
+        "panel_material": "dark_grey",
+        "light_material": "orange"
+      },
+      "bounds": [
+        [
+          -0.42,
+          -0.6,
+          1.5
+        ],
+        [
+          0.42,
+          -0.15,
+          1.85
+        ]
+      ],
+      "source": "observed",
+      "assumption": "頂上招牌箱：奶油色圓角盒＋前面一條深色面板與兩顆小燈（參考圖頂上像機器的盒子）。",
+      "confidence": 0.8
+    },
+    {
+      "id": "red_box",
+      "kind": "rm_box",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "red",
+      "bounds": [
+        [
+          0.18,
+          -0.62,
+          1.62
+        ],
+        [
+          0.48,
+          -0.32,
+          1.8
+        ]
+      ],
+      "source": "observed",
+      "assumption": "招牌箱右上的紅色小盒。",
+      "confidence": 0.8
+    },
+    {
+      "id": "bezel",
+      "kind": "rm_bezel",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "opening",
+      "material": "cream",
+      "params": {
+        "screen_material": "screen_dark"
+      },
+      "bounds": [
+        [
+          -0.4,
+          -0.27,
+          0.98
+        ],
+        [
+          0.4,
+          -0.09,
+          1.5
+        ]
+      ],
+      "source": "observed",
+      "assumption": "螢幕框：奶油色斜框（跟著機身的斜螢幕面）＋裡面一塊微微發光的深色螢幕。",
+      "confidence": 0.8
+    },
+    {
+      "id": "controls",
+      "kind": "rm_controls",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "cream",
+      "params": {
+        "front_material": "orange",
+        "ball_material": "red",
+        "knob_material": "black",
+        "slot_material": "dark_grey"
+      },
+      "bounds": [
+        [
+          -0.5,
+          -0.82,
+          0.86
+        ],
+        [
+          0.5,
+          -0.3,
+          1.31
+        ]
+      ],
+      "source": "observed",
+      "assumption": "往前伸的操作台：奶油色檯面、橘色前緣、兩支紅球搖桿、中間一顆深色圓鈕、兩個投幣口。",
+      "confidence": 0.8
+    },
+    {
+      "id": "coin_door",
+      "kind": "rm_coin_door",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "dark_grey",
+      "params": {
+        "knob_material": "orange",
+        "window_material": "black"
+      },
+      "bounds": [
+        [
+          -0.24,
+          -0.6,
+          0.3
+        ],
+        [
+          0.24,
+          -0.44,
+          0.76
+        ]
+      ],
+      "source": "observed",
+      "assumption": "下方的投幣門：深灰面板＋橘色旋鈕＋一個小窗。",
+      "confidence": 0.8
+    },
+    {
+      "id": "camera",
+      "kind": "rm_camera",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "orange",
+      "params": {
+        "lens_material": "lens",
+        "trim_material": "cream"
+      },
+      "bounds": [
+        [
+          -0.8,
+          -0.28,
+          1.45
+        ],
+        [
+          -0.45,
+          0.12,
+          1.78
+        ]
+      ],
+      "source": "observed",
+      "assumption": "左上角的橘色相機：方盒＋往前的鏡頭（深色鏡片）＋頂上提把。",
+      "confidence": 0.8
+    },
+    {
+      "id": "speaker",
+      "kind": "rm_speaker",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "cream",
+      "params": {
+        "grille_material": "dark_grey",
+        "hole_material": "black"
+      },
+      "bounds": [
+        [
+          -0.64,
+          -0.32,
+          1.02
+        ],
+        [
+          -0.45,
+          0.18,
+          1.48
+        ]
+      ],
+      "source": "observed",
+      "assumption": "左側的大喇叭圓盤：奶油色外圈＋深灰喇叭網＋五個圓孔（朝左）。",
+      "confidence": 0.8
+    },
+    {
+      "id": "knob_box",
+      "kind": "rm_knob_box",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "dark_grey",
+      "params": {
+        "knob_material": "orange",
+        "small_material": "red"
+      },
+      "bounds": [
+        [
+          -0.64,
+          -0.22,
+          0.74
+        ],
+        [
+          -0.45,
+          0.14,
+          1.0
+        ]
+      ],
+      "source": "observed",
+      "assumption": "左側的旋鈕盒：深灰盒＋一顆大橘鈕、兩顆紅色小鈕（朝左）。",
+      "confidence": 0.8
+    },
+    {
+      "id": "candy_box",
+      "kind": "rm_candy_box",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "dark_grey",
+      "params": {
+        "colors": [
+          "candy_green",
+          "candy_yellow",
+          "candy_blue",
+          "candy_pink"
+        ]
+      },
+      "bounds": [
+        [
+          -0.62,
+          -0.2,
+          0.54
+        ],
+        [
+          -0.45,
+          0.14,
+          0.72
+        ]
+      ],
+      "source": "observed",
+      "assumption": "左側的糖果按鈕盒：深灰盒上一排彩色圓按鈕（綠、黃、藍、粉紅）。",
+      "confidence": 0.8
+    },
+    {
+      "id": "vent_box",
+      "kind": "rm_vent_box",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "cream",
+      "params": {
+        "vent_material": "dark_grey"
+      },
+      "bounds": [
+        [
+          -0.64,
+          -0.26,
+          0.08
+        ],
+        [
+          -0.45,
+          0.2,
+          0.52
+        ]
+      ],
+      "source": "observed",
+      "assumption": "左下的奶油色盒子：側面三條深色通風槽。",
+      "confidence": 0.8
+    },
+    {
+      "id": "feet",
+      "kind": "rm_feet",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "black",
+      "bounds": [
+        [
+          -0.42,
+          -0.47,
+          0.0
+        ],
+        [
+          0.42,
+          0.42,
+          0.05
+        ]
+      ],
+      "source": "observed",
+      "assumption": "機身底下四個深色小腳墊。",
+      "confidence": 0.8
+    }
+  ],
+  "decals": []
+}
