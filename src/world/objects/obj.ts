@@ -1642,6 +1642,8 @@ export type WorldFriedEgg = {
   settings: FriedEggSettings;
   apply: () => void;
   applyVisuals: () => void;
+  /** 重新長出程式產生的蛋白（控制面板改了蛋白外觀時用） */
+  rebuildWhite: () => void;
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;
 };
@@ -1654,6 +1656,7 @@ function exposeFriedEgg(id: string, egg: ReturnType<typeof createFriedEgg>): Wor
     settings: egg.settings,
     apply: egg.applySettings,
     applyVisuals: egg.applyVisuals,
+    rebuildWhite: egg.rebuildWhite,
     getNormal: egg.getNormal,
     setNormal: egg.setNormal,
   };

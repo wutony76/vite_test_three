@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { conformChildrenToSphere } from './conformToSphere';
 import { cloneGltfInstance, loadGltfOnce, scheduleGltfMount } from './sharedGltf';
+import { eggViewLight, lockEggLightingToCamera, rebuildEggWhite, replaceEggWhite, replaceEggYolk } from './friedEggWhite';
 import {
   FRIED_EGG_SUN_DEFAULT,
   type FriedEggAttachLayout,
@@ -11,6 +12,19 @@ import {
 } from './friedEggLayout';
 
 const FRIED_EGG_URL = `${import.meta.env.BASE_URL}models/fried_egg/fried_egg.glb`;
+/** true = 蛋白改用程式產生（波浪邊＋焦脆金黃邊，見 friedEggWhite.ts）；false = 用 glb 原本的低面數蛋白 */
+const PROCEDURAL_EGG_WHITE = true;
+/** true = 蛋黃改用程式產生的平滑圓頂（見 friedEggWhite.ts 的 replaceEggYolk）；false = 用 glb 原本有切面的低面數蛋黃 */
+const PROCEDURAL_EGG_YOLK = true;
+/**
+ * Q 彈抖動分開：半熟的蛋黃才會晃，煎熟的蛋白幾乎不動。
+ *   YOLK_JIGGLE_GAIN：蛋黃抖動是原本整顆蛋的幾倍（只動蛋黃，畫面上的動感變小，放大一點補回來）
+ *   WHITE_JIGGLE_RATIO：蛋白跟著抖的比例（0 = 完全不動）
+ *   YOLK_SWAY_DEGREES：蛋黃左右、前後搖擺的最大角度（以蛋黃底部為支點，像果凍在晃）
+ */
+const YOLK_JIGGLE_GAIN = 1.6;
+const WHITE_JIGGLE_RATIO = 0.15;
+const YOLK_SWAY_DEGREES = 5;
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const direction = new THREE.Vector3();
@@ -32,7 +46,9 @@ const EGG_FACE_CAMERA = new THREE.Quaternion().setFromEuler(
  * 這顆 glb 的蛋白貼圖只有正中心（被蛋黃蓋住的地方）是白的，外圍大片是焦褐色，照貼圖發光整顆蛋會變土黃；
  * 蛋黃貼圖偏深橘，照貼圖發光會變紅。所以維持單色發光，只把強度降下來，讓燈光和反射透出立體感。
  */
-const EGG_YOLK_EMISSIVE = new THREE.Color(0xffa41c);
+const EGG_YOLK_EMISSIVE = new THREE.Color(0xff9214);
+/** 程式產生的蛋黃沒有貼圖，用這個當底色（有貼圖時底色維持白色，顏色交給貼圖） */
+const EGG_YOLK_BASE_COLOR = new THREE.Color(0xff8a12);
 const YOLK_RIM_TINT = new THREE.Color(1.0, 0.62, 0.22);
 
 /**
@@ -78,6 +94,8 @@ function toYolkPhysical(
     shader.uniforms.uYolkSpec = highlight.strength;
     shader.uniforms.uYolkSpecSharp = highlight.sharpness;
     shader.uniforms.uYolkDomeCenter = { value: domeCenter };
+    // 轉動島嶼時明暗不跟著跑：燈光、環境反射都綁在鏡頭上
+    lockEggLightingToCamera(shader, eggViewLight.yolkKeyScale);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nuniform vec3 uYolkDomeCenter;\nvarying vec3 vYolkDomeNormal;')
       .replace(
@@ -163,6 +181,11 @@ export function createFriedEgg({
   let introGrow = 1;
   let builtModelSize = settings.modelSize;
   let jigglePhase = 0;
+  /** 抖動要分開動蛋黃、蛋白，所以記住兩個 mesh 和它們原本的縮放、旋轉 */
+  let yolkPart: { mesh: THREE.Object3D; scale: THREE.Vector3; quaternion: THREE.Quaternion } | null = null;
+  let whitePart: { mesh: THREE.Object3D; scale: THREE.Vector3 } | null = null;
+  const swayEuler = new THREE.Euler();
+  const swayQuat = new THREE.Quaternion();
 
   const sunLight = new THREE.PointLight(0xfff4e0, 0, Math.max(groundRadius * 6, 12), 1.6);
   sunLight.castShadow = false;
@@ -301,7 +324,8 @@ export function createFriedEgg({
           m.metalness = 0;
           m.roughness = sun ? 0.18 : 0.28;
           m.envMapIntensity = sun ? 0.52 : 0.4;
-          m.color.setRGB(1, 1, 1);
+          if (m.map) m.color.setRGB(1, 1, 1);
+          else m.color.copy(EGG_YOLK_BASE_COLOR);
           m.emissive.copy(EGG_YOLK_EMISSIVE);
           m.emissiveIntensity = sun ? settings.yolkGlow * boost : 0.22;
           const p = m as THREE.MeshPhysicalMaterial;
@@ -347,6 +371,20 @@ export function createFriedEgg({
         model.name = 'fried_egg_model';
         model.traverse((child) => {
           child.frustumCulled = false;
+        });
+        // 蛋黃先換：蛋白的半透明圈、鼓起要量蛋黃的位置和大小
+        if (PROCEDURAL_EGG_YOLK) replaceEggYolk(model);
+        if (PROCEDURAL_EGG_WHITE) replaceEggWhite(model);
+        model.traverse((child) => {
+          const mesh = child as THREE.Mesh;
+          // 只取第一個符合的：蛋白底下還掛著氣泡，不能被當成蛋白
+          if (!mesh.isMesh || mesh.parent?.name === 'egg_bubbles') return;
+          const name = `${(Array.isArray(mesh.material) ? mesh.material[0] : mesh.material)?.name ?? ''} ${mesh.name}`.toLowerCase();
+          if (name.includes('yolk') && !yolkPart) {
+            yolkPart = { mesh, scale: mesh.scale.clone(), quaternion: mesh.quaternion.clone() };
+          } else if (name.includes('white') && !whitePart) {
+            whitePart = { mesh, scale: mesh.scale.clone() };
+          }
         });
         fitModel(model);
         enhanceEggMaterials(model);
@@ -402,9 +440,10 @@ export function createFriedEgg({
 
     const sun = settings;
     model.rotation.set(0, 0, 0);
+    model.scale.setScalar(modelBaseScale);
 
     if (!introDone || introGrow < 0.999) {
-      model.scale.setScalar(modelBaseScale);
+      resetJiggle();
       return;
     }
 
@@ -418,14 +457,57 @@ export function createFriedEgg({
       (0.045 * Math.sin(jigglePhase * 5.1) +
         0.028 * Math.sin(jigglePhase * 8.7 + 0.6) +
         0.015 * Math.sin(jigglePhase * 2.3));
+
+    if (!yolkPart) {
+      // 找不到蛋黃（換了模型）：退回整顆一起抖
+      setJelly(model, modelBaseScale, wobble);
+      return;
+    }
+    const yolk = yolkPart as NonNullable<typeof yolkPart>;
+    // 蛋黃：上下 Q 彈 + 以底部為支點左右前後搖（兩個方向用不同頻率，才不會像在畫圓）
+    setJellyScale(yolk.mesh, yolk.scale, wobble * YOLK_JIGGLE_GAIN);
+    const sway = THREE.MathUtils.degToRad(YOLK_SWAY_DEGREES) * jiggleStrength;
+    swayEuler.set(
+      sway * Math.sin(jigglePhase * 3.7 + 1.1),
+      0,
+      sway * Math.sin(jigglePhase * 4.6 + 0.3),
+    );
+    yolk.mesh.quaternion.copy(yolk.quaternion).multiply(swayQuat.setFromEuler(swayEuler));
+    // 蛋白：只跟著輕輕抖一點
+    if (whitePart) {
+      const white = whitePart as NonNullable<typeof whitePart>;
+      setJellyScale(white.mesh, white.scale, wobble * WHITE_JIGGLE_RATIO);
+    }
+  }
+
+  function setJelly(target: THREE.Object3D, base: number, wobble: number) {
+    const squash = THREE.MathUtils.clamp(1 - wobble * 0.55, 0.55, 1.45);
+    const bulge = THREE.MathUtils.clamp(1 + wobble, 0.55, 1.45);
+    target.scale.set(base * squash, base * bulge, base * squash);
+  }
+
+  function setJellyScale(target: THREE.Object3D, base: THREE.Vector3, wobble: number) {
     const squash = THREE.MathUtils.clamp(1 - wobble * 0.55, 0.55, 1.45);
     const bulge = THREE.MathUtils.clamp(1 + wobble, 0.55, 1.45);
     jellyScale.set(squash, bulge, squash);
-    model.scale.set(
-      modelBaseScale * jellyScale.x,
-      modelBaseScale * jellyScale.y,
-      modelBaseScale * jellyScale.z,
-    );
+    target.scale.copy(base).multiply(jellyScale);
+  }
+
+  function resetJiggle() {
+    if (yolkPart) {
+      const yolk = yolkPart as NonNullable<typeof yolkPart>;
+      yolk.mesh.scale.copy(yolk.scale);
+      yolk.mesh.quaternion.copy(yolk.quaternion);
+    }
+    if (whitePart) {
+      const white = whitePart as NonNullable<typeof whitePart>;
+      white.mesh.scale.copy(white.scale);
+    }
+  }
+
+  /** 控制面板改了蛋白外觀（friedEggWhite.ts 的 EGG_WHITE_LOOK）後呼叫 */
+  function rebuildWhite() {
+    if (model && PROCEDURAL_EGG_WHITE) rebuildEggWhite(model);
   }
 
   return {
@@ -433,6 +515,7 @@ export function createFriedEgg({
     settings,
     applySettings,
     applyVisuals,
+    rebuildWhite,
     setIntroGrow,
     update,
     getNormal: () => (isSunLayout(settings) || isAttachLayout(settings) ? up.clone() : normal.clone()),

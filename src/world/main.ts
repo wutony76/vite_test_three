@@ -48,6 +48,7 @@ import { formatFrenchFryStickPlacementsForPaste } from './objects/frenchFryStick
 import { formatPuddingPlacementsForPaste } from './objects/pudding';
 import { formatSalmonSteakPlacementsForPaste } from './objects/salmonSteak';
 import { formatFriedEggPlacementsForPaste } from './objects/friedEgg';
+import { EGG_WHITE_LOOK, eggViewLight, eggWhiteExposure, formatEggWhiteLookForPaste } from './objects/friedEggWhite';
 import { formatPigSettingsForPaste } from './objects/pig';
 import { formatPigCloudSettingsForPaste, PIG_CLOUD_STATES } from './objects/pigCloud';
 import type { FriedEggSunLayout } from './objects/friedEggLayout';
@@ -1100,6 +1101,34 @@ if (eggSunFolder && eggSunEntry && eggSunEntry.settings.mode === 'sun') {
     eggSunFolder.add(sun, key, min, max, step).name(name).onChange(applyVisuals).onFinishChange(logEggSun);
   }
   eggSunFolder.add({ log: logEggSun }, 'log').name('印出設定 (console)');
+
+  // 蛋白外觀（程式產生的蛋白，見 friedEggWhite.ts）：形狀類的數值改了要重新長一次
+  const eggWhiteFolder = eggSunFolder.addFolder('蛋白外觀');
+  const logEggWhite = () => console.log(formatEggWhiteLookForPaste());
+  const rebuildWhite = () => eggSunEntry.rebuildWhite();
+  const eggWhiteSliders: Array<[keyof typeof EGG_WHITE_LOOK, number, number, number, string]> = [
+    ['seed', 1, 60, 1, '亂數種子（換輪廓）'],
+    ['wobble', 0, 0.25, 0.005, '波浪起伏'],
+    ['lace', 0, 0.06, 0.002, '邊緣鋸齒'],
+    ['crispWidth', 0.05, 0.5, 0.01, '焦脆邊寬度'],
+    ['rimCurl', 0, 1.2, 0.02, '邊緣上翹'],
+    ['domeBulge', 0, 0.8, 0.02, '蛋黃旁鼓起'],
+    ['translucentRing', 1, 3, 0.05, '半熟透明圈'],
+    ['bubbles', 0, 12, 1, '氣泡數'],
+    ['bubbleSize', 0.3, 2, 0.05, '氣泡大小'],
+  ];
+  for (const [key, min, max, step, name] of eggWhiteSliders) {
+    eggWhiteFolder.add(EGG_WHITE_LOOK, key, min, max, step).name(name).onChange(rebuildWhite).onFinishChange(logEggWhite);
+  }
+  // 曝光是 shader 直接讀的 uniform，改了立刻生效，不用重新長
+  eggWhiteFolder.add(eggWhiteExposure.value, 'x', 0.3, 2, 0.01).name('蛋白曝光斜率').onFinishChange(logEggWhite);
+  eggWhiteFolder.add(eggWhiteExposure.value, 'y', 0.8, 1.4, 0.01).name('蛋白最亮').onFinishChange(logEggWhite);
+  // 鏡頭固定光（蛋白、蛋黃共用）：轉島嶼時蛋的明暗不變，亮度從這裡調
+  eggWhiteFolder.add(eggViewLight.key, 'value', 0.5, 5, 0.05).name('蛋主光強度').onFinishChange(logEggWhite);
+  eggWhiteFolder.add(eggViewLight.ambient, 'value', 0, 1, 0.01).name('蛋背光面亮度').onFinishChange(logEggWhite);
+  eggWhiteFolder.add(eggViewLight.yolkKeyScale, 'value', 0.1, 1.5, 0.01).name('蛋黃主光倍率').onFinishChange(logEggWhite);
+  eggWhiteFolder.add({ log: logEggWhite }, 'log').name('印出蛋白外觀 (console)');
+  eggWhiteFolder.close();
 }
 
 if (puddingFolder) {
