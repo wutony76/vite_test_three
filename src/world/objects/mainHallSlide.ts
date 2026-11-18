@@ -76,6 +76,21 @@ export const MAIN_HALL_SLIDE_DEFAULT: MainHallSlideSettings = {
 
 type PondInfo = { normal: THREE.Vector3; size: number };
 
+/**
+ * 給小豬溜滑梯用的路線（全部是 ground 座標）：
+ * 從三樓洞口出來 → 走過木平台 → 沿滑道曲線滑進水潭
+ */
+export type SlideRide = {
+  /** 洞口底部中央（平台頂面、貼著外牆）：小豬從這裡冒出來 */
+  door: THREE.Vector3;
+  /** 往外的方向（離開房子） */
+  outward: THREE.Vector3;
+  /** 房子的「上」 */
+  houseUp: THREE.Vector3;
+  /** 滑道曲線：起點是平台末端，終點在水潭裡；曲線上的點是「槽底」 */
+  curve: THREE.CatmullRomCurve3;
+};
+
 type CreateMainHallSlideOptions = {
   ground: THREE.Object3D;
   groundRadius: number;
@@ -111,6 +126,8 @@ export function createMainHallSlide({
   const capProbeMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
 
   let chute: THREE.Mesh | null = null;
+  /** 最近一次建好的滑行路線（小豬溜滑梯用）；還沒建好、或被清掉時是 null */
+  let ride: SlideRide | null = null;
   let chuteIndexCount = 0;
   let builtKey = '';
   let introGrow = 1;
@@ -130,6 +147,7 @@ export function createMainHallSlide({
     });
     group.clear();
     chute = null;
+    ride = null;
   }
 
   /** 把 ground 本地座標的點，沿著球心方向調到離地 height 的高度 */
@@ -548,6 +566,12 @@ export function createMainHallSlide({
       points.push(atHeight(h, THREE.MathUtils.lerp(startHeightAboveGround, endHeight, e)));
     });
     const curve = new THREE.CatmullRomCurve3(points);
+    ride = {
+      door: wall.clone().addScaledVector(outward, 0.05 * unit),
+      outward: outward.clone(),
+      houseUp: houseUp.clone(),
+      curve,
+    };
 
     // ── 滑道：U 形斷面沿曲線掃出來 ──
     {
@@ -690,7 +714,15 @@ export function createMainHallSlide({
     applyIntro();
   }
 
-  return { object: group, settings, applySettings, update, setIntroGrow };
+  return {
+    object: group,
+    settings,
+    applySettings,
+    update,
+    setIntroGrow,
+    /** 小豬溜滑梯的路線；溜滑梯關掉、還沒建好、開場還沒伸出來時回傳 null */
+    getRide: (): SlideRide | null => (settings.enabled && group.visible && introGrow >= 0.999 ? ride : null),
+  };
 }
 
 export function formatMainHallSlideSettingsForPaste(s: MainHallSlideSettings) {

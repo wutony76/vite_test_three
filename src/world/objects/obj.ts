@@ -46,6 +46,7 @@ import {
   type FrenchFryStickLayout,
 } from './frenchFryStickLayout';
 import { createPig, type PigSettings } from './pig';
+import { createPigAdventure, type PigAdventureSettings } from './pigAdventure';
 import type { PigCloudSettings, PigCloudState } from './pigCloud';
 import { createCampfire, type CampfireSettings } from './campfire';
 import { createShiitake, SHIITAKE_DEFAULT, SHIITAKE_PLACEMENTS, type ShiitakeSettings } from './shiitake';
@@ -550,6 +551,9 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     const n = grilledCornEntries.length + 1;
     if (seed?.azimuthDegrees === undefined) {
       base.azimuthDegrees = GRILLED_CORN_LAYOUT_DEFAULT.azimuthDegrees + n * 14;
+    } else {
+      // 從選中的玉米複製時往旁邊錯開 12°（跟香菇一樣）：不錯開的話新玉米會和原本那根完全疊在一起，看起來像沒新增
+      base.azimuthDegrees = wrapDegrees(seed.azimuthDegrees + 12);
     }
     return spawnGrilledCorn(nextGrilledCornId(), base, introDone);
   }
@@ -869,6 +873,32 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       console.error('[pig] 建立失敗，已略過（world 其餘場景照常）', error);
     }
   }
+  // 小豬的溜滑梯冒險：走進龍兔的家大門 → 從三樓溜滑梯滑進水潭（濺水花、有機率噴出魚排）
+  const pigAdventure =
+    pigRuntime && puddingAxes
+      ? createPigAdventure({
+          ground,
+          groundRadius: GROUND_RADIUS,
+          up: puddingAxes.up,
+          front: puddingAxes.front,
+          camera,
+          pig: pigRuntime,
+          getHouse: () => ({ object: mainHall.object, door: mainHallDoor as THREE.Object3D | null }),
+          getRide: () => slideRuntime.getRide(),
+          getPond: () =>
+            pondRuntime
+              ? {
+                  object: pondRuntime.object,
+                  settings: pondRuntime.settings,
+                  getNormal: pondRuntime.getNormal,
+                  splash: pondRuntime.splash,
+                }
+              : null,
+          // 魚排用既有的鮭魚排模型，但不登記到使用者擺的魚排清單（不會出現在面板、不會被印進佈局）
+          createFish: (layout) =>
+            createSalmonSteak({ groundRadius: GROUND_RADIUS, up: puddingAxes.up, front: puddingAxes.front, envMap, layout }),
+        })
+      : null;
   // 綠球表面細節：色彩斑塊、番茄醬陰影帶、草叢、泥土小徑、小道具
   const groundInverseScratch = new THREE.Matrix4();
   const footprintCenter = new THREE.Vector3();
@@ -885,8 +915,16 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     root.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh || !mesh.geometry) return;
-      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-      const bb = mesh.geometry.boundingBox;
+      // InstancedMesh：用所有 instance 合起來的包圍盒（只看 geometry 是單一顆原始大小、沒套縮放，會算成超大一圈）
+      const instanced = mesh as THREE.InstancedMesh;
+      let bb: THREE.Box3 | null;
+      if (instanced.isInstancedMesh) {
+        instanced.computeBoundingBox();
+        bb = instanced.boundingBox;
+      } else {
+        if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+        bb = mesh.geometry.boundingBox;
+      }
       if (!bb || bb.isEmpty()) return;
       footprintMatrix.multiplyMatrices(groundInverseScratch, mesh.matrixWorld);
       for (let k = 0; k < 8; k++) {
@@ -971,6 +1009,16 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       getCloudState: pigRuntime.cloud.getState,
       visitNow: pigRuntime.visitNow,
       isVisiting: pigRuntime.isVisiting,
+      adventure: pigAdventure
+        ? {
+            settings: pigAdventure.settings,
+            startNow: pigAdventure.startNow,
+            startWalk: pigAdventure.startWalk,
+            testSplashFish: pigAdventure.testSplashFish,
+            getPhase: pigAdventure.getPhase,
+            getLastFailReason: pigAdventure.getLastFailReason,
+          }
+        : null,
     }
   : null;
   const campfire: WorldCampfire | null = campfireRuntime
@@ -1297,6 +1345,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       pigRuntime.setIntroGrow(easeOutBack(pigT, 1.9));
       try {
         pigRuntime.update(deltaTime, introDone);
+        pigAdventure?.update(deltaTime, introDone);
       } catch (error) {
         console.error('[pig] update 失敗', error);
       }
@@ -1560,6 +1609,18 @@ export type WorldPig = {
   /** 立刻跑去篝火看烤雞（測試用） */
   visitNow: () => boolean;
   isVisiting: () => boolean;
+  /** 溜滑梯冒險（走進龍兔的家 → 溜滑梯 → 水潭濺水、噴魚排） */
+  adventure: {
+    settings: PigAdventureSettings;
+    /** 立刻去溜滑梯（測試用；會打斷小豬正在做的事） */
+    startNow: () => boolean;
+    /** 完整流程：走到龍兔的家大門、走進去、屋裡待一下、溜滑梯 */
+    startWalk: () => boolean;
+    /** 在水潭中央濺一下、必定噴出魚排（測試用） */
+    testSplashFish: () => boolean;
+    getPhase: () => string;
+    getLastFailReason: () => string;
+  } | null;
 };
 
 export type WorldHappyFatShop = {

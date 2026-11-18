@@ -448,7 +448,144 @@ export function createPond({ groundRadius, up, front, envMap, layout = POND_DEFA
 
   applyPlacement();
 
+  // ── 水花：東西掉進水裡時（小豬溜滑梯滑下來）往上噴的水珠＋水面擴散的波紋 ──
+  // 水珠、波紋都預先做好一池重複用，不會每次濺水都 new 一堆東西
+  const SPLASH_DROPS = 30;
+  const SPLASH_RINGS = 3;
+  /** 水珠的重力（ground 單位／秒²）：比真實小，水珠在空中停留久一點，看得清楚 */
+  const SPLASH_GRAVITY = 1.6;
+  type SplashDrop = { mesh: THREE.Mesh; velocity: THREE.Vector3; age: number; life: number; size: number };
+  type SplashRing = { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; age: number; life: number; maxRadius: number; delay: number };
+  let splashGroup: THREE.Group | null = null;
+  const splashDrops: SplashDrop[] = [];
+  const splashRings: SplashRing[] = [];
+  const dropGeometry = new THREE.IcosahedronGeometry(1, 1);
+  const dropMaterial = new THREE.MeshStandardMaterial({
+    color: '#dff6ff',
+    emissive: '#9fdcef',
+    emissiveIntensity: 0.25,
+    roughness: 0.15,
+    transparent: true,
+    opacity: 0.9,
+  });
+  // 波紋是一圈細環，平躺在水面上（RingGeometry 原本在 XY 平面，轉成 XZ 平面）
+  const ringGeometry = new THREE.RingGeometry(0.78, 1, 40);
+  ringGeometry.rotateX(-Math.PI / 2);
+
+  /** 第一次濺水時才建：要掛在 ground（水潭的父節點）底下，水珠才是 ground 座標，不會跟著水潭自轉 */
+  function ensureSplash() {
+    if (splashGroup || !anchor.parent) return splashGroup;
+    splashGroup = new THREE.Group();
+    splashGroup.name = 'pond_splash';
+    for (let i = 0; i < SPLASH_DROPS; i++) {
+      const mesh = new THREE.Mesh(dropGeometry, dropMaterial);
+      mesh.visible = false;
+      mesh.raycast = () => {};
+      splashGroup.add(mesh);
+      splashDrops.push({ mesh, velocity: new THREE.Vector3(), age: 0, life: 0, size: 0 });
+    }
+    for (let i = 0; i < SPLASH_RINGS; i++) {
+      const material = new THREE.MeshBasicMaterial({
+        color: '#ffffff',
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -4,
+        polygonOffsetUnits: -4,
+      });
+      const mesh = new THREE.Mesh(ringGeometry, material);
+      mesh.visible = false;
+      mesh.raycast = () => {};
+      mesh.renderOrder = 3;
+      splashGroup.add(mesh);
+      splashRings.push({ mesh, material, age: 0, life: 0, maxRadius: 0, delay: 0 });
+    }
+    anchor.parent.add(splashGroup);
+    return splashGroup;
+  }
+
+  /**
+   * 在 point（ground 座標，水面上的點）濺起水花。strength 1 = 小豬滑下來那種大小。
+   * 水珠往上、往四周噴，受重力落回水面；水面上一圈一圈往外擴散的白色波紋。
+   */
+  function splash(point: THREE.Vector3, strength = 1) {
+    if (!ensureSplash()) return;
+    const radial = point.clone().normalize();
+    // 水面高度：跟水面 mesh 一樣，比地表高 0.0016
+    const surfacePoint = radial.clone().multiplyScalar(groundRadius - settings.sink + 0.0016);
+    // 切平面上的兩個方向，用來把水珠往四周撒
+    const tangentA = new THREE.Vector3().crossVectors(radial, Math.abs(radial.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)).normalize();
+    const tangentB = new THREE.Vector3().crossVectors(radial, tangentA).normalize();
+    for (const drop of splashDrops) {
+      const angle = Math.random() * Math.PI * 2;
+      // 實測原本的大小（水珠 0.0035～0.0075、往上 0.22～0.48）在預設鏡頭下只看得到幾個小白點，放大約一倍
+      const outward = (0.07 + Math.random() * 0.16) * strength;
+      const upward = (0.3 + Math.random() * 0.32) * strength;
+      drop.velocity
+        .copy(tangentA)
+        .multiplyScalar(Math.cos(angle) * outward)
+        .addScaledVector(tangentB, Math.sin(angle) * outward)
+        .addScaledVector(radial, upward);
+      drop.mesh.position.copy(surfacePoint).addScaledVector(radial, 0.002);
+      drop.size = (0.006 + Math.random() * 0.006) * Math.sqrt(strength);
+      drop.mesh.scale.setScalar(drop.size);
+      drop.age = 0;
+      drop.life = 1.4;
+      drop.mesh.visible = true;
+    }
+    splashRings.forEach((ring, index) => {
+      ring.mesh.position.copy(surfacePoint);
+      ring.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
+      ring.age = 0;
+      ring.delay = index * 0.18;
+      ring.life = 0.9 + index * 0.15;
+      ring.maxRadius = (0.05 + index * 0.018) * strength;
+      ring.mesh.visible = false;
+    });
+  }
+
+  function updateSplash(deltaTime: number) {
+    if (!splashGroup) return;
+    const dt = Math.min(deltaTime, 0.05);
+    const radial = new THREE.Vector3();
+    const waterRadius = groundRadius - settings.sink + 0.0016;
+    for (const drop of splashDrops) {
+      if (!drop.mesh.visible) continue;
+      drop.age += dt;
+      radial.copy(drop.mesh.position).normalize();
+      drop.velocity.addScaledVector(radial, -SPLASH_GRAVITY * dt);
+      drop.mesh.position.addScaledVector(drop.velocity, dt);
+      // 落回水面（往下掉、而且已經低於水面）或時間到 → 收起來
+      const falling = drop.velocity.dot(radial) < 0;
+      if ((falling && drop.mesh.position.length() < waterRadius) || drop.age > drop.life) {
+        drop.mesh.visible = false;
+        continue;
+      }
+      // 在空中慢慢變小一點
+      drop.mesh.scale.setScalar(drop.size * (1 - 0.4 * (drop.age / drop.life)));
+    }
+    for (const ring of splashRings) {
+      if (ring.life <= 0) continue;
+      ring.age += dt;
+      const t = (ring.age - ring.delay) / ring.life;
+      if (t < 0) continue;
+      if (t >= 1) {
+        ring.mesh.visible = false;
+        ring.life = 0;
+        continue;
+      }
+      ring.mesh.visible = true;
+      // 先快後慢地擴散、越大越淡
+      const grow = 1 - (1 - t) * (1 - t);
+      ring.mesh.scale.setScalar(Math.max(0.0005, ring.maxRadius * grow));
+      ring.material.opacity = 0.75 * (1 - t);
+    }
+  }
+
   function update(deltaTime: number) {
+    updateSplash(deltaTime);
     if (!settings.enabled) return;
     time += deltaTime;
     waterUniforms.uTime.value = time;
@@ -483,6 +620,8 @@ export function createPond({ groundRadius, up, front, envMap, layout = POND_DEFA
     update,
     setNormal,
     getNormal: () => currentNormal(new THREE.Vector3()),
+    /** 在水面某點（ground 座標）濺起水花（小豬溜滑梯滑進來時用） */
+    splash,
   };
 }
 

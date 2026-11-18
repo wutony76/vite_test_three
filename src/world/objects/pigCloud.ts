@@ -169,6 +169,12 @@ export function createPigCloud({ getBodyLength }: CreatePigCloudOptions) {
 
   let state: PigCloudState = 'none';
   let stateTimer = 0;
+  /**
+   * 暫時收起（例如小豬去溜滑梯：進門、滑下、泡在水裡時不該有雲跟著）。
+   * 收起時記住原本的天氣，恢復時直接回到那個天氣：重新抽的話可能抽到「沒有」，看起來就像雲沒回來
+   */
+  let suppressed = false;
+  let stateBeforeSuppress: PigCloudState = 'none';
   /** 雲出現程度 0～1：切到「沒有」時縮小淡出，切回來時彈出來 */
   let appear = 0;
   let appearVelocity = 0;
@@ -259,7 +265,7 @@ export function createPigCloud({ getBodyLength }: CreatePigCloudOptions) {
     const cloudBottom = body * settings.height;
 
     // ---- 狀態切換 ----
-    if (!active || !settings.enabled) {
+    if (!active || !settings.enabled || suppressed) {
       setState('none');
     } else if (settings.forceState !== 'random') {
       setState(settings.forceState);
@@ -375,6 +381,23 @@ export function createPigCloud({ getBodyLength }: CreatePigCloudOptions) {
     settings,
     update,
     getState: () => state,
+    /** 暫時收起烏雲（連雨、閃電）；false = 恢復成收起前的天氣 */
+    setSuppressed: (on: boolean) => {
+      if (on === suppressed) return;
+      if (on) {
+        stateBeforeSuppress = state;
+        suppressed = true;
+        // 半空中的雨滴、亮著的閃電也一起立刻清掉（不然雲縮掉後，還會看到幾滴雨掉下來、閃電閃一下）
+        for (const drop of drops) drop.active = false;
+        rain.visible = false;
+        bolt.visible = false;
+        return;
+      }
+      suppressed = false;
+      if (settings.enabled && settings.forceState === 'random' && stateBeforeSuppress !== 'none') {
+        setState(stateBeforeSuppress);
+      }
+    },
     /** 給測試／debug：目前在空中的雨滴數、閃電是否亮著 */
     getDebug: () => ({ drops: drops.filter((d) => d.active).length, bolt: bolt.visible, appear }),
   };

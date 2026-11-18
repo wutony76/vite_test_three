@@ -41,6 +41,7 @@ import { formatShiitakePlacementsForPaste } from './objects/shiitake';
 import { formatTreasureChestSettingsForPaste } from './objects/treasureChest';
 import { formatPondSettingsForPaste } from './objects/pond';
 import { formatMainHallSlideSettingsForPaste } from './objects/mainHallSlide';
+import { formatPigAdventureSettingsForPaste } from './objects/pigAdventure';
 import { formatHappyFatShopSettingsForPaste, HAPPY_FAT_SHOP_DEFAULT } from './objects/happyFatShop';
 import { formatFloatingIslandSettingsForPaste } from './objects/floatingIsland';
 import { formatFrenchFriesPlacementsForPaste } from './objects/frenchFries';
@@ -912,7 +913,6 @@ bindHousePanel(houses[0]);
 
 /** false = 場景上不可點選、拖曳，也不顯示調整面板 */
 const PUDDING_SCENE_EDIT = false;
-const CORN_SCENE_EDIT = false;
 
 // DEBUG...布丁（綠球上，可多顆）
 const puddingFolder =
@@ -1158,35 +1158,80 @@ if (puddingFolder) {
   highlightPudding(null);
 }
 
-// 烤玉米（綠球上；拖曳選取後調整）
-const cornFolder = CORN_SCENE_EDIT ? gui.addFolder('烤玉米') : null;
+// 烤玉米（綠球上；拖曳選取後調整，可複製）——選取、編輯方式跟檸檬片一樣
+// 已擺好（佈局寫在 grilledCornLayout.ts）：關閉編輯 → 不顯示面板、場景上不能點選或拖曳。
+// 要再調整時改成 true：面板、點選、拖曳都會回來
+const CORN_SCENE_EDIT = false;
+const cornFolder = gui.addFolder('烤玉米');
+if (!CORN_SCENE_EDIT) cornFolder.hide();
 let selectedCorn: WorldGrilledCorn | null = null;
 
+/**
+ * 發光前每個材質原本的發光顏色、強度。取消選取時要還原：
+ * 玉米的 applyVisuals 只會重設玉米粒、本體的材質，葉子等其他材質的發光不會被清掉，
+ * 少了這個，換選另一根後前一根還在發光，越點越多根亮著
+ */
+const cornGlowSaved = new WeakMap<THREE.Material, { emissive: THREE.Color; intensity: number }>();
+
+function forEachCornMaterial(corn: WorldGrilledCorn, fn: (material: THREE.MeshStandardMaterial) => void) {
+  corn.object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      if ('emissive' in material) fn(material as THREE.MeshStandardMaterial);
+    }
+  });
+}
+
+/** 選中的那根整根發光（用自己的顏色），跟檸檬片一樣一眼看得出選了哪根；其他根還原 */
 function highlightCorn(entry: WorldGrilledCorn | null) {
   for (const corn of grilledCorns) {
-    if (corn !== entry) {
-      corn.applyVisuals();
-      continue;
-    }
-    corn.object.traverse((child) => {
-      const mesh = child as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const material of materials) {
-        if (!('emissiveIntensity' in material)) continue;
-        const m = material as THREE.MeshStandardMaterial;
-        const name = (m.name || mesh.name || '').toLowerCase();
-        if (!name.includes('kernel') && !name.includes('body')) continue;
-        m.emissiveIntensity = Math.max(m.emissiveIntensity, 0.9);
-      }
+    // 先還原上次發光前的值，再套一次外觀（玉米粒、本體的發光由外觀設定決定）
+    forEachCornMaterial(corn, (m) => {
+      const saved = cornGlowSaved.get(m);
+      if (!saved) return;
+      m.emissive.copy(saved.emissive);
+      m.emissiveIntensity = saved.intensity;
+      cornGlowSaved.delete(m);
+    });
+    corn.applyVisuals();
+    if (corn !== entry) continue;
+    forEachCornMaterial(corn, (m) => {
+      cornGlowSaved.set(m, { emissive: m.emissive.clone(), intensity: m.emissiveIntensity });
+      m.emissive.copy(m.color);
+      m.emissiveIntensity = 0.35;
     });
   }
 }
 
-const CORN_PANEL_ACTIONS = new Set(['add', 'remove', 'log', 'reloadModel']);
+/**
+ * 選中時玉米模型可能還沒載入完（剛開頁面、剛複製出來）：那時沒有 mesh 可以發光；
+ * 載入完成時玉米會重新套一次外觀，也會把發光蓋掉。所以選中後每 0.25 秒檢查一次，
+ * 模型出現了、但沒在發光，就再補一次，最多等 60 秒（剛開頁面時模型可能要等好一陣子才掛上）。
+ */
+let cornHighlightTimer = 0;
+function ensureCornHighlight(entry: WorldGrilledCorn, tries = 240) {
+  window.clearTimeout(cornHighlightTimer);
+  if (selectedCorn !== entry || tries <= 0) return;
+  let hasMesh = false;
+  let glowing = false;
+  entry.object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    hasMesh = true;
+    const material = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial;
+    if (material && material.emissiveIntensity === 0.35) glowing = true;
+  });
+  if (hasMesh && !glowing) highlightCorn(entry);
+  if (hasMesh && glowing) return;
+  cornHighlightTimer = window.setTimeout(() => ensureCornHighlight(entry, tries - 1), 250);
+}
 
+const CORN_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+
+/** 清掉上一根的滑桿（按鈕保留）。滑桿都放在同一層、不用子資料夾：子資料夾不會被清掉，每換一根就多疊一個 */
 function clearCornPanelSliders() {
-  if (!cornFolder) return;
   cornFolder.title('烤玉米');
   for (const controller of [...cornFolder.controllers]) {
     if (CORN_PANEL_ACTIONS.has(String(controller.property))) continue;
@@ -1195,19 +1240,24 @@ function clearCornPanelSliders() {
 }
 
 function bindCornPanel(entry: WorldGrilledCorn) {
-  if (!cornFolder) return;
   const alreadyShowing = entry === selectedCorn && cornFolder.controllers.length > CORN_PANEL_ACTIONS.size;
   selectedCorn = entry;
   highlightCorn(entry);
+  ensureCornHighlight(entry);
   if (alreadyShowing) return;
 
-  cornFolder.title(`烤玉米 · ${entry.label}`);
+  // 先清再設標題：反過來的話清除時會把標題改回「烤玉米」，看不出選了哪根
   clearCornPanelSliders();
+  cornFolder.title(`烤玉米 · ${entry.label}`);
 
   const settings = entry.settings;
   const visual = entry.visualSettings;
   const apply = () => entry.apply();
-  const applyVisuals = () => entry.applyVisuals();
+  // 外觀改完要再套一次選中發光，不然調外觀時選中標示會消失
+  const applyVisuals = () => {
+    entry.applyVisuals();
+    highlightCorn(entry);
+  };
 
   cornFolder
     .add(settings, 'angleFromTopDegrees', 0, 90, 1)
@@ -1226,7 +1276,7 @@ function bindCornPanel(entry: WorldGrilledCorn) {
     .onFinishChange(logCornPlacements);
   cornFolder
     .add(settings, 'sink', -0.05, 0.08, 0.001)
-    .name('下沉')
+    .name('下沉（負值上浮）')
     .onChange(apply)
     .onFinishChange(logCornPlacements);
   cornFolder
@@ -1239,40 +1289,39 @@ function bindCornPanel(entry: WorldGrilledCorn) {
     .name('大小 (m)')
     .onChange(apply)
     .onFinishChange(logCornPlacements);
-
-  const look = cornFolder.addFolder('外觀（即時）');
-  look
-    .add(visual, 'emissiveIntensity', 0, 1.2, 0.01)
-    .name('發光')
-    .onChange(applyVisuals)
-    .onFinishChange(logCornPlacements);
-  look
+  cornFolder
     .add(visual, 'colorBoost', 0.7, 1.4, 0.01)
     .name('亮度')
     .onChange(applyVisuals)
     .onFinishChange(logCornPlacements);
-  look
+  cornFolder
+    .add(visual, 'emissiveIntensity', 0, 1.2, 0.01)
+    .name('發光')
+    .onChange(applyVisuals)
+    .onFinishChange(logCornPlacements);
+  cornFolder
     .add(visual, 'orangeBias', 0, 0.25, 0.005)
     .name('偏橘')
     .onChange(applyVisuals)
     .onFinishChange(logCornPlacements);
-  look
+  cornFolder
     .add(visual, 'normalScale', 0.5, 2.5, 0.05)
     .name('顆粒立體')
-    .onChange(applyVisuals);
-  look
+    .onChange(applyVisuals)
+    .onFinishChange(logCornPlacements);
+  cornFolder
     .add(visual, 'steamDensity', 0, 1.8, 0.05)
     .name('熱氣濃度')
     .onChange(applyVisuals)
     .onFinishChange(logCornPlacements);
-  look
+  cornFolder
     .addColor(visual, 'tintColor')
-    .name('染色')
+    .name('顏色')
     .onChange(applyVisuals)
     .onFinishChange(logCornPlacements);
-  look
+  cornFolder
     .add(visual, 'tintMix', 0, 1, 0.01)
-    .name('染色強度')
+    .name('顏色強度')
     .onChange(applyVisuals)
     .onFinishChange(logCornPlacements);
 }
@@ -1286,39 +1335,36 @@ function logCornPlacements() {
   return text;
 }
 
-if (cornFolder) {
+{
   const cornControls = {
     add() {
-      const seed = selectedCorn
-        ? { ...selectedCorn.settings, ...selectedCorn.visualSettings }
-        : undefined;
-      const created = addGrilledCorn(seed);
+      const created = addGrilledCorn(
+        selectedCorn ? { ...selectedCorn.settings, ...selectedCorn.visualSettings } : undefined,
+      );
       if (!created) return;
       bindCornPanel(created);
       applyFoodGroupVisibility();
     },
     remove() {
       if (!selectedCorn || grilledCorns.length === 0) return;
-      const removed = selectedCorn;
-      if (!removeGrilledCorn(removed)) return;
+      if (!removeGrilledCorn(selectedCorn)) return;
       selectedCorn = null;
       clearCornPanelSliders();
-      highlightCorn(null);
+      // 移除後自動選最後一根（跟檸檬片一樣），不用再去場景上點
+      const next = grilledCorns[grilledCorns.length - 1];
+      if (next) bindCornPanel(next);
+      else highlightCorn(null);
       refreshPuddingDragTargets();
     },
     log() {
       logCornPlacements();
     },
-    reloadModel() {
-      window.location.reload();
-    },
   };
-  cornFolder.add(cornControls, 'add').name('新增玉米');
+  cornFolder.add(cornControls, 'add').name('複製玉米');
   cornFolder.add(cornControls, 'remove').name('移除選中玉米');
-  cornFolder.add(cornControls, 'log').name('印出全部設定 (console)');
-  cornFolder.add(cornControls, 'reloadModel').name('重載頁面（換新 GLB）');
-  if (grilledCorns[0]) bindCornPanel(grilledCorns[0]);
-  else highlightCorn(null);
+  cornFolder.add(cornControls, 'log').name('印出全部佈局 (console)');
+  // 關閉編輯時不要預先選第一根：選中會整根發光
+  if (CORN_SCENE_EDIT && grilledCorns[0]) bindCornPanel(grilledCorns[0]);
 }
 
 // 魚排（綠球上；拖曳選取後調整，可複製）
@@ -1529,6 +1575,13 @@ if (pigFolder && pig) {
   pigFolder.add(pig.settings, 'visitWatchMaxSeconds', 0.5, 20, 0.5).name('看烤雞最長 (秒)').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'visitCooldownSeconds', 0, 120, 1).name('看完多久才會再去 (秒)').onFinishChange(logPigSettings);
   pigFolder.add({ visit: () => { if (!pig.visitNow()) console.warn('[pig] 篝火關閉、沒有烤雞，或位置去不了'); } }, 'visit').name('現在去看烤雞');
+  // 跟「現在去看烤雞」放在一起，不用打開「溜滑梯冒險」子資料夾就能按
+  if (pig.adventure) {
+    const adventure = pig.adventure;
+    pigFolder
+      .add({ slide: () => { if (!adventure.startNow()) console.warn(`[pig] 現在去不了溜滑梯：${adventure.getLastFailReason()}`); } }, 'slide')
+      .name('現在去溜滑梯');
+  }
   pigFolder.add(pig.settings, 'smokeEnabled').name('走動冒煙').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'smokeRate', 0, 30, 0.5).name('煙量 (團/秒)').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'smokeSize', 0.2, 3, 0.05).name('煙團大小').onFinishChange(logPigSettings);
@@ -1538,6 +1591,31 @@ if (pigFolder && pig) {
   pigFolder.add({ log: logPigSettings }, 'log').name('印出設定 (console)');
 
   // 頭上的烏雲：沒有／下雨／打雷／暴雨 隨機切換；「固定狀態」可以停在某一種方便調整
+  // 溜滑梯冒險：走進龍兔的家大門 → 從三樓溜滑梯滑進水潭（濺水花、有機率噴出魚排，小豬有機率去撿）
+  if (pig.adventure) {
+    const adventure = pig.adventure;
+    const a = adventure.settings;
+    const logAdventure = () => console.log(formatPigAdventureSettingsForPaste(a));
+    const adventureFolder = pigFolder.addFolder('溜滑梯冒險');
+    adventureFolder.add(a, 'enabled').name('開啟').onFinishChange(logAdventure);
+    adventureFolder.add(a, 'chance', 0, 1, 0.05).name('冷卻到時去的機率').onFinishChange(logAdventure);
+    adventureFolder.add(a, 'cooldownMinSeconds', 5, 120, 1).name('冷卻最短 (秒)').onFinishChange(logAdventure);
+    adventureFolder.add(a, 'cooldownMaxSeconds', 5, 180, 1).name('冷卻最長 (秒)').onFinishChange(logAdventure);
+    adventureFolder.add(a, 'insideSeconds', 0.2, 5, 0.1).name('屋裡待幾秒').onFinishChange(logAdventure);
+    adventureFolder.add(a, 'slideSpeed', 0.1, 1, 0.01).name('滑行速度').onFinishChange(logAdventure);
+    adventureFolder.add(a, 'fishChance', 0, 1, 0.05).name('噴出魚排機率').onFinishChange(logAdventure);
+    adventureFolder.add(a, 'fetchChance', 0, 1, 0.05).name('小豬去撿機率').onFinishChange(logAdventure);
+    adventureFolder.add(a, 'fishLifetimeSeconds', 2, 60, 1).name('魚排至少留幾秒').onFinishChange(logAdventure);
+    adventureFolder.add(a, 'fishSize', 0.02, 0.12, 0.005).name('魚排大小').onFinishChange(logAdventure);
+    adventureFolder
+      .add({ go: () => { if (!adventure.startNow()) console.warn(`[pig] 現在去不了溜滑梯：${adventure.getLastFailReason()}`); } }, 'go')
+      .name('立刻去溜滑梯');
+    adventureFolder
+      .add({ walk: () => { if (!adventure.startWalk()) console.warn(`[pig] 現在去不了溜滑梯：${adventure.getLastFailReason()}`); } }, 'walk')
+      .name('走去大門再溜（完整流程）');
+    adventureFolder.add({ fish: () => adventure.testSplashFish() }, 'fish').name('測試：水潭噴魚排');
+    adventureFolder.add({ log: logAdventure }, 'log').name('印出設定 (console)');
+  }
   const cloudFolder = pigFolder.addFolder('頭上烏雲');
   const logCloud = () => console.log(formatPigCloudSettingsForPaste(pig.cloud));
   const cloudStatus = { state: pig.getCloudState() };

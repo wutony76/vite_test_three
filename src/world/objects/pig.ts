@@ -133,6 +133,24 @@ type SmokePuff = {
 
 type PigObstacle = { root: THREE.Object3D; normal: THREE.Vector3; clearanceRad: number };
 
+/**
+ * 外部下的「走到某處」指令（例如走到龍兔的家大門、跑去撿魚排）。
+ * 走路、避障沿用平常那套；只是目標由外部給、走到了／放棄了會回呼。
+ */
+export type PigGoToOptions = {
+  /** 目標的地表方向（綠球座標）；回傳 null = 目標不見了（例如魚排被收走），指令失敗 */
+  getTarget: () => THREE.Vector3 | null;
+  /** 離目標多近（弧度）算走到 */
+  arriveRad: number;
+  /** 快走到時，探路不把這個物件當障礙（例如目標就在房子門口，不然永遠覺得前面被房子擋住、一直繞） */
+  ignoreRoot?: THREE.Object3D | null;
+  /** 允許走到「離頂端太近」的地方（平常小豬不會走進頂端 roamColatitudeMin 以內，龍兔的家門口就在那裡） */
+  allowNearTop?: boolean;
+  /** 最多走幾秒；不給就依距離估（直線所需秒數 ×3 ＋ 8） */
+  timeoutSeconds?: number;
+  onDone: (arrived: boolean) => void;
+};
+
 type CreatePigOptions = {
   groundRadius: number;
   up: THREE.Vector3;
@@ -209,6 +227,19 @@ export function createPig({
   let visitAimTimer = 0;
   let visitCooldown = 0;
   const visitTarget = new THREE.Vector3();
+
+  /** 外部下的「走到某處」指令；進行中時不會自己去篝火、不會路邊停下 */
+  let command: (PigGoToOptions & { giveUp: number; aimTimer: number }) | null = null;
+  const commandTarget = new THREE.Vector3();
+  /**
+   * 操偶模式：小豬不自己走，位置、方向、大小每格由外部指定（進門、溜滑梯、跳上岸）。
+   * puppetScale 乘在原本的大小上（0 = 藏起來）；puppetWaddle = 腳步擺動（0 = 坐著不動）
+   */
+  /** isWalkable 檢查「頂端附近的點」時暫時放寬頂端限制（例如龍兔的家大門口） */
+  let allowNearTopCheck = false;
+  let puppet = false;
+  let puppetScale = 1;
+  let puppetWaddle = 0;
 
   /**
    * 煙不能掛在 anchor 底下：anchor 會跟著小豬移動，煙就會黏在屁股上一起跑。
@@ -316,7 +347,9 @@ export function createPig({
   function isBlocked(n: THREE.Vector3, checkView = false, from?: THREE.Vector3) {
     if (checkView && !isVisibleHemisphere(n)) return true;
     const col = colatitudeFromNormal(n);
-    if (col < settings.roamColatitudeMin) return true;
+    // 走去龍兔的家大門時，門口在頂端附近：暫時不限制「離頂端至少幾度」
+    const minCol = command?.allowNearTop || allowNearTopCheck ? 0 : settings.roamColatitudeMin;
+    if (col < minCol) return true;
     if (col > effectiveColatMax) {
       // 已經在界外（例如剛把緞帶拖高）：允許「往頂端走」的步伐，不然會被困在醬底下動不了
       if (!from || col >= colatitudeFromNormal(from)) return true;
@@ -385,8 +418,18 @@ export function createPig({
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh || !mesh.visible || !mesh.geometry) return;
       const geometry = mesh.geometry;
-      if (!geometry.boundingBox) geometry.computeBoundingBox();
-      const bb = geometry.boundingBox;
+      // InstancedMesh（例如水潭的岸邊石頭）：要用「所有 instance 合起來」的包圍盒。
+      // 只看 geometry 的話是單一顆的原始大小（半徑 1 的 20 面體），沒套上每顆的縮放，
+      // 水潭會被當成半徑 1 的大圓（實測避障範圍 51°，小豬幾乎半顆球都走不過去）
+      const instanced = mesh as THREE.InstancedMesh;
+      let bb: THREE.Box3 | null;
+      if (instanced.isInstancedMesh) {
+        instanced.computeBoundingBox();
+        bb = instanced.boundingBox;
+      } else {
+        if (!geometry.boundingBox) geometry.computeBoundingBox();
+        bb = geometry.boundingBox;
+      }
       if (!bb || bb.isEmpty()) return;
       meshToGround.multiplyMatrices(groundInverse, mesh.matrixWorld);
       for (let k = 0; k < 8; k++) {
@@ -759,7 +802,11 @@ export function createPig({
       bearing += pendingTurn;
       // 目前想去的方向前面被擋 → 換一個走得通的方向（只有被擋才換，避免每幀亂抖）
       // 快走到篝火時：前面只被篝火本身擋住不算擋（不然永遠走不到），被其他東西擋住才繞
-      const ignore = isApproachingVisitTarget() ? visitTargetObstacle() : null;
+      const ignore = isApproachingVisitTarget()
+        ? visitTargetObstacle()
+        : isApproachingCommandTarget()
+          ? commandIgnoreObstacle()
+          : null;
       if (!isPathFreeIgnoring(ignore, bearing, lookRad)) {
         const free = findFreeBearing(lookRad);
         if (free !== null) bearing = free;
@@ -864,6 +911,71 @@ export function createPig({
     wanderTimer = settings.wanderSeconds;
   }
 
+  /** 指令要忽略的那個障礙（例如龍兔的家本身） */
+  function commandIgnoreObstacle() {
+    if (!command?.ignoreRoot) return null;
+    return obstacleScratch.find((obstacle) => obstacle.root === command!.ignoreRoot) ?? null;
+  }
+
+  function isApproachingCommandTarget() {
+    if (!command) return false;
+    return angularDistance(surfaceNormal, commandTarget) < THREE.MathUtils.degToRad(settings.lookAheadDegrees + 2);
+  }
+
+  function finishCommand(arrived: boolean) {
+    const done = command;
+    command = null;
+    done?.onDone(arrived);
+  }
+
+  /** 下指令：走到某處。原本的指令（如果有）當作失敗結束；篝火、路邊停下都取消 */
+  function startGoTo(options: PigGoToOptions) {
+    if (command) finishCommand(false);
+    const target = options.getTarget();
+    if (!target) {
+      options.onDone(false);
+      return;
+    }
+    commandTarget.copy(target).normalize();
+    visiting = false;
+    pauseRemaining = 0;
+    const distanceDeg = THREE.MathUtils.radToDeg(angularDistance(surfaceNormal, commandTarget));
+    const giveUp = options.timeoutSeconds ?? (distanceDeg / Math.max(settings.roamSpeedDegrees, 0.5)) * 3 + 8;
+    command = { ...options, giveUp, aimTimer: 0 };
+  }
+
+  /** 指令進行中：跟去篝火一樣，每隔一下重新瞄準；走到了／超時就回呼 */
+  function updateCommand(deltaTime: number) {
+    if (!command) return;
+    const target = command.getTarget();
+    if (!target) {
+      finishCommand(false);
+      return;
+    }
+    commandTarget.copy(target).normalize();
+    if (angularDistance(surfaceNormal, commandTarget) < command.arriveRad) {
+      finishCommand(true);
+      return;
+    }
+    command.giveUp -= deltaTime;
+    if (command.giveUp <= 0) {
+      finishCommand(false);
+      return;
+    }
+    command.aimTimer -= deltaTime;
+    const aim = bearingTowardDirection(surfaceNormal, commandTarget);
+    const lookRad = Math.min(
+      THREE.MathUtils.degToRad(settings.lookAheadDegrees),
+      angularDistance(surfaceNormal, commandTarget),
+    );
+    const directShot = isApproachingCommandTarget() && isPathFreeIgnoring(commandIgnoreObstacle(), aim, lookRad);
+    if (command.aimTimer <= 0 || directShot) {
+      command.aimTimer = 0.6;
+      bearing = aim;
+    }
+    wanderTimer = settings.wanderSeconds;
+  }
+
   /** 剛走到某個物件旁邊時擲骰子，中了就停下來轉頭看它一下 */
   function maybePauseNearObstacles() {
     const footprint = pigBodyRadiusRad();
@@ -878,7 +990,7 @@ export function createPig({
     }
     nearObstacles = nowNear;
     // 前往篝火途中不被路邊的東西分心
-    if (!entered || visiting || pauseCooldown > 0 || Math.random() >= settings.pauseChance) return;
+    if (!entered || visiting || command || pauseCooldown > 0 || Math.random() >= settings.pauseChance) return;
     const min = Math.min(settings.pauseMinSeconds, settings.pauseMaxSeconds);
     const max = Math.max(settings.pauseMinSeconds, settings.pauseMaxSeconds);
     pauseRemaining = min + Math.random() * (max - min);
@@ -931,9 +1043,19 @@ export function createPig({
   }
 
   function update(deltaTime: number, introDone: boolean) {
-    anchor.scale.setScalar(settings.placementScale * Math.max(0.0001, introGrow));
+    anchor.scale.setScalar(settings.placementScale * Math.max(0.0001, introGrow) * (puppet ? Math.max(0.0001, puppetScale) : 1));
     if (!model) return;
     coinShine?.update(deltaTime);
+
+    // 操偶模式：位置、方向由外部（setPuppetPose）決定，這裡只動腳、雲、煙
+    if (puppet) {
+      cloud.update(deltaTime, true);
+      updateSmoke(deltaTime, false);
+      waddlePhase += deltaTime * 11.5 * puppetWaddle;
+      rig?.update(deltaTime, waddlePhase, puppetWaddle);
+      model.scale.setScalar(modelBaseScale);
+      return;
+    }
 
     const roaming = introDone && introGrow >= 0.999;
     cloud.update(deltaTime, roaming);
@@ -964,10 +1086,11 @@ export function createPig({
         wanderTimer = settings.wanderSeconds * (0.55 + Math.random() * 0.9);
       }
     } else {
+      if (command) updateCommand(deltaTime);
       if (visiting) updateVisit(deltaTime);
       wanderTimer -= deltaTime;
-      if (wanderTimer <= 0 && !visiting && maybeStartVisit()) updateVisit(0);
-      if (wanderTimer <= 0 && !visiting) {
+      if (wanderTimer <= 0 && !visiting && !command && maybeStartVisit()) updateVisit(0);
+      if (wanderTimer <= 0 && !visiting && !command) {
         wanderTimer = settings.wanderSeconds * (0.55 + Math.random() * 0.9);
         bearing = settings.stayInViewHemisphere && camera ?
           bearingTowardCamera(surfaceNormal) + (Math.random() - 0.5) * 1.1 :
@@ -1034,6 +1157,80 @@ export function createPig({
       return startVisit();
     },
     isVisiting: () => visiting,
+    /** 下指令：走到某處（走到／放棄會呼叫 onDone） */
+    goTo: startGoTo,
+    cancelGoTo: () => {
+      if (command) finishCommand(false);
+    },
+    /** 正在忙（去篝火、走指令、停下來看東西、被操偶）：外部想派任務前先問 */
+    isBusy: () => visiting || command !== null || puppet || pauseRemaining > 0,
+    /** 小豬避障用的半徑（弧度） */
+    getBodyRadiusRad: () => pigBodyRadiusRad(),
+    /** 某個物件的避障範圍（弧度，含餘量）；不在障礙清單裡回傳 null */
+    getObstacleClearance: (root: THREE.Object3D) => {
+      refreshObstacles();
+      return obstacleScratch.find((obstacle) => obstacle.root === root)?.clearanceRad ?? null;
+    },
+    /** 這個地表位置小豬站得下嗎（不在障礙裡、在活動範圍內） */
+    isWalkable: (normal: THREE.Vector3, allowNearTop = false) => {
+      refreshObstacles();
+      allowNearTopCheck = allowNearTop;
+      try {
+        return !isBlocked(normal.clone().normalize());
+      } finally {
+        allowNearTopCheck = false;
+      }
+    },
+    /** 停下來看某處幾秒（例如吃魚排） */
+    pauseFor: (seconds: number, lookAt: THREE.Vector3) => {
+      pauseRemaining = seconds;
+      pauseCooldown = seconds + 2;
+      pauseLookAt.copy(lookAt).normalize();
+    },
+    /** 進入／離開操偶模式。進入時會取消指令、篝火、停下 */
+    setPuppet: (on: boolean) => {
+      if (on) {
+        if (command) finishCommand(false);
+        visiting = false;
+        pauseRemaining = 0;
+      }
+      puppet = on;
+      puppetScale = 1;
+      puppetWaddle = 0;
+    },
+    /**
+     * 操偶時每格指定姿勢（綠球座標）：position 是腳底、forward 是鼻頭方向、upDir 是頭頂方向。
+     * scale 乘在原本大小上（0 = 藏起來）；waddle = 腳步擺動 0～1
+     */
+    setPuppetPose: (position: THREE.Vector3, forward: THREE.Vector3, upDir: THREE.Vector3, scale = 1, waddle = 0) => {
+      anchor.position.copy(position);
+      placeEast.crossVectors(upDir, forward);
+      if (placeEast.lengthSq() > 1e-10) {
+        placeEast.normalize();
+        const upOrtho = upDir.clone().normalize();
+        placeForward.crossVectors(placeEast, upOrtho).normalize();
+        basis.makeBasis(placeEast, upOrtho, placeForward);
+        anchor.quaternion.setFromRotationMatrix(basis);
+      }
+      puppetScale = scale;
+      puppetWaddle = waddle;
+      anchor.scale.setScalar(settings.placementScale * Math.max(0.0001, introGrow) * Math.max(0.0001, scale));
+    },
+    /** 離開操偶、從某處恢復自由遊走（normal = 地表方向；forward = 鼻頭方向） */
+    resumeAt: (normal: THREE.Vector3, forward: THREE.Vector3) => {
+      puppet = false;
+      puppetScale = 1;
+      puppetWaddle = 0;
+      surfaceNormal.copy(normal).normalize();
+      facingForward.copy(forward).addScaledVector(surfaceNormal, -forward.dot(surfaceNormal));
+      if (facingForward.lengthSq() < 1e-8) facingForward.copy(tangentFromBearing(surfaceNormal, bearing, probe2));
+      facingForward.normalize();
+      syncBearingFromFacing();
+      wanderTimer = settings.wanderSeconds * (0.55 + Math.random() * 0.9);
+      stuckSeconds = 0;
+      applyPlacement();
+    },
+    isPuppet: () => puppet,
   };
 }
 
