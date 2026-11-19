@@ -113,6 +113,9 @@ export const MAIN_HALL_DOOR_DEFAULT: MainHallDoorSettings = { scale: 0.8, width:
 // 洗衣店模型還在 public/models/laundry/laundry.glb（plan 在 tools/blender/plans/laundry.plan.json），
 // 想換回來：把 attachProceduralModel(bgRoom, …) 換回 attachHouseModel(bgRoom, 那個網址)，並把網址加回 WORLD_GLTF_URLS
 
+/** 撒草時，柑仔店（twRoom）避開範圍的縮放倍率：1 = 整個長方體的包圍圓，越小草長得越靠近店 */
+const TW_ROOM_GRASS_FOOTPRINT_SCALE = 0.6;
+
 export const WORLD_GLTF_URLS = [
   MODEL_URL,
   PROJECT_ROOM_MODEL_URL,
@@ -1162,7 +1165,12 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
               if (retroArcades.some((item) => item.object === root)) continue;
               if (danceMachines.some((item) => item.object === root)) continue;
               const footprint = measureGroundFootprint(root);
-              if (footprint) list.push(footprint);
+              if (!footprint) continue;
+              // 柑仔店（twRoom）：包圍圓是用整個長方體的對角線算的（含電線桿、外圍零散的地磚），
+              // 比店本體大很多，門口一大片都不長草。撒草時把圓縮小到大約只蓋住餅乾地磚台座
+              //（小豬繞路用的範圍不受影響）
+              if (root === twRoom.object) footprint.radiusRad *= TW_ROOM_GRASS_FOOTPRINT_SCALE;
+              list.push(footprint);
             }
             if (campfireRuntime?.settings.enabled) {
               const s = campfireRuntime.settings;
