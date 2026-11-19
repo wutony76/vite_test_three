@@ -101,6 +101,36 @@
         transform: none;
       }
 
+      /* 「去看看」：小豬去龍兔的家玩溜滑梯（暖黃色，跟「初視」粉紅、「進入」薄荷綠分開） */
+      .world-ui-btn--visit {
+        background: linear-gradient(160deg, #ffe9a8 0%, #ffc94d 45%, #f5a623 100%);
+        box-shadow:
+          0 0 0 2px rgb(255 201 77 / 50%),
+          0 4px 0 #c7820f,
+          0 14px 32px rgb(245 166 35 / 38%);
+      }
+
+      .world-ui-btn--visit:hover:not(:disabled) {
+        box-shadow:
+          0 0 0 3px rgb(255 214 120 / 55%),
+          0 7px 0 #c7820f,
+          0 18px 36px rgb(245 166 35 / 44%);
+      }
+
+      .world-ui-btn--visit:active:not(:disabled) {
+        box-shadow:
+          0 0 0 2px rgb(255 201 77 / 45%),
+          0 1px 0 #c7820f,
+          0 8px 20px rgb(245 166 35 / 30%);
+      }
+
+      /* 小豬正在玩：反灰、不能按（游標不是「等待中」的轉圈，是「不能按」） */
+      .world-ui-btn--visit:disabled {
+        cursor: not-allowed;
+        filter: grayscale(1);
+        opacity: 0.55;
+      }
+
       .world-ui-btn--enter {
         background: linear-gradient(160deg, #b8f0e8 0%, #5ed4c6 45%, #3ebdb0 100%);
         box-shadow:
@@ -271,6 +301,9 @@
           進入
         </button>
       </div>
+      <button type="button" id="pig-visit" class="world-ui-btn world-ui-btn--visit" aria-label="讓小豬去龍兔的家玩溜滑梯" hidden>
+        去看看
+      </button>
     </div>
     <div id="app"></div>
     <!-- <script type="module" src="/src/learn/main.ts"></script> -->

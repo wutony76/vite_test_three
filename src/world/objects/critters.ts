@@ -113,7 +113,8 @@ function limb(a: THREE.Vector3Like, b: THREE.Vector3Like, r: number, hex: number
 }
 
 function merge(parts: THREE.BufferGeometry[]) {
-  const merged = mergeGeometries(parts.map((g) => g.toNonIndexed()));
+  // 有 index 的（Cylinder、Shape）才轉成沒有 index；Icosahedron 本來就沒有 index，再轉一次 three.js 會跳警告
+  const merged = mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
   for (const g of parts) g.dispose();
   if (!merged) throw new Error('[critters] 合併幾何失敗');
   merged.computeVertexNormals();

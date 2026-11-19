@@ -148,6 +148,11 @@ export type PigGoToOptions = {
   allowNearTop?: boolean;
   /** 最多走幾秒；不給就依距離估（直線所需秒數 ×3 ＋ 8） */
   timeoutSeconds?: number;
+  /**
+   * 避障距離的倍率（預設 1）：小於 1 = 可以貼著、擦過房子走（從兩棟房子中間擠過去）；0 = 完全不避障、直直走過去。
+   * 「去看看」找不到路時一級一級放寬用，模型有一點穿插沒關係，總比小豬原地消失好
+   */
+  obstacleScale?: number;
   onDone: (arrived: boolean) => void;
 };
 
@@ -366,10 +371,13 @@ export function createPig({
       // 已經在界外（例如剛把緞帶拖高）：允許「往頂端走」的步伐，不然會被困在醬底下動不了
       if (!from || col >= colatitudeFromNormal(from)) return true;
     }
-    const footprint = pigBodyRadiusRad();
+    // 走指令時可以放寬避障（obstacleScale < 1 擦過房子、0 完全不避）
+    const scale = command?.obstacleScale ?? 1;
+    if (scale <= 0) return false;
+    const footprint = pigBodyRadiusRad() * scale;
     for (const obstacle of obstacleScratch) {
       if (obstacle === ignoredObstacle) continue;
-      if (angularDistance(n, obstacle.normal) < footprint + obstacle.clearanceRad) return true;
+      if (angularDistance(n, obstacle.normal) < footprint + obstacle.clearanceRad * scale) return true;
     }
     return false;
   }
@@ -1252,6 +1260,22 @@ export function createPig({
       if (col < settings.roamColatitudeMin || col > effectiveColatMax) return false;
       for (const obstacle of obstacleScratch) {
         if (angularDistance(normal, obstacle.normal) < radiusRad + obstacle.clearanceRad) return false;
+      }
+      return true;
+    },
+    /**
+     * 給「規劃路線」用：小豬站在這裡會不會撞到障礙（房子、水潭、食物…）、會不會超出醬的上緣。
+     * 不限制「離頂端至少幾度」（龍兔的家大門在頂端附近）；ignoreRoot 那個物件不算障礙（例如要走進去的房子）。
+     * 跟 isOpenGround 一樣直接用小豬這一格算好的障礙清單，不重算
+     */
+    isClearForPath: (normal: THREE.Vector3, ignoreRoot: THREE.Object3D | null = null, obstacleScale = 1) => {
+      if (colatitudeFromNormal(normal) > effectiveColatMax) return false;
+      // obstacleScale：跟 goTo 的同名選項一樣，< 1 = 允許擦過房子、0 = 不避障
+      if (obstacleScale <= 0) return true;
+      const footprint = pigBodyRadiusRad() * obstacleScale;
+      for (const obstacle of obstacleScratch) {
+        if (obstacle.root === ignoreRoot) continue;
+        if (angularDistance(normal, obstacle.normal) < footprint + obstacle.clearanceRad * obstacleScale) return false;
       }
       return true;
     },

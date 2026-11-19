@@ -374,6 +374,8 @@ const worldUiActions = document.getElementById('world-ui-actions');
 const viewIntroButton = document.getElementById('view-intro') as HTMLButtonElement | null;
 const houseEnterSlot = document.getElementById('house-enter-slot');
 const houseEnterButton = document.getElementById('house-enter') as HTMLButtonElement | null;
+/** 「去看看」：選到龍兔的家時才出現；按了小豬就去玩溜滑梯，玩完之前反灰 */
+const pigVisitButton = document.getElementById('pig-visit') as HTMLButtonElement | null;
 
 /** 已選房子（或開場預設 mainHall） */
 let houseEnterReady = false;
@@ -386,6 +388,20 @@ function syncWorldActionButtons() {
   if (viewIntroButton) viewIntroButton.disabled = busy;
   if (houseEnterSlot) houseEnterSlot.hidden = !showEnter;
   if (houseEnterButton) houseEnterButton.disabled = busy || !showEnter;
+  syncPigVisitButton();
+}
+
+/**
+ * 「去看看」按鈕：只有選到龍兔的家（mainHall）時才出現；
+ * 小豬正在冒險（走去大門、進門、溜滑梯、泡在水裡、爬上岸）時反灰，回到岸上才能再按
+ */
+function syncPigVisitButton() {
+  if (!pigVisitButton) return;
+  const adventure = pig?.adventure;
+  const show = !!adventure && houseEnterReady && introEnterUnlocked && selectedHouse?.label === 'mainHall';
+  pigVisitButton.hidden = !show;
+  // 開場時溜滑梯還沒伸出來、或水潭關著：也先反灰，按了也去不了
+  pigVisitButton.disabled = !show || adventure.getPhase() !== 'idle' || !adventure.canPlay();
 }
 
 function resetIntroEnterButton() {
@@ -413,6 +429,16 @@ viewIntroButton?.addEventListener('click', () => {
     syncWorldActionButtons();
   });
 });
+
+pigVisitButton?.addEventListener('click', () => {
+  const adventure = pig?.adventure;
+  if (!adventure || adventure.getPhase() !== 'idle') return;
+  if (!adventure.playNow()) console.warn(`[pig] 去不了溜滑梯：${adventure.getLastFailReason()}`);
+  // 馬上反灰：不用等下一次輪詢
+  syncPigVisitButton();
+});
+// 小豬玩完（回到岸上）時按鈕要恢復：冒險的階段是在動畫裡變的，這裡每 0.25 秒對一次
+setInterval(syncPigVisitButton, 250);
 
 houseEnterButton?.addEventListener('click', () => {
   if (!houseEnterReady || isCameraFlying() || isHouseTransitionPlaying()) return;
@@ -2986,7 +3012,8 @@ const labelToCamera = new THREE.Vector3();
 const HOUSE_LABEL_DISPLAY: Record<string, { title: string; note?: string }> = {
   mainHall: { title: '龍兔的家', note: '（點擊進入會看到詳細資訊）' },
   projectRoom: { title: '工作間' },
-  bgRoom: { title: '點心樓' },
+  bgRoom: { title: '金 • 彩 • 閣', note: '（過來試試手氣吧！）' },
+  Gamehall: { title: '電 • 波 • 町', note: '（好像是一個玩遊戲的地方）' },
 };
 let renderedHouseLabel = '';
 

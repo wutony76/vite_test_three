@@ -444,8 +444,9 @@ export function createShiitake({ groundRadius, up, front, envMap, layout = SHIIT
     // 原本的貼圖是所有香菇共用的，直接改會讓每一顆一起變色
     // 注意：texture.clone() 會「共用」同一個 Source（圖片來源），直接設 texture.image 會改到共用的那張，
     // 所有香菇（連十字花刀、菇柄）都會一起被染色。所以要給它一個全新的 Source。
+    // （新版 three.js 把 THREE.Source 改名成 THREE.TextureSource，用舊名字會跳警告）
     const texture = material.map.clone();
-    texture.source = new THREE.Source(canvas);
+    texture.source = new THREE.TextureSource(canvas);
     texture.needsUpdate = true;
     material.map = texture;
     capPaint = {

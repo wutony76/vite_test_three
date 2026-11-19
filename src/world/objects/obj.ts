@@ -1211,6 +1211,8 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
             settings: pigAdventure.settings,
             startNow: pigAdventure.startNow,
             startWalk: pigAdventure.startWalk,
+            playNow: pigAdventure.playNow,
+            canPlay: pigAdventure.canPlay,
             testSplashFish: pigAdventure.testSplashFish,
             getPhase: pigAdventure.getPhase,
             getLastFailReason: pigAdventure.getLastFailReason,
@@ -1881,6 +1883,10 @@ export type WorldPig = {
     startNow: () => boolean;
     /** 完整流程：走到龍兔的家大門、走進去、屋裡待一下、溜滑梯 */
     startWalk: () => boolean;
+    /** 畫面上的「去看看」：不管小豬在哪裡都規劃路線走進龍兔的家、玩溜滑梯 */
+    playNow: () => boolean;
+    /** 現在能不能去玩（溜滑梯、水潭、大門都準備好了） */
+    canPlay: () => boolean;
     /** 在水潭中央濺一下、必定噴出魚排（測試用） */
     testSplashFish: () => boolean;
     getPhase: () => string;

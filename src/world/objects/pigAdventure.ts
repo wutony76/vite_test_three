@@ -209,7 +209,9 @@ export function createPigAdventure({
         return true;
       }
     }
-    return false;
+    // 大門前都被別的東西佔住（例如食物擺得太近）：還是用大門正前方那一點，小豬擠過去就好，不放棄
+    doorFront.copy(rotateOnSphere(houseNormal, toDoor, clearance + body + 1 * DEG));
+    return true;
   }
 
   /** 開始一趟冒險；force = 面板「立刻去溜滑梯」（不擲骰子、會打斷小豬正在做的事） */
@@ -236,8 +238,12 @@ export function createPigAdventure({
   };
 
   function start(force = false) {
-    // 還在走去大門的路上又按一次：重新出發（重新規劃路線），不用等它走不到、放棄
-    if (force && phase === 'toDoor') pig.cancelGoTo();
+    // 還在走去大門的路上又按一次：重新出發（重新規劃路線），不用等它走不到、放棄。
+    // 先回到 idle 再取消走路：取消會呼叫 onDone(false)，phase 已經不是 toDoor 就直接略過（不會觸發重新規劃）
+    if (force && phase === 'toDoor') {
+      setPhase('idle');
+      pig.cancelGoTo();
+    }
     if (phase !== 'idle') return fail(`小豬已經在冒險中：${PHASE_LABEL[phase]}`);
     if (!force && pig.isBusy()) return fail('小豬正在忙（去篝火、停下來看東西…）');
     if (pig.isPuppet()) return fail('小豬正在被操作');
@@ -247,25 +253,343 @@ export function createPigAdventure({
     if (!computeDoorFront()) return fail('大門前找不到小豬站得下的位置');
     lastFailReason = '';
     setPhase('toDoor');
+    level = 0;
+    lastLevelRetries = 0;
+    // 先規劃一條繞過房子、水潭、溜滑梯的路線，再一段一段走過去（只朝大門直走的話，
+    // 從水潭邊出發時會被擋住、一直繞）；找不到就放寬避障，從房子中間擠過去
+    route = planRouteEscalating(pig.object.position.clone().normalize());
+    routeIndex = 0;
+    walkLeg();
+    return true;
+  }
+
+  // ─────────────────────────── 走去大門的路線 ───────────────────────────
+
+  /**
+   * 規劃好的路線：大門之前的轉折點（綠球座標的地表方向）＋走這一段要放寬到多少避障（scale）；
+   * 最後一段走到 doorFront，用 finalScale
+   */
+  type RoutePoint = { point: THREE.Vector3; scale: number };
+  let route: RoutePoint[] = [];
+  let finalScale = 1;
+  let routeIndex = 0;
+  /**
+   * 窄縫（例如 projectRoom 和 GameHall 中間）：正常避障距離下過不去，但縮小一點就過得去。
+   * 這種格子不當成牆，而是「走起來比較貴」：TIGHT_SCALE = 那一格要放寬到多少才過得去，
+   * TIGHT_COST = 走那一格的距離算幾倍。繞外圍明顯比較遠時，就會選擇從中間穿過去
+   */
+  const TIGHT_SCALE = [1, 0.7, 0.45];
+  const TIGHT_COST = [1, 1.25, 1.6];
+  /**
+   * 避障放寬的等級：找不到路、或某一段卡住，就往下一級放寬重新規劃。
+   * 1 = 正常；0.7／0.45／0.2 = 越來越能貼著、擦過房子走（從兩棟房子中間擠過去，模型穿插一點沒關係）；
+   * 0 = 完全不避障，直直走到大門。所以一定走得到，小豬不會原地縮小直接去
+   */
+  const OBSTACLE_LEVELS = [1, 0.7, 0.45, 0.2, 0];
+  let level = 0;
+  /** 最後一級（完全不避障）也失敗時，最多再重試幾次（避免無限重來） */
+  let lastLevelRetries = 0;
+  /** 這一段離目標最近到過多近、多久沒有更近（判斷卡住） */
+  let legBest = Infinity;
+  let legStall = 0;
+  /** 走這麼久都沒有更接近這一段的目標 → 算卡住，重新規劃 */
+  const LEG_STALL_SECONDS = 4;
+
+  const ROUTE_STEP = 2 * DEG;
+  const ROUTE_ROWS = 41; // 離頂端 0～80°
+  const ROUTE_COLS = 180; // 方位每 2°
+  const routeNormal = (i: number, j: number, target = new THREE.Vector3()) => {
+    const colat = i * ROUTE_STEP;
+    const az = (j / ROUTE_COLS) * Math.PI * 2;
+    return target
+      .copy(up)
+      .multiplyScalar(Math.cos(colat))
+      .addScaledVector(front, Math.sin(colat) * Math.cos(az))
+      .addScaledVector(side, Math.sin(colat) * Math.sin(az));
+  };
+  const routeCell = (n: THREE.Vector3) => {
+    const colat = Math.acos(THREE.MathUtils.clamp(n.dot(up), -1, 1));
+    tmp.copy(n).addScaledVector(up, -n.dot(up));
+    let az = Math.atan2(tmp.dot(side), tmp.dot(front));
+    if (az < 0) az += Math.PI * 2;
+    const i = THREE.MathUtils.clamp(Math.round(colat / ROUTE_STEP), 0, ROUTE_ROWS - 1);
+    const j = Math.round((az / (Math.PI * 2)) * ROUTE_COLS) % ROUTE_COLS;
+    return i * ROUTE_COLS + j;
+  };
+
+  /**
+   * 這個位置在 scale 倍的避障距離下走得過去嗎（scale 再乘上目前的放寬等級）。
+   * 靠近大門（5° 內）時房子本身不算障礙，才走得進門
+   */
+  function routeClear(n: THREE.Vector3, scale = 1) {
+    const house = getHouse()?.object ?? null;
+    return pig.isClearForPath(n, n.angleTo(doorFront) < 5 * DEG ? house : null, OBSTACLE_LEVELS[level] * scale);
+  }
+
+  /** 這一格要放寬到第幾級才過得去（TIGHT_SCALE 的索引）；-1 = 再放寬也過不去 */
+  function tightness(n: THREE.Vector3) {
+    for (let t = 0; t < TIGHT_SCALE.length; t++) if (routeClear(n, TIGHT_SCALE[t])) return t;
+    return -1;
+  }
+
+  /** 兩點之間的大圓弧上，每 1° 檢查一次都走得過去（scale 倍的避障距離） */
+  function segmentClear(a: THREE.Vector3, b: THREE.Vector3, scale = 1) {
+    const angle = a.angleTo(b);
+    const steps = Math.max(1, Math.ceil(angle / DEG));
+    const p = new THREE.Vector3();
+    for (let k = 1; k < steps; k++) {
+      // 球面線性插值（slerp）：兩個單位向量之間沿大圓走
+      const t = k / steps;
+      const sinA = Math.sin(angle) || 1;
+      p.copy(a).multiplyScalar(Math.sin((1 - t) * angle) / sinA).addScaledVector(b, Math.sin(t * angle) / sinA).normalize();
+      if (!routeClear(p, scale)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * A* 找路：在綠球上鋪一張「離頂端 × 方位」的格子（每格 2°），障礙（房子、水潭、溜滑梯、食物）佔的格子不能走，
+   * 從小豬現在的位置找到大門前。找不到回傳 null。
+   * 回傳的是「轉折點」：把格子路線拉直（看得到的就直接連過去），小豬才不會一格一格鋸齒狀地走
+   */
+  function planRoute(from: THREE.Vector3): RoutePoint[] | null {
+    const total = ROUTE_ROWS * ROUTE_COLS;
+    const startCell = routeCell(from);
+    const goalCell = routeCell(doorFront);
+    const normals: THREE.Vector3[] = new Array(total);
+    // 每一格的「窄度」：0 = 正常走得過、1／2 = 要放寬才過得去（走起來比較貴）、-1 = 擋住；-2 = 還沒算
+    const tight = new Int8Array(total).fill(-2);
+    const nodeNormal = (k: number) => (normals[k] ??= routeNormal(Math.floor(k / ROUTE_COLS), k % ROUTE_COLS));
+    const cellTight = (k: number) => {
+      if (k === startCell || k === goalCell) return 0;
+      if (tight[k] === -2) tight[k] = tightness(nodeNormal(k));
+      return tight[k];
+    };
+    // 隨機路線（一）：球面上鋪一層隨機的「起伏」（幾個方向、頻率隨機的 sin 疊起來），有的地方走起來比較貴（1～2.5 倍）。
+    // 用平滑的起伏而不是每格獨立亂數：每格亂數只會讓路線歪七扭八，不會換一條「走廊」
+    const waves = Array.from({ length: 4 }, () => ({
+      dir: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(),
+      freq: 3 + Math.random() * 6,
+      phase: Math.random() * Math.PI * 2,
+    }));
+    const bumpCache = new Float32Array(total).fill(-1);
+    const bump = (k: number) => {
+      if (bumpCache[k] < 0) {
+        const n = nodeNormal(k);
+        let v = 0;
+        for (const w of waves) v += Math.sin(n.dot(w.dir) * w.freq + w.phase);
+        bumpCache[k] = 1 + 1.5 * ((v / waves.length + 1) / 2);
+      }
+      return bumpCache[k];
+    };
+
+    const g = new Float32Array(total);
+    const came = new Int32Array(total);
+    const closed = new Uint8Array(total);
+    // 簡單的二元堆積（最小堆）：[f, cell]
+    let heap: Array<[number, number]> = [];
+    const push = (f: number, k: number) => {
+      heap.push([f, k]);
+      let c = heap.length - 1;
+      while (c > 0) {
+        const parent = (c - 1) >> 1;
+        if (heap[parent][0] <= heap[c][0]) break;
+        [heap[parent], heap[c]] = [heap[c], heap[parent]];
+        c = parent;
+      }
+    };
+    const pop = () => {
+      const top = heap[0];
+      const last = heap.pop()!;
+      if (heap.length) {
+        heap[0] = last;
+        let c = 0;
+        for (;;) {
+          const l = c * 2 + 1;
+          const r = l + 1;
+          let m = c;
+          if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+          if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+          if (m === c) break;
+          [heap[m], heap[c]] = [heap[c], heap[m]];
+          c = m;
+        }
+      }
+      return top;
+    };
+
+    /** A*：從 src 格走到 dst 格，回傳經過的格子（含頭尾）；走不到回傳 null */
+    const search = (src: number, dst: number): number[] | null => {
+      g.fill(Infinity);
+      came.fill(-1);
+      closed.fill(0);
+      heap = [];
+      const dstN = nodeNormal(dst);
+      g[src] = 0;
+      push(nodeNormal(src).angleTo(dstN), src);
+      while (heap.length) {
+        const [, k] = pop();
+        if (closed[k]) continue;
+        closed[k] = 1;
+        if (k === dst) {
+          const keys: number[] = [];
+          for (let c = dst; c !== -1; c = came[c]) keys.push(c);
+          return keys.reverse();
+        }
+        const i = Math.floor(k / ROUTE_COLS);
+        const j = k % ROUTE_COLS;
+        for (let di = -1; di <= 1; di++) {
+          const ni = i + di;
+          if (ni < 0 || ni >= ROUTE_ROWS) continue;
+          for (let dj = -1; dj <= 1; dj++) {
+            if (!di && !dj) continue;
+            const nk = ni * ROUTE_COLS + ((j + dj + ROUTE_COLS) % ROUTE_COLS);
+            if (closed[nk]) continue;
+            const t = cellTight(nk);
+            if (t < 0) continue;
+            const cost = g[k] + nodeNormal(k).angleTo(nodeNormal(nk)) * TIGHT_COST[t] * bump(nk);
+            if (cost < g[nk]) {
+              g[nk] = cost;
+              came[nk] = k;
+              push(cost + nodeNormal(nk).angleTo(dstN), nk);
+            }
+          }
+        }
+      }
+      return null;
+    };
+
+    // 隨機路線（二）：先隨機挑一個「途經點」——在起點和大門之間、往左或往右偏一段（偏多少也隨機），
+    // 路線變成「起點 → 途經點 → 大門」。每次的途經點不同，就會走不同的路：有時穿過房子中間、有時從旁邊繞
+    let cellKeys: number[] | null = null;
+    /** 途經點在 cellKeys 裡的位置：拉直時要分兩段拉，不然途經點會被拉掉 */
+    let viaIndex = -1;
+    const distance = from.angleTo(doorFront);
+    /** 這一格不能走的話，往外一圈一圈找最近的可走格子（最多 4 圈）；都不行回傳 -1 */
+    const nearestWalkable = (cell: number) => {
+      const ci = Math.floor(cell / ROUTE_COLS);
+      const cj = cell % ROUTE_COLS;
+      for (let ring = 0; ring <= 4; ring++) {
+        for (let di = -ring; di <= ring; di++) {
+          for (let dj = -ring; dj <= ring; dj++) {
+            if (Math.max(Math.abs(di), Math.abs(dj)) !== ring) continue;
+            const ni = ci + di;
+            if (ni < 0 || ni >= ROUTE_ROWS) continue;
+            const nk = ni * ROUTE_COLS + ((cj + dj + ROUTE_COLS) % ROUTE_COLS);
+            if (cellTight(nk) >= 0) return nk;
+          }
+        }
+      }
+      return -1;
+    };
+    for (let attempt = 0; attempt < 10 && !cellKeys; attempt++) {
+      const along = 0.2 + Math.random() * 0.6;
+      // 起點往大門方向的切線，再隨機往左或往右轉 20～110°
+      const toward = tangentOf(doorFront.clone().sub(from), from);
+      if (toward.lengthSq() < 0.5) break;
+      const turnSide = (Math.random() < 0.5 ? -1 : 1) * (20 + Math.random() * 90) * DEG;
+      const dir = toward.applyAxisAngle(from, turnSide);
+      const via = rotateOnSphere(from, dir, distance * along);
+      // 挑到房子、水潭上：往旁邊找最近走得過去的格子（窄縫也可以，只是比較貴）
+      const viaCell = nearestWalkable(routeCell(via));
+      if (viaCell < 0 || viaCell === startCell || viaCell === goalCell) continue;
+      const first = search(startCell, viaCell);
+      if (!first) continue;
+      const second = search(viaCell, goalCell);
+      if (!second) continue;
+      cellKeys = [...first, ...second.slice(1)];
+      viaIndex = first.length - 1;
+    }
+    // 途經點都不好挑（太近、挑到障礙）：直接從起點找到大門
+    if (!cellKeys) cellKeys = search(startCell, goalCell);
+    if (!cellKeys) return null;
+    const cells = cellKeys.map((k) => nodeNormal(k).clone());
+    const cellTights = cellKeys.map((k) => Math.max(0, cellTight(k)));
+    // 起點用小豬真正的位置、終點用大門前（格子點只是近似）
+    cells[0] = from.clone();
+    cells[cells.length - 1] = doorFront.clone();
+    // 拉直：從目前的點，往後找「直線走得過去」的最遠那一點當下一個轉折點。
+    // 直線檢查用「這兩點之間格子最窄的那一級」：原本就要擠過窄縫的那段才放寬，其他段照正常距離。
+    // 有途經點時分兩段拉直（起點 → 途經點、途經點 → 大門）：一起拉的話，放寬後障礙變小，
+    // 常常一條直線就從起點拉到大門，途經點被拉掉，每次又變成同一條路
+    const points: RoutePoint[] = [];
+    const stops = viaIndex > 0 ? [viaIndex, cells.length - 1] : [cells.length - 1];
+    let a = 0;
+    for (const stop of stops) {
+      while (a < stop) {
+        let b = stop;
+        const needed = (to: number) => {
+          let t = 0;
+          for (let m = a + 1; m <= to; m++) t = Math.max(t, cellTights[m]);
+          return TIGHT_SCALE[t];
+        };
+        while (b > a + 1 && !segmentClear(cells[a], cells[b], needed(b))) b--;
+        points.push({ point: cells[b], scale: OBSTACLE_LEVELS[level] * needed(b) });
+        a = b;
+      }
+    }
+    // 最後一點就是大門前，那一段由 walkLeg 的最後一段負責
+    finalScale = points.pop()?.scale ?? OBSTACLE_LEVELS[level];
+    return points;
+  }
+
+  /** 從目前等級開始規劃路線；找不到就一級一級放寬，直到找到為止（最後一級不避障，一定找得到） */
+  function planRouteEscalating(from: THREE.Vector3): RoutePoint[] {
+    for (;;) {
+      const found = planRoute(from);
+      if (found) return found;
+      if (level >= OBSTACLE_LEVELS.length - 1) return [];
+      level++;
+    }
+  }
+
+  /** 走路線上的下一段；路線走完就走最後一段到大門前 */
+  function walkLeg() {
+    legBest = Infinity;
+    legStall = 0;
+    if (routeIndex < route.length) {
+      const { point: target, scale } = route[routeIndex];
+      pig.goTo({
+        getTarget: () => (phase === 'toDoor' ? target : null),
+        arriveRad: 1.5 * DEG,
+        allowNearTop: true,
+        // 這一段要擠過窄縫的話，小豬自己的避障也跟著放寬（不然走到縫前又自己轉開）
+        obstacleScale: scale,
+        timeoutSeconds: THREE.MathUtils.clamp(
+          (pig.object.position.clone().normalize().angleTo(target) / DEG / Math.max(pig.settings.roamSpeedDegrees, 0.5)) * 3 + 5,
+          6,
+          30,
+        ),
+        onDone: (arrived) => {
+          if (phase !== 'toDoor') return;
+          if (!arrived) {
+            walkFailed();
+            return;
+          }
+          routeIndex++;
+          walkLeg();
+        },
+      });
+      return;
+    }
     pig.goTo({
       getTarget: () => (phase === 'toDoor' ? doorFront : null),
       arriveRad: 1 * DEG,
       ignoreRoot: getHouse()?.object ?? null,
       allowNearTop: true,
-      // 走多久放棄：依距離估（直線秒數 ×3 ＋ 8），但限制在 20～75 秒。
-      // 不設上限的話，遠的時候要等兩分多鐘，走不到時這段期間一直「冒險中」；
-      // 固定 40 秒又太短（實測從綠球另一側要繞過好幾棟房子，40 秒走不到就放棄了）
+      obstacleScale: finalScale,
       timeoutSeconds: THREE.MathUtils.clamp(
         (pig.object.position.clone().normalize().angleTo(doorFront) / DEG / Math.max(pig.settings.roamSpeedDegrees, 0.5)) * 3 + 8,
-        20,
-        75,
+        10,
+        40,
       ),
       onDone: (arrived) => {
         if (phase !== 'toDoor') return;
         if (!arrived) {
-          finish();
+          walkFailed();
           return;
         }
+        mustPlay = false;
         enterFrom.copy(pig.object.position);
         pig.setPuppet(true);
         // 烏雲（連雨、閃電）先收起來：進門、溜滑梯、泡在水裡都不該有雲跟著，爬上岸才回來
@@ -273,7 +597,42 @@ export function createPigAdventure({
         setPhase('entering');
       },
     });
-    return true;
+  }
+
+  /**
+   * 這一段走不到（逾時、卡住）：放寬一級避障，從現在的位置重新規劃路線再走。
+   * 最後一級是完全不避障（直直走過去），所以一定走得到；小豬不會原地縮小直接去。
+   * 自動冒險在最後一級也失敗才放棄；「去看看」會再重試幾次
+   */
+  function walkFailed() {
+    if (level < OBSTACLE_LEVELS.length - 1) level++;
+    else lastLevelRetries++;
+    if (lastLevelRetries > (mustPlay ? 5 : 1)) {
+      mustPlay = false;
+      finish();
+      return;
+    }
+    route = planRouteEscalating(pig.object.position.clone().normalize());
+    routeIndex = 0;
+    walkLeg();
+  }
+
+  /** 「去看看」按鈕發起的這一趟：一定要走進龍兔的家玩到溜滑梯（放寬避障重試，不會原地縮小直接去） */
+  let mustPlay = false;
+
+  /**
+   * 畫面上的「去看看」按鈕：不管小豬在哪裡、正在做什麼，都去龍兔的家玩溜滑梯。
+   * 先規劃一條繞過障礙的路線走去大門、走進去（一定看得到小豬跑進龍兔的家）；
+   * 找不到路、卡住就放寬避障，從房子中間擠過去（模型穿插一點沒關係），不會原地縮小直接去。
+   * 已經在冒險中回傳 false（按鈕這時是反灰的）
+   */
+  function playNow() {
+    if (phase !== 'idle') return fail(`小豬已經在冒險中：${PHASE_LABEL[phase]}`);
+    mustPlay = true;
+    if (start(true)) return true;
+    // 出發不了只有「溜滑梯、水潭、大門還沒準備好」這種情況（按鈕那時是反灰的）；不會改成原地縮小直接去
+    mustPlay = false;
+    return false;
   }
 
   /** 按鈕「馬上去溜滑梯」：在屋裡只待這麼久（自動冒險還是照 insideSeconds） */
@@ -289,7 +648,12 @@ export function createPigAdventure({
     if (pig.isPuppet()) return fail('小豬正在被操作');
     if (!getRide()) return fail('溜滑梯還沒準備好（關閉、還沒建好或開場還沒伸出來）');
     if (!getPond()?.settings.enabled) return fail('水潭關閉');
-    if (phase === 'toDoor') pig.cancelGoTo();
+    if (phase === 'toDoor') {
+      // 先切到下一個階段再取消走路：取消會呼叫 goTo 的 onDone(false)，
+      // 那時 phase 已經不是 toDoor，onDone 直接略過，不會先把這一趟「結束」掉再重來
+      setPhase('vanish');
+      pig.cancelGoTo();
+    }
     // 中途出狀況時要回到的位置：有大門前就用大門前，沒有就回到原地
     if (!computeDoorFront()) doorFront.copy(pig.object.position).normalize();
     lastFailReason = '';
@@ -482,7 +846,24 @@ export function createPigAdventure({
       return;
     }
 
-    if (phase === 'toDoor') return; // 走路交給 pig.ts 的 goTo，走到時 onDone 會切到 entering
+    if (phase === 'toDoor') {
+      // 走路交給 pig.ts 的 goTo，走到時 onDone 會切到 entering
+      // 這一段一直沒有更接近目標（被擋住、在原地繞）→ 取消這一段，goTo 的 onDone(false) 會重新規劃路線
+      const legTarget = routeIndex < route.length ? route[routeIndex].point : doorFront;
+      const distance = pig.object.position.clone().normalize().angleTo(legTarget);
+      if (distance < legBest - 0.3 * DEG) {
+        legBest = distance;
+        legStall = 0;
+      } else {
+        legStall += deltaTime;
+      }
+      if (legStall > LEG_STALL_SECONDS) {
+        legStall = 0;
+        legBest = Infinity;
+        pig.cancelGoTo();
+      }
+      return;
+    }
 
     // 下面都是操偶階段：溜滑梯或水潭被關掉就放棄，小豬回到大門前
     if (!getPond()?.settings.enabled || (phase !== 'vanish' && phase !== 'entering' && phase !== 'inside' && !ride && !getRide())) {
@@ -675,6 +1056,10 @@ export function createPigAdventure({
     startNow: () => startImmediate(),
     /** 面板「走去大門再溜」：完整流程（走到龍兔的家大門、走進去、屋裡待一下、溜滑梯） */
     startWalk: () => start(true),
+    /** 畫面上的「去看看」：規劃路線走去大門、走進去再溜（一定會玩到溜滑梯） */
+    playNow,
+    /** 現在能不能去玩：溜滑梯建好了（開場時要等它伸出來）、水潭開著、龍兔的家大門載入了 */
+    canPlay: () => !!getRide() && !!getPond()?.settings.enabled && !!getHouse()?.door,
     testSplashFish,
     getPhase: () => phase,
     getLastFailReason: () => lastFailReason,
