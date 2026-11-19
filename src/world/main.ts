@@ -1836,6 +1836,20 @@ if (groundDetail) {
     },
   };
   const refreshPathPanel = () => path.controllersRecursive().forEach((c) => c.updateDisplay());
+  // 編輯小徑時暫時藏起來的房子（勾選的才藏）：房子擋住視線或蓋住路點時，藏起來比較好點、好拖。
+  // 只是畫面上不畫（object.visible），位置、障礙、名牌設定都不變；關掉編輯就恢復
+  const hideWhileEditing: Record<string, boolean> = Object.fromEntries(houses.map((house) => [house.label, true]));
+  const applyPathEditHouseHiding = () => {
+    for (const house of houses) house.object.visible = !(pathEdit.editing && hideWhileEditing[house.label]);
+  };
+  // 面板上顯示的名字（HOUSE_LABEL_DISPLAY 定義在檔案後面，這裡還不能用，所以另外寫一份）
+  const houseNicknames: Record<string, string> = {
+    mainHall: '龍兔的家',
+    projectRoom: '工作間',
+    bgRoom: '金 • 彩 • 閣',
+    twRoom: '台味雜貨',
+    Gamehall: '電 • 波 • 町',
+  };
   path
     .add(s, 'pathMode', GROUND_PATH_MODES)
     .name('路線來源 (auto/custom)')
@@ -1857,8 +1871,18 @@ if (groundDetail) {
         }
         groundDetail.forcePathVisible(on);
         pathEditor.setEditing(on);
+        applyPathEditHouseHiding();
         refreshPathPanel();
       });
+    const hideFolder = path.addFolder('編輯時隱藏的房子');
+    for (const house of houses) {
+      const nickname = houseNicknames[house.label];
+      hideFolder
+        .add(hideWhileEditing, house.label)
+        .name(nickname ? `${house.label}（${nickname}）` : house.label)
+        // 編輯中勾選／取消也立刻生效
+        .onChange(applyPathEditHouseHiding);
+    }
     path.add(pathEdit, 'active').name('目前編輯').disable().listen();
     path.add({ add: () => { pathEditor.addPath(); refreshPathPanel(); } }, 'add').name('新增一條路（接著點綠球）');
     path.add({ del: () => { pathEditor.deleteActivePath(); refreshPathPanel(); } }, 'del').name('刪除目前這條路');
