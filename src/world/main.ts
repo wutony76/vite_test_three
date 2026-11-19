@@ -400,7 +400,29 @@ function syncWorldActionButtons() {
  * 「去看看」按鈕：只有選到龍兔的家（mainHall）時才出現；
  * 小豬正在冒險（走去大門、進門、溜滑梯、泡在水裡、爬上岸）時反灰，回到岸上才能再按
  */
+/** 按了「去看看」、小豬還在這趟冒險中（回到岸上、階段變回 idle 就結束） */
+let pigVisiting = false;
+/** 上一次小豬有沒有套「選中效果」：沒套、也不需要套時就不用每 0.25 秒 traverse 一次 */
+let pigVisitLookApplied = false;
+
+/**
+ * 選到龍兔的家、按了「去看看」：小豬這趟冒險期間也套「選中效果」（HOUSE_SELECT_LOOK 的「小豬」那組），
+ * 跟龍兔的家、溜滑梯一起亮；玩完或改選別棟就變回原樣
+ */
+function applyPigVisitLook() {
+  if (!pig) return;
+  const active = pigVisiting && selectedHouse?.label === 'mainHall';
+  // 開頁面時這個函式就會被呼叫，那時 HOUSE_SELECT_LOOK 還沒宣告（const 在宣告前不能用）：沒套也不用套就直接跳過
+  if (!active && !pigVisitLookApplied) return;
+  pigVisitLookApplied = active;
+  const look = active ? selectLookByLabel('小豬') : null;
+  setObjectSelectGrade(pig.object, look?.saturation ?? 1, look?.brightness ?? 1);
+}
+
 function syncPigVisitButton() {
+  // 小豬玩完回到岸上：這趟「去看看」結束，飽和度、亮度變回原樣
+  if (pigVisiting && pig?.adventure?.getPhase() === 'idle') pigVisiting = false;
+  applyPigVisitLook();
   if (!pigVisitButton) return;
   const adventure = pig?.adventure;
   const show = !!adventure && houseEnterReady && introEnterUnlocked && selectedHouse?.label === 'mainHall';
@@ -438,7 +460,8 @@ viewIntroButton?.addEventListener('click', () => {
 pigVisitButton?.addEventListener('click', () => {
   const adventure = pig?.adventure;
   if (!adventure || adventure.getPhase() !== 'idle') return;
-  if (!adventure.playNow()) console.warn(`[pig] 去不了溜滑梯：${adventure.getLastFailReason()}`);
+  if (adventure.playNow()) pigVisiting = true;
+  else console.warn(`[pig] 去不了溜滑梯：${adventure.getLastFailReason()}`);
   // 馬上反灰：不用等下一次輪詢
   syncPigVisitButton();
 });
@@ -910,6 +933,12 @@ function bindHousePanel(entry: WorldHouse) {
       .onChange(applyLook)
       .onFinishChange(logHouseSelectLook);
   }
+  // 龍兔的家：按「去看看」後小豬也一起亮（只在這趟冒險期間）
+  if (entry.label === 'mainHall' && pig) {
+    const pigLook = selectLookByLabel('小豬');
+    lookFolder.add(pigLook, 'saturation', 0.5, 2.5, 0.01).name('小豬（去看看）飽和度').onChange(applyLook).onFinishChange(logHouseSelectLook);
+    lookFolder.add(pigLook, 'brightness', 0.5, 2, 0.01).name('小豬（去看看）亮度').onChange(applyLook).onFinishChange(logHouseSelectLook);
+  }
 
   if (LOCKED_HOUSES.has(entry.label)) {
     houseFolder.title(`房子 · ${entry.label}（已鎖定）`);
@@ -1030,6 +1059,8 @@ const HOUSE_SELECT_LOOK: Record<string, HouseSelectLook> = {
   跳舞機: { saturation: 1.3, brightness: 1.4 },
   // 選點心樓（bgRoom）時一起被選到
   大包子: { saturation: 1, brightness: 1.35 },
+  // 選龍兔的家、按「去看看」後，小豬這趟冒險期間套用
+  小豬: { saturation: 1.2, brightness: 1.2 },
 };
 
 /** 沒列在上面的房子（之後新增的）用這組 */
@@ -1072,6 +1103,8 @@ function applyHouseSelectLook(house: WorldHouse, active: boolean) {
   for (const companion of HOUSE_SELECT_COMPANIONS[house.label] ?? []) {
     for (const object of companion.objects()) apply(object, selectLookByLabel(companion.label));
   }
+  // 小豬溜滑梯時可能掛在溜滑梯底下，上面那次會套到溜滑梯的數值：小豬永遠最後套，用自己的那組蓋過去
+  applyPigVisitLook();
 }
 
 function logHouseSelectLook() {
