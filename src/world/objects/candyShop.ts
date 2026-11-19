@@ -13,6 +13,8 @@ import { SKIP_SPHERE_CONFORM } from './conformToSphere';
  *   - 屋頂：一個超大的玻璃糖果罐（紅蓋子、裡面裝滿彩色糖球），旁邊插一支棒棒糖
  *   - 左上角一塊黃色直立燈箱「古早味」；右邊電線桿掛著「地下道」燈箱，電線垂到屋頂
  *   - 背面（-z）：一片金光閃閃的金色布棚，從二樓垂到一樓、微微往外鼓，上面一個紅色大「彩」字，旁邊有光暈和輪流閃的星星
+ *   - 布棚底下是刮刮樂攤：牆上一整排刮刮樂卡片架、紅底金字「刮刮樂」橫招牌，
+ *     前面一張櫃台（正面「今彩539」），檯面上攤開幾張卡和一枚金幣，旁邊一塊直立小立牌
  *   - 地上：紅色塑膠矮凳、扭蛋機兩台、一箱彈珠汽水、「冰」字立牌、往下走的地下道樓梯
  * 招牌、窗戶都是自發光材質（emissive），亮度跟著 glow 設定；「柑仔店」招牌偶爾會「閃一下」像老燈管。
  *
@@ -314,6 +316,46 @@ function createCaiTexture() {
   return toTexture(canvas);
 }
 
+/** 刮刮樂卡片架：4×2 張色彩鮮豔的卡，每張有標題色塊、一塊銀色刮除區、幾個幸運符號 */
+function createScratchRackTexture() {
+  const { canvas, g } = makeCanvas(512, 256);
+  g.fillStyle = '#7a2230';
+  g.fillRect(0, 0, 512, 256);
+  const cards = ['#ff4f6d', '#ffb02e', '#3fb6ff', '#7ee07a', '#b07cff', '#ffd23f', '#ff7ab8', '#4ad6c8'];
+  const symbols = ['$', '7', '★', '福', '¥', '♥', '7', '★'];
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  for (let i = 0; i < 8; i++) {
+    const col = i % 4;
+    const row = Math.floor(i / 4);
+    const x = 12 + col * 125;
+    const y = 10 + row * 123;
+    const w = 112;
+    const h = 112;
+    g.fillStyle = cards[i];
+    g.fillRect(x, y, w, h);
+    // 標題色塊
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    g.fillRect(x + 8, y + 8, w - 16, 20);
+    g.fillStyle = cards[i];
+    g.font = `800 15px ${FONT}`;
+    g.fillText('刮刮樂', x + w / 2, y + 19);
+    // 銀色刮除區（左邊刮開一塊，露出底下的幸運符號）
+    g.fillStyle = '#c9cdd3';
+    g.fillRect(x + 10, y + 36, w - 20, 44);
+    g.fillStyle = '#fff6d6';
+    g.fillRect(x + 10, y + 36, 34, 44);
+    g.fillStyle = '#d81e1e';
+    g.font = `900 26px ${FONT}`;
+    g.fillText(symbols[i], x + 27, y + 59);
+    // 底下一排獎金
+    g.fillStyle = '#ffffff';
+    g.font = `800 16px ${FONT}`;
+    g.fillText(`$${(i + 1) * 100}萬`, x + w / 2, y + 96);
+  }
+  return toTexture(canvas);
+}
+
 /** 「冰」字立牌：台灣冰店門口那種白底、紅色大「冰」字、下面一條藍色海浪 */
 function createIceSignTexture() {
   const { canvas, g } = makeCanvas(128, 160);
@@ -488,6 +530,21 @@ export function createCandyShop({ envMap, layout = CANDY_SHOP_DEFAULT }: CreateC
     polygonOffset: true,
     polygonOffsetFactor: -2,
   });
+  // 刮刮樂攤：卡片架、紅底金字橫招牌、「今彩539」櫃台正面、黃底紅字立牌（都會微微發光）
+  const scratchRackTexture = createScratchRackTexture();
+  const scratchRackMaterial = new THREE.MeshStandardMaterial({
+    map: scratchRackTexture,
+    emissive: 0xffffff,
+    emissiveMap: scratchRackTexture,
+    roughness: 0.5,
+    side: THREE.DoubleSide,
+  });
+  const scratchHeaderTexture = createSignTexture('刮刮樂', 384, 96, false, '#d81e1e', '#ffe066');
+  const scratchHeaderMaterial = new THREE.MeshStandardMaterial({ map: scratchHeaderTexture, emissive: 0xffffff, emissiveMap: scratchHeaderTexture, roughness: 0.5 });
+  const luckyBannerTexture = createSignTexture('今彩539', 384, 96, false, '#c8102e', '#ffd84a');
+  const luckyBannerMaterial = new THREE.MeshStandardMaterial({ map: luckyBannerTexture, emissive: 0xffffff, emissiveMap: luckyBannerTexture, roughness: 0.5 });
+  const scratchStandTexture = createSignTexture('刮刮樂', 96, 256, true, '#ffe066', '#c8102e');
+  const scratchStandMaterial = new THREE.MeshStandardMaterial({ map: scratchStandTexture, emissive: 0xffffff, emissiveMap: scratchStandTexture, roughness: 0.5 });
   let canopyHalo: THREE.Sprite | null = null;
   const canopyStars: Array<{ sprite: THREE.Sprite; phase: number; speed: number; baseSize: number }> = [];
 
@@ -518,6 +575,10 @@ export function createCandyShop({ envMap, layout = CANDY_SHOP_DEFAULT }: CreateC
     { material: subwaySignMaterial, base: 0.8 },
     { material: roomMaterial, base: 0.55 },
     { material: shelfMaterial, base: 0.45 },
+    { material: scratchRackMaterial, base: 0.35 },
+    { material: scratchHeaderMaterial, base: 0.5 },
+    { material: luckyBannerMaterial, base: 0.4 },
+    { material: scratchStandMaterial, base: 0.35 },
     { material: windowMaterial, base: 0.6 },
     { material: lampMaterial, base: 1.2 },
     { material: greenLampMaterial, base: 1.2 },
@@ -901,6 +962,97 @@ export function createCandyShop({ envMap, layout = CANDY_SHOP_DEFAULT }: CreateC
         sparkle.add(star);
         canopyStars.push({ sprite: star, phase: i * 1.3, speed: 2 + i * 0.45, baseSize: 0.12 + (i % 2) * 0.06 });
       }
+    }
+
+    // 刮刮樂攤：就在金色「彩」字布棚底下（背面 -z）
+    {
+      const wallZ = -HALF - 0.005;
+      // 牆上的卡片架：一塊木框，中間貼一整排刮刮樂（自己會微微發光，像攤子開著燈）
+      const rackW = 0.84;
+      const rackH = 0.4;
+      const rackY = BASE_H + 0.52;
+      building.add(box(rackW + 0.06, rackH + 0.06, 0.03, darkWoodMaterial, 0, rackY, wallZ - 0.015));
+      const rack = new THREE.Mesh(new THREE.PlaneGeometry(rackW, rackH), scratchRackMaterial);
+      // 平面預設朝 +z，要朝外（-z）就轉 180°
+      rack.rotation.y = Math.PI;
+      rack.position.set(0, rackY, wallZ - 0.032);
+      building.add(rack);
+      // 「刮刮樂」橫招牌：卡片架上方（BoxGeometry 第 6 面是 -z，也就是朝外那面）
+      const header = new THREE.Mesh(new THREE.BoxGeometry(rackW * 0.7, 0.1, 0.03), [
+        goldTrimMaterial,
+        goldTrimMaterial,
+        goldTrimMaterial,
+        goldTrimMaterial,
+        goldTrimMaterial,
+        scratchHeaderMaterial,
+      ]);
+      header.position.set(0, rackY + rackH / 2 + 0.09, wallZ - 0.02);
+      building.add(header);
+
+      // 櫃台：紅色櫃子，朝外那面貼「今彩539」，上面一塊金色檯面
+      const counterZ = -HALF - 0.36;
+      const counterH = 0.28;
+      const counterW = 0.8;
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(counterW, counterH, 0.18), [
+        redPlasticMaterial,
+        redPlasticMaterial,
+        redPlasticMaterial,
+        redPlasticMaterial,
+        redPlasticMaterial,
+        luckyBannerMaterial,
+      ]);
+      counter.position.set(0, BASE_H + counterH / 2, counterZ);
+      building.add(counter);
+      building.add(box(counterW + 0.05, 0.025, 0.22, goldTrimMaterial, 0, BASE_H + counterH + 0.012, counterZ));
+      // 檯面上攤開的刮刮樂：一張張扇形排開
+      const cardColors = [0xff4f6d, 0xffb02e, 0x3fb6ff, 0x7ee07a, 0xb07cff];
+      cardColors.forEach((color, k) => {
+        const card = box(
+          0.07,
+          0.006,
+          0.1,
+          new THREE.MeshStandardMaterial({ color, roughness: 0.4 }),
+          -0.3 + k * 0.045,
+          BASE_H + counterH + 0.03 + k * 0.002,
+          counterZ,
+        );
+        card.rotation.y = (k - 2) * 0.25;
+        building.add(card);
+      });
+      // 刮刮樂一定要有的：刮卡用的金幣
+      const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.01, 20), goldTrimMaterial);
+      coin.position.set(-0.06, BASE_H + counterH + 0.032, counterZ - 0.03);
+      building.add(coin);
+      // 檯面右半邊一個斜立的展示架：牆上的卡片架被布棚擋住，從外面看主要靠這個認出是刮刮樂攤
+      // （先轉 180° 朝外，再往後仰一點，上緣靠向牆）
+      const display = new THREE.Group();
+      display.position.set(0.17, BASE_H + counterH + 0.025, counterZ + 0.02);
+      display.rotation.set(0.32, Math.PI, 0);
+      building.add(display);
+      const displayW = 0.36;
+      const displayH = 0.2;
+      display.add(box(displayW + 0.03, displayH + 0.03, 0.015, goldTrimMaterial, 0, displayH / 2, -0.01));
+      const displayCards = new THREE.Mesh(new THREE.PlaneGeometry(displayW, displayH), scratchRackMaterial);
+      displayCards.position.set(0, displayH / 2, 0.001);
+      display.add(displayCards);
+
+      // 直立小立牌：黃底紅字「刮刮樂」，放在攤子旁邊的地上
+      const stand = new THREE.Group();
+      stand.position.set(-0.62, BASE_H, -1.0);
+      stand.rotation.y = -0.35;
+      building.add(stand);
+      stand.add(box(0.025, 0.3, 0.025, goldTrimMaterial, 0, 0.15, 0));
+      stand.add(box(0.12, 0.02, 0.12, goldTrimMaterial, 0, 0.01, 0));
+      const standBoard = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.34, 0.025), [
+        goldTrimMaterial,
+        goldTrimMaterial,
+        goldTrimMaterial,
+        goldTrimMaterial,
+        scratchStandMaterial,
+        scratchStandMaterial,
+      ]);
+      standBoard.position.y = 0.42;
+      stand.add(standBoard);
     }
 
     // 店門口兩張紅色塑膠矮凳（台灣巷口必備）：上大下小的圓凳，凳面中間一個小洞
