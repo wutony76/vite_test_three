@@ -71,7 +71,7 @@ import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { enableViewPlaneDrag } from './debug/viewPlaneDrag';
 import { enableSurfaceDrag } from './debug/surfaceDrag';
 import { enableCameraPlaneDrag } from './debug/cameraPlaneDrag';
-import { createStyleGrade, formatStyleGradeSettingsForPaste } from './styleGrade';
+import { createStyleGrade, formatStyleGradeSettingsForPaste, setObjectSelectGrade } from './styleGrade';
 import { createSoftLayerPass, formatSoftLayerSettingsForPaste } from './softLayerPass';
 import { createForegroundBlur, formatForegroundBlurSettingsForPaste } from './foregroundBlur';
 import { formatKetchupSauceSettingsForPaste } from './objects/ketchup';
@@ -880,7 +880,8 @@ const isHouseLocked = (target: { object: THREE.Object3D }) =>
 
 function bindHousePanel(entry: WorldHouse) {
   // 已經是這一棟就不要拆掉滑桿重建：拖曳中每一格都會碰面板，重建會讓數字閃一下
-  const alreadyShowing = entry === selectedHouse && houseFolder.controllers.length > 0;
+  const alreadyShowing =
+    entry === selectedHouse && (houseFolder.controllers.length > 0 || houseFolder.folders.length > 0);
   selectedHouse = entry;
   highlightHouse(entry);
   if (alreadyShowing) return;
@@ -888,6 +889,28 @@ function bindHousePanel(entry: WorldHouse) {
   houseFolder.title(`房子 · ${entry.label}`);
   for (const controller of [...houseFolder.controllers]) controller.destroy();
   for (const folder of [...houseFolder.folders]) folder.destroy();
+
+  // 選中效果：鎖定的房子也要能調（只影響「被選中時」的樣子，不會動到擺放），所以放在鎖定判斷前面
+  const look = houseSelectLook(entry);
+  const applyLook = () => applyHouseSelectLook(entry, selectedHouse === entry);
+  const lookFolder = houseFolder.addFolder('選中效果');
+  lookFolder.add(look, 'saturation', 0.5, 2.5, 0.01).name('飽和度').onChange(applyLook).onFinishChange(logHouseSelectLook);
+  lookFolder.add(look, 'brightness', 0.5, 2, 0.01).name('亮度').onChange(applyLook).onFinishChange(logHouseSelectLook);
+  // 一起被選到的建築（例如工作間的 Happy Fat）：各自一組滑桿
+  for (const companion of HOUSE_SELECT_COMPANIONS[entry.label] ?? []) {
+    const companionLook = selectLookByLabel(companion.label);
+    lookFolder
+      .add(companionLook, 'saturation', 0.5, 2.5, 0.01)
+      .name(`${companion.label} 飽和度`)
+      .onChange(applyLook)
+      .onFinishChange(logHouseSelectLook);
+    lookFolder
+      .add(companionLook, 'brightness', 0.5, 2, 0.01)
+      .name(`${companion.label} 亮度`)
+      .onChange(applyLook)
+      .onFinishChange(logHouseSelectLook);
+  }
+
   if (LOCKED_HOUSES.has(entry.label)) {
     houseFolder.title(`房子 · ${entry.label}（已鎖定）`);
     return;
@@ -966,6 +989,7 @@ function clearHouseSelection() {
   houseLabel.style.visibility = 'hidden';
   houseFolder.title('房子');
   for (const controller of [...houseFolder.controllers]) controller.destroy();
+  for (const folder of [...houseFolder.folders]) folder.destroy();
   syncWorldActionButtons();
 }
 
@@ -979,7 +1003,86 @@ function highlightHouse(entry: WorldHouse | null) {
     material.emissive.set(active ? house.settings.color : 0x000000);
     // 只要能認出選中的是哪一棟；太亮會把那一棟洗白，其他棟看起來更暗
     material.emissiveIntensity = active ? 0.16 : 1;
+    // 模型房子的長方體是隱形的，上面的發光看不到：改成把選中那一棟的顏色調鮮艷、調亮（每棟各自的設定）
+    applyHouseSelectLook(house, active);
   }
+}
+
+type HouseSelectLook = { saturation: number; brightness: number };
+
+/**
+ * 每一棟「被選中時」的飽和度、亮度（1 = 原樣）。面板「選中效果」調好後，把 console 印出來的整段貼回這裡。
+ * 飽和度太高（2 以上）顏色會開始爆掉、像螢光色；亮度太高（1.4 以上）亮面會洗白。
+ */
+const HOUSE_SELECT_LOOK: Record<string, HouseSelectLook> = {
+  mainHall: { saturation: 1.3, brightness: 1.5 },
+  projectRoom: { saturation: 1.2, brightness: 1.5 },
+  bgRoom: { saturation: 1.1, brightness: 1.22 },
+  twRoom: { saturation: 1.2, brightness: 1.3 },
+  Gamehall: { saturation: 1.2, brightness: 1 },
+  // 不是房子，但選工作間時會一起被選到（見 HOUSE_SELECT_COMPANIONS）
+  'Happy Fat': { saturation: 1, brightness: 1.3 },
+  // 選龍兔的家（mainHall）時一起被選到
+  溜滑梯: { saturation: 1.12, brightness: 1 },
+  小水潭: { saturation: 1.2, brightness: 1.5 },
+  // 選 Gamehall 時一起被選到（每一台街機、跳舞機共用同一組）
+  街機: { saturation: 1, brightness: 1 },
+  跳舞機: { saturation: 1.3, brightness: 1.4 },
+  // 選點心樓（bgRoom）時一起被選到
+  大包子: { saturation: 1, brightness: 1.35 },
+};
+
+/** 沒列在上面的房子（之後新增的）用這組 */
+const HOUSE_SELECT_LOOK_DEFAULT: HouseSelectLook = { saturation: 1.5, brightness: 1 };
+
+function houseSelectLook(house: WorldHouse) {
+  return selectLookByLabel(house.label);
+}
+
+/**
+ * 選到某一棟時，旁邊「同一組」的建築也一起被選到，但用自己那一組飽和度、亮度（HOUSE_SELECT_LOOK 裡的 label）。
+ * 工作間＋Happy Fat、龍兔的家＋溜滑梯＋小水潭、Gamehall＋街機＋跳舞機、點心樓＋大包子，各是一組
+ */
+const HOUSE_SELECT_COMPANIONS: Record<string, Array<{ label: string; objects: () => THREE.Object3D[] }>> = {
+  projectRoom: [{ label: 'Happy Fat', objects: () => (happyFatShop?.settings.enabled ? [happyFatShop.object] : []) }],
+  // 龍兔的家（mainHall）：旁邊的溜滑梯、小水潭是同一組。
+  // 溜滑梯如果掛在房子底下，房子那一次會先套到它，這裡再用它自己的數值蓋過去（同伴永遠在房子之後套）
+  mainHall: [
+    { label: '溜滑梯', objects: () => (mainHallSlide.settings.enabled ? [mainHallSlide.object] : []) },
+    { label: '小水潭', objects: () => (pond?.settings.enabled ? [pond.object] : []) },
+  ],
+  // Gamehall：門口的復古街機、跳舞機（可以複製很多台，全部一起）
+  Gamehall: [
+    { label: '街機', objects: () => retroArcades.map((arcade) => arcade.object) },
+    { label: '跳舞機', objects: () => danceMachines.map((machine) => machine.object) },
+  ],
+  bgRoom: [{ label: '大包子', objects: () => (bigBun ? [bigBun.object] : []) }],
+};
+
+function selectLookByLabel(label: string) {
+  // 第一次用到就複製一份放回表裡：面板改的是這份，印出來的也是這份
+  HOUSE_SELECT_LOOK[label] ??= { ...HOUSE_SELECT_LOOK_DEFAULT };
+  return HOUSE_SELECT_LOOK[label];
+}
+
+function applyHouseSelectLook(house: WorldHouse, active: boolean) {
+  const apply = (object: THREE.Object3D, look: HouseSelectLook) =>
+    setObjectSelectGrade(object, active ? look.saturation : 1, active ? look.brightness : 1);
+  apply(house.object, houseSelectLook(house));
+  for (const companion of HOUSE_SELECT_COMPANIONS[house.label] ?? []) {
+    for (const object of companion.objects()) apply(object, selectLookByLabel(companion.label));
+  }
+}
+
+function logHouseSelectLook() {
+  const lines = Object.entries(HOUSE_SELECT_LOOK).map(
+    ([label, look]) =>
+      `  ${/^[\w\u4e00-\u9fff]+$/.test(label) ? label : `'${label}'`}: { saturation: ${look.saturation.toFixed(2)}, brightness: ${look.brightness.toFixed(2)} },`,
+  );
+  console.log(
+    `// 貼回 src/world/main.ts 的 HOUSE_SELECT_LOOK\n` +
+      `const HOUSE_SELECT_LOOK: Record<string, HouseSelectLook> = {\n${lines.join('\n')}\n};`,
+  );
 }
 
 bindHousePanel(houses[0]);
@@ -1743,7 +1846,11 @@ if (pigFolder && pig) {
 // 畫面風格統一：全場色調統一（陰影偏淡紫、整體往粉色靠）＋寫實貼圖降對比
 // 模型是陸續載入的，每 0.5 秒掃一次新材質；已處理過的不會重複處理
 const styleGrade = createStyleGrade({ root: scene });
-setInterval(() => styleGrade.scan(), 500);
+setInterval(() => {
+  styleGrade.scan();
+  // 剛開頁面就選中的房子，模型可能比選取晚載入：每次掃描順便補一次（traverse 很便宜）
+  if (selectedHouse) applyHouseSelectLook(selectedHouse, true);
+}, 500);
 {
   const gradeFolder = gui.addFolder('畫面風格統一');
   const s = styleGrade.settings;

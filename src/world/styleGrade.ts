@@ -48,6 +48,37 @@ const EXCLUDED_ROOT_NAMES = new Set(['floating_island', 'egg_sun_anchor']);
 
 const GRADE_KEY = '|styleGrade:v1';
 
+/**
+ * 每個材質自己的「選取調色」：飽和度、亮度（1 = 原樣）。
+ * 跟上面全場共用的 uniforms 不同：選中某一棟房子時只有那一棟變，所以每個材質要有自己一份。
+ * 放在 material.userData：注入 shader 時、選取時都拿同一個物件，誰先誰後都沒關係
+ * （房子模型是非同步載入的，可能先被選、後才注入）。
+ */
+type SelectUniforms = { saturation: { value: number }; brightness: { value: number } };
+
+function selectUniforms(material: THREE.Material): SelectUniforms {
+  const data = material.userData as { gradeSelect?: SelectUniforms };
+  data.gradeSelect ??= { saturation: { value: 1 }, brightness: { value: 1 } };
+  return data.gradeSelect;
+}
+
+/**
+ * 把 root 底下所有材質的飽和度、亮度設成指定值（1 = 原樣）。
+ * 只對有注入調色的材質有效；發光、不吃色調映射的燈（招牌字、燈管）不會變。
+ */
+export function setObjectSelectGrade(root: THREE.Object3D, saturation: number, brightness: number) {
+  root.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.material) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      const u = selectUniforms(material);
+      u.saturation.value = saturation;
+      u.brightness.value = brightness;
+    }
+  });
+}
+
 type GradeUniforms = {
   uGradeEnabled: { value: number };
   uTintAmount: { value: number };
@@ -140,6 +171,9 @@ export function createStyleGrade({ root, settings: initial = STYLE_GRADE_DEFAULT
         stats.softened += 1;
       }
       Object.assign(shader.uniforms, uniforms);
+      const select = selectUniforms(material);
+      shader.uniforms.uSelectSaturation = select.saturation;
+      shader.uniforms.uSelectBrightness = select.brightness;
 
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <common>',
@@ -151,7 +185,9 @@ export function createStyleGrade({ root, settings: initial = STYLE_GRADE_DEFAULT
         uniform vec3 uShadowColor;
         uniform float uTexSaturation;
         uniform float uTexContrast;
-        uniform float uTexPivot;`,
+        uniform float uTexPivot;
+        uniform float uSelectSaturation;
+        uniform float uSelectBrightness;`,
       );
 
       if (soften && shader.fragmentShader.includes('#include <map_fragment>')) {
@@ -182,6 +218,10 @@ export function createStyleGrade({ root, settings: initial = STYLE_GRADE_DEFAULT
           graded += uShadowColor * uShadowLift * (1.0 - smoothstep(0.0, 0.12, gLum));
           graded = mix(graded, uTintColor, uTintAmount);
           gl_FragColor.rgb = mix(gl_FragColor.rgb, graded, uGradeEnabled);
+          // 選取調色（不受上面的 enabled 開關影響）：
+          // 飽和度 = 往「同亮度的灰」的反方向推，顏色更鮮艷、亮度不變；亮度 = 整體乘上倍率
+          float sLum = dot(gl_FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          gl_FragColor.rgb = max(mix(vec3(sLum), gl_FragColor.rgb, uSelectSaturation), 0.0) * uSelectBrightness;
         }
         #include <tonemapping_fragment>`,
       );
