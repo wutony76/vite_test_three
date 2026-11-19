@@ -448,6 +448,9 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   // 所有 shader 共用同一個 uniform 物件：每幀改 value，shader 就會讀到新的時間
   const uniforms = {
     uTime: { value: 0 },
+    // 浮在醬上的東西（菠蘿麵包）底下的凹洞：xyz = 世界座標的中心（麵包底部）、w = 半徑（0 = 沒有）
+    uDent: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uDentDepth: { value: 0 },
     // 載入時醬從 uWrapOrigin 開始，沿著圈圈長到 uWrap。1 = 已經繞滿
     uWrap: { value: 0 },
     uWrapOrigin: { value: 0 },
@@ -474,7 +477,7 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     shader.uniforms.uWrapOrigin = uniforms.uWrapOrigin;
     for (const key of [
       'uRimStrength', 'uRimColor', 'uRimPower', 'uContactDark', 'uStreakStrength', 'uStreakTime',
-      'uBubbleStrength', 'uBallCenter', 'uRipples', 'uRippleClock', 'uRippleStrength',
+      'uBubbleStrength', 'uBallCenter', 'uRipples', 'uRippleClock', 'uRippleStrength', 'uDent', 'uDentDepth',
     ] as const) {
       shader.uniforms[key] = uniforms[key];
     }
@@ -568,7 +571,9 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
         varying vec3 vSauceWorldNormal;
         uniform vec4 uRipples[${RIPPLE_SLOTS}];
         uniform float uRippleClock;
-        uniform float uRippleStrength;`,
+        uniform float uRippleStrength;
+        uniform vec4 uDent;
+        uniform float uDentDepth;`,
       )
       // begin_vertex 之後 transformed 就是頂點原始位置，在這裡把它推出去
       .replace(
@@ -584,6 +589,15 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
                      * sin(position.z * 7.0 + uTime * 2.1);
         // 沿法線（管子表面朝外的方向）推動：正值變粗、負值變細
         transformed += objectNormal * (blob * ${BLOB_AMOUNT.toFixed(4)} + wobble * ${WOBBLE_AMOUNT.toFixed(4)});
+        // ⑥ 浮在醬上的東西（菠蘿麵包）：底下的醬往管子裡面壓一個凹洞。
+        //    醬一團一團往前流、表面又在蠕動，少了這段，鼓起來的醬會一下一下地從麵包底部穿出來
+        if (uDent.w > 0.0) {
+          vec3 dentWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
+          float dentDistance = distance(dentWorld, uDent.xyz);
+          // 中心整個壓下去，往外慢慢回到原本的醬面（邊緣是一圈平滑的坡，不會出現斷層）
+          float dentAmount = 1.0 - smoothstep(uDent.w * 0.55, uDent.w * 1.4, dentDistance);
+          transformed -= objectNormal * uDentDepth * dentAmount;
+        }
         vWrapProgress = aProgress;
         vRadial = aRadial;
         vSauceWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
@@ -876,6 +890,85 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
   const finBasis = new THREE.Matrix4();
   const RIDER_Y_AXIS = new THREE.Vector3(0, 1, 0);
 
+  /**
+   * 浮在醬上、會擋路的東西（菠蘿麵包）：食物和鯊魚鰭經過時要從旁邊繞過去，不能直接穿過。
+   * center 是世界座標（麵包底部），radius 是擋住的範圍（世界單位）。null = 沒有。
+   */
+  let obstacle: { center: THREE.Vector3; radius: number } | null = null;
+  const obstacleLocal = new THREE.Vector3();
+  const obstacleDir = new THREE.Vector3();
+
+  const surfaceTangent = new THREE.Vector3();
+  const surfaceDir = new THREE.Vector3();
+  const surfaceLocal = new THREE.Vector3();
+  /**
+   * 醬圈上某一點「醬面」的位置（世界座標），給浮在醬上的東西（菠蘿麵包）用。
+   *   - pivotAngle：在整圈（pivot）座標裡的角度（x = cos、z = sin）
+   *   - up：想要站在醬面的哪個方向（世界座標，通常是畫面的「上」）；會先扣掉沿著醬圈的分量，變成管子截面上的方向
+   * 醬面會動：一團一團往前流的鼓包、表面蠕動（sauceSwell，跟 vertex shader 同一條公式），
+   * 還有凹洞（uDent）；只用管子半徑算的話，醬面往下凹時東西會像浮在空中。
+   * 整條醬繞自己的 y 軸自轉，所以要先扣掉自轉換成醬自己的角度。
+   */
+  function getSurfacePoint(pivotAngle: number, radialOffset: number, up: THREE.Vector3, target: THREE.Vector3) {
+    mesh.updateWorldMatrix(true, false);
+    // mesh 繞 y 轉 θ：醬自己的角度 = pivot 角度 + θ
+    const progress = THREE.MathUtils.euclideanModulo((pivotAngle + mesh.rotation.y) / (Math.PI * 2), 1);
+    curve.getPoint(progress, target);
+    const k = (curve.radius + radialOffset) / curve.radius;
+    target.x *= k;
+    target.z *= k;
+    mesh.localToWorld(target);
+    // 管子截面上的方向：up 扣掉沿著醬圈（切線）的分量
+    const along = progress * Math.PI * 2;
+    surfaceTangent.set(-Math.sin(along), 0, Math.cos(along)).transformDirection(mesh.matrixWorld);
+    surfaceDir.copy(up).addScaledVector(surfaceTangent, -up.dot(surfaceTangent));
+    if (surfaceDir.lengthSq() < 1e-8) surfaceDir.copy(up);
+    surfaceDir.normalize();
+    // 醬面那一點在醬自己的座標（sauceSwell 的蠕動是用 mesh 座標算的）
+    surfaceLocal.copy(target).addScaledVector(surfaceDir, TUBE_RADIUS);
+    mesh.worldToLocal(surfaceLocal);
+    const swell = sauceSwell(progress, surfaceLocal, uniforms.uTime.value);
+    return target.addScaledVector(surfaceDir, TUBE_RADIUS + swell);
+  }
+
+  /** 由外部（main.ts）每幀設定：同時決定醬面的凹洞，以及食物、鯊魚要讓開的位置 */
+  function setFloatingObstacle(center: THREE.Vector3 | null, radius = 0.14, dentDepth = 0.07) {
+    if (!center) {
+      obstacle = null;
+      uniforms.uDent.value.w = 0;
+      return;
+    }
+    obstacle ??= { center: new THREE.Vector3(), radius };
+    obstacle.center.copy(center);
+    obstacle.radius = radius;
+    uniforms.uDent.value.set(center.x, center.y, center.z, radius);
+    uniforms.uDentDepth.value = dentDepth;
+  }
+
+  /**
+   * 圈圈上 progress 那一點的「截面座標」：管子中心（世界）、往外的方向、往畫面上方的方向。
+   * 食物的 climb 就是在 外 ↔ 上 這個平面上繞的角度（0 = 正外側）
+   */
+  function tubeFrame(progress: number, center: THREE.Vector3, outward: THREE.Vector3, up: THREE.Vector3) {
+    curve.getPoint(progress, center);
+    const along = progress * Math.PI * 2;
+    riderTangent.set(-Math.sin(along), 0, Math.cos(along)).transformDirection(mesh.matrixWorld);
+    center.applyMatrix4(mesh.matrixWorld);
+    outward.copy(center).sub(ballCenter);
+    outward.addScaledVector(riderTangent, -outward.dot(riderTangent));
+    if (outward.lengthSq() < 1e-8) outward.copy(center);
+    outward.normalize();
+    up.crossVectors(riderTangent, outward);
+    if (up.lengthSq() < 1e-8) up.set(0, 1, 0);
+    else up.normalize();
+    if (up.dot(camera.up) < 0) up.negate();
+  }
+  const obstacleCenter = new THREE.Vector3();
+  const obstacleOutward = new THREE.Vector3();
+  const obstacleUp = new THREE.Vector3();
+  /** 食物繞到醬的背面（朝綠球那側）就看不到了：讓路時不要超過這個 climb */
+  const AVOID_CLIMB_LIMIT = 1.3;
+
   /** 每幀呼叫：time 單位是秒 */
   function update(time: number) {
     // 傳進 shader 的時間先乘上倍率：shader 裡所有用到 uTime 的動畫會一起變快或變慢
@@ -949,7 +1042,46 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     }
     separateRiders(riders);
     const movers = sharkFin ? [...riders, sharkFin] : riders;
+    // 擋路的東西（菠蘿麵包）在圈圈上的位置：沿圈圈的 progress、截面上的 climb、要讓開多少
+    let avoidProgress = 0;
+    let avoidClimb = 0;
+    let avoidClimbHalf = 0;
+    let avoidAlongHalf = 0;
+    if (obstacle) {
+      obstacleLocal.copy(obstacle.center).applyMatrix4(riderInverse);
+      avoidProgress = THREE.MathUtils.euclideanModulo(Math.atan2(obstacleLocal.z, obstacleLocal.x) / (Math.PI * 2), 1);
+      tubeFrame(avoidProgress, obstacleCenter, obstacleOutward, obstacleUp);
+      obstacleDir.copy(obstacle.center).sub(obstacleCenter);
+      avoidClimb = Math.atan2(obstacleDir.dot(obstacleUp), obstacleDir.dot(obstacleOutward));
+      // 截面上要讓開的角度：擋住的半徑換成管子上的角度，再多留一點給食物自己的大小
+      avoidClimbHalf = Math.min(obstacle.radius / TUBE_RADIUS, 1.4) + 0.3;
+      // 沿圈圈方向：擋住的半徑＋食物大小，換成弧長
+      avoidAlongHalf = obstacle.radius + 0.05;
+    }
+    const ringCircumference = curve.radius * Math.PI * 2;
     for (const rider of movers) {
+      // 經過擋路的東西時，截面角度暫時往旁邊挪（不改 rider.climb，過了就自然回到原本的路線）
+      let climb = rider.kind === 'sharkFin' && sharkFinSettings.curveAmp <= 0.001 ? 0 : rider.climb;
+      let avoiding = false;
+      if (obstacle) {
+        let dp = rider.progress - avoidProgress;
+        dp -= Math.round(dp);
+        const along = Math.abs(dp) * ringCircumference;
+        // 靠近時慢慢挪過去、離開後慢慢回來：看起來是順著醬從旁邊繞過，不是瞬間跳開
+        const weight = 1 - THREE.MathUtils.smoothstep(along, avoidAlongHalf, avoidAlongHalf + 0.12);
+        const rel = climb - avoidClimb;
+        if (weight > 0 && Math.abs(rel) < avoidClimbHalf) {
+          // 往自己本來就偏的那一側繞；那一側會繞到醬的背面，就改走另一側
+          let side = rel >= 0 ? 1 : -1;
+          let target = avoidClimb + side * avoidClimbHalf;
+          if (Math.abs(target) > AVOID_CLIMB_LIMIT) {
+            side = -side;
+            target = avoidClimb + side * avoidClimbHalf;
+          }
+          climb = THREE.MathUtils.lerp(climb, target, weight);
+          avoiding = true;
+        }
+      }
       curve.getPoint(rider.progress, rider.center);
       const along = rider.progress * Math.PI * 2;
       riderTangent.set(-Math.sin(along), 0, Math.cos(along)).transformDirection(mesh.matrixWorld);
@@ -965,19 +1097,14 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
       if (riderBinormal.lengthSq() < 1e-8) riderBinormal.set(0, 1, 0);
       else riderBinormal.normalize();
       if (riderBinormal.dot(camera.up) < 0) riderBinormal.negate();
-      if (rider.kind === 'sharkFin' && sharkFinSettings.curveAmp > 0.001) {
-        riderDir
-          .copy(riderOffset)
-          .multiplyScalar(Math.cos(rider.climb))
-          .addScaledVector(riderBinormal, Math.sin(rider.climb))
-          .normalize();
-      } else if (rider.kind === 'sharkFin') {
+      if (rider.kind === 'sharkFin' && sharkFinSettings.curveAmp <= 0.001 && !avoiding) {
         riderDir.copy(riderOffset);
       } else {
+        // climb：截面上繞的角度（讓路時已經換成挪開後的角度）
         riderDir
           .copy(riderOffset)
-          .multiplyScalar(Math.cos(rider.climb))
-          .addScaledVector(riderBinormal, Math.sin(rider.climb))
+          .multiplyScalar(Math.cos(climb))
+          .addScaledVector(riderBinormal, Math.sin(climb))
           .normalize();
       }
       riderLocalDir.copy(riderDir).transformDirection(riderInverse);
@@ -1087,6 +1214,10 @@ export function createKetchup({ envMap, camera }: KetchupOptions) {
     update,
     ringObject: pivot,
     ringSettings,
+    setFloatingObstacle,
+    getSurfacePoint,
+    /** 開場醬沿著圈圈長到哪裡了（0 = 還沒流出、1 = 繞滿一圈）：菠蘿麵包等醬繞滿才出現 */
+    getWrap: () => uniforms.uWrap.value,
     applyRingSettings,
     visualSettings,
     applyVisualSettings,

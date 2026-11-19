@@ -67,6 +67,7 @@ import { createChineseTemple, type ChineseTempleSettings } from './chineseTemple
 import { createBigBun, type BigBunSettings } from './bigBun';
 import { createCandyShop, type CandyShopSettings } from './candyShop';
 import { createSausageStall, type SausageStallSettings } from './sausageStall';
+import { createMelonTrough, type MelonTroughSettings } from './melonTrough';
 import {
   createRetroArcade,
   RETRO_ARCADE_DEFAULT,
@@ -780,6 +781,15 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     sausageStallRuntime.setIntroGrow(0);
   }
 
+  // 古井冰西瓜：洗石子水槽泡西瓜＋手壓幫浦＋龜背芋（整組用程式拼，不用 GLB），可在面板調位置、拖曳擺放
+  const melonTroughRuntime = puddingAxes
+    ? createMelonTrough({ groundRadius: GROUND_RADIUS, up: puddingAxes.up, front: puddingAxes.front, envMap: eggEnvMap })
+    : null;
+  if (melonTroughRuntime) {
+    ground.add(melonTroughRuntime.object);
+    melonTroughRuntime.setIntroGrow(0);
+  }
+
 
   // 復古街機：第一台放在 GameHall（電 • 波 • 町 遊樂中心）左邊；可以複製很多台（跟烤玉米一樣）
   type RetroArcadeRuntime = ReturnType<typeof createRetroArcade>;
@@ -997,6 +1007,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     if (happyFatRuntime?.settings.enabled) roots.push(happyFatRuntime.object);
     if (bigBunRuntime?.settings.enabled) roots.push(bigBunRuntime.object);
     if (sausageStallRuntime?.settings.enabled) roots.push(sausageStallRuntime.object);
+    if (melonTroughRuntime?.settings.enabled) roots.push(melonTroughRuntime.object);
     for (const { world } of retroArcadeEntries) if (world.settings.enabled) roots.push(world.object);
     for (const { world } of danceMachineEntries) if (world.settings.enabled) roots.push(world.object);
     // 水潭也是障礙：小豬繞著走，草叢、小石頭不會長在水面上
@@ -1440,6 +1451,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         happyFatRuntime?.setIntroGrow(1);
         bigBunRuntime?.setIntroGrow(1);
         sausageStallRuntime?.setIntroGrow(1);
+        melonTroughRuntime?.setIntroGrow(1);
         for (const { runtime } of retroArcadeEntries) runtime.setIntroGrow(1);
         for (const { runtime } of danceMachineEntries) runtime.setIntroGrow(1);
         pondRuntime?.setIntroGrow(1);
@@ -1563,6 +1575,14 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         const stallStart = housesIntroEnd + 0.35;
         const stallT = THREE.MathUtils.clamp((introElapsed - stallStart) / 0.9, 0, 1);
         sausageStallRuntime.setIntroGrow(easeOutBack(stallT, 1.8));
+      }
+    }
+    if (melonTroughRuntime) {
+      melonTroughRuntime.update(deltaTime);
+      if (!introDone) {
+        const troughStart = housesIntroEnd + 0.45;
+        const troughT = THREE.MathUtils.clamp((introElapsed - troughStart) / 0.9, 0, 1);
+        melonTroughRuntime.setIntroGrow(easeOutBack(troughT, 1.8));
       }
     }
     // 柑仔店（twRoom）：招牌閃爍、棒棒糖轉。長出來的動畫跟著房子一起
@@ -1696,6 +1716,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     happyFatRuntime?.setIntroGrow(0);
     bigBunRuntime?.setIntroGrow(0);
     sausageStallRuntime?.setIntroGrow(0);
+    melonTroughRuntime?.setIntroGrow(0);
     for (const { runtime } of retroArcadeEntries) runtime.setIntroGrow(0);
     for (const { runtime } of danceMachineEntries) runtime.setIntroGrow(0);
     pondRuntime?.setIntroGrow(0);
@@ -1708,7 +1729,15 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
   return {
     all,
     update,
-    ketchupRing: { object: ketchup.ringObject, settings: ketchup.ringSettings, apply: ketchup.applyRingSettings },
+    ketchupRing: {
+      object: ketchup.ringObject,
+      settings: ketchup.ringSettings,
+      apply: ketchup.applyRingSettings,
+      // 浮在醬上的東西（菠蘿麵包）：醬面壓凹洞、食物和鯊魚從旁邊繞過
+      setFloatingObstacle: ketchup.setFloatingObstacle,
+      getWrap: ketchup.getWrap,
+      getSurfacePoint: ketchup.getSurfacePoint,
+    },
     ketchupVisual: { settings: ketchup.visualSettings, apply: ketchup.applyVisualSettings },
     ketchupSauce: { settings: ketchup.sauceSettings, apply: ketchup.applySauceSettings },
     // 食物數量：面板上的滑桿改這個，再叫 apply 把多出來或少掉的塊數補上
@@ -1808,6 +1837,17 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
           getNormal: sausageStallRuntime.getNormal,
           setNormal: sausageStallRuntime.setNormal,
         } as WorldSausageStall)
+      : null,
+    melonTrough: melonTroughRuntime
+      ? ({
+          id: 'melon_trough',
+          label: '古井冰西瓜',
+          object: melonTroughRuntime.object,
+          settings: melonTroughRuntime.settings,
+          apply: melonTroughRuntime.applySettings,
+          getNormal: melonTroughRuntime.getNormal,
+          setNormal: melonTroughRuntime.setNormal,
+        } as WorldMelonTrough)
       : null,
     // 柑仔店的顏色、發光（位置、大小、旋轉在房子面板的 twRoom）
     candyShop: {
@@ -1995,6 +2035,16 @@ export type WorldSausageStall = {
   label: string;
   object: THREE.Object3D;
   settings: SausageStallSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldMelonTrough = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: MelonTroughSettings;
   apply: () => void;
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;

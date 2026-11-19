@@ -371,3 +371,25 @@ def load_tests(loader, tests, pattern):  # noqa: ARG001
         if name.startswith("test_") and callable(fn):
             suite.addTest(unittest.FunctionTestCase(fn, description=name))
     return suite
+
+
+def test_pineapple_bun_parts_are_closed_and_face_out():
+    """菠蘿麵包：上下兩半各 1 個封閉島（organic；上半顆壓出龜裂溝只移動頂點，不能多出島或破洞）；
+    奶油 1 個島；木牌兩片板子 2 個島、木樁 2 個島；青苔 4 叢＋2 朵小紅菇（菇柄、菇傘各 1）= 8 個島。
+    每個零件的面都朝外（有號體積 > 0）。"""
+    _doc, _lay, built = _build_all("pineapple_bun.plan.json")
+    _closed_single(built["bun_bottom"][1])
+    _closed_single(built["bun_top"][1])
+    _closed_single(built["butter"][1])
+    _closed_single(built["sign_board"][1], islands=2)
+    _closed_single(built["sign_stakes"][1], islands=2)
+    _closed_single(built["sign_moss"][1], islands=8)
+    assert {"crust_top", "crumb"} <= set(built["bun_top"][1].mats)
+    assert {"crust_bottom", "crumb"} <= set(built["bun_bottom"][1].mats)
+    assert {"moss", "shroom_red", "shroom_stem"} <= set(built["sign_moss"][1].mats)
+    for cid, (_ctx, data) in built.items():
+        assert _signed_volume(data) > 0, cid
+    # 龜裂溝真的有壓出來：圓頂頂點到球心的距離不是全部一樣
+    ctx, top = built["bun_top"]
+    radii = [((v[0] / ctx.hw) ** 2 + (v[1] / ctx.hd) ** 2) ** 0.5 for v in top.verts if v[2] > ctx.h * 0.3 and v[2] < ctx.h * 0.6]
+    assert max(radii) - min(radii) > 0.04

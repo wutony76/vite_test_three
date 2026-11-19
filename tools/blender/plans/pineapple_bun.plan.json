@@ -1,0 +1,335 @@
+{
+  "schema": "lowpoly.asset/1",
+  "id": "pineapple_bun",
+  "notes": "菠蘿麵包夾奶油（菠蘿油，造型參考使用者圖一：上半顆龜裂酥皮圓頂、中間一片厚奶油往左右突出、下半顆淺金黃麵包），頂上插一塊卡通木牌（風格參考使用者圖二：兩片歪斜木板、木樁、板上長青苔與小紅菇；字改成 Welcome / HFYY world.，不沿用參考圖的字）。在 Three.js 端固定浮在畫面左側的番茄醬海上，載浮載沉。正面朝 -Y，原點在麵包底部中心。",
+  "dimensions": {
+    "w": 1.16,
+    "d": 1.0,
+    "h": 1.62
+  },
+  "detail": {
+    "preset": "game_default",
+    "overrides": {
+      "tertiary_density": 1,
+      "geometry_complexity": 12,
+      "bevel_quality": 0,
+      "bake": "none"
+    }
+  },
+  "style": {
+    "edge_wobble": 0.004
+  },
+  "budget": {
+    "max_tris": 9000,
+    "max_primitives": 12,
+    "max_texture_kb": 600,
+    "max_gpu_texture_mb": 10
+  },
+  "materials": [
+    {
+      "name": "crust_top",
+      "hex": "#F0A63A",
+      "roughness": 0.55,
+      "surface": {
+        "class": "food",
+        "pattern": "painted",
+        "scale_m": 0.3,
+        "palette": [
+          "#E08A2C",
+          "#F2A93E",
+          "#FFD47E"
+        ],
+        "uv": "cylinder",
+        "tier": "standard",
+        "wear": 0.0,
+        "dirt": 0.0,
+        "posterize_mix": 0.1
+      }
+    },
+    {
+      "name": "crust_groove",
+      "hex": "#B5601C",
+      "roughness": 0.6
+    },
+    {
+      "name": "crust_bottom",
+      "hex": "#F0BE70",
+      "roughness": 0.6,
+      "surface": {
+        "class": "food",
+        "pattern": "crust",
+        "scale_m": 0.4,
+        "palette": [
+          "#E0A050",
+          "#F2C27A",
+          "#FCE6B0"
+        ],
+        "accents": {
+          "char": "#E8A85A"
+        },
+        "uv": "cylinder",
+        "tier": "prop",
+        "wear": 0.0,
+        "dirt": 0.0,
+        "posterize_mix": 0.1
+      }
+    },
+    {
+      "name": "crumb",
+      "hex": "#FBF0D6",
+      "roughness": 0.8
+    },
+    {
+      "name": "butter",
+      "hex": "#FFF09A",
+      "roughness": 0.3
+    },
+    {
+      "name": "sign_wood",
+      "hex": "#9A5E32",
+      "roughness": 0.75,
+      "surface": {
+        "class": "wood",
+        "pattern": "planks",
+        "scale_m": 0.22,
+        "palette": [
+          "#5E3418",
+          "#9A5E32",
+          "#C98E58"
+        ],
+        "uv": "along",
+        "tier": "prop",
+        "wear": 0.2,
+        "dirt": 0.1
+      }
+    },
+    {
+      "name": "stake_wood",
+      "hex": "#6E4224",
+      "roughness": 0.8,
+      "surface": {
+        "class": "wood",
+        "pattern": "wood_grain",
+        "scale_m": 0.3,
+        "palette": [
+          "#42261A",
+          "#6E4224",
+          "#9A6638"
+        ],
+        "uv": "along",
+        "tier": "prop",
+        "wear": 0.1,
+        "dirt": 0.0
+      }
+    },
+    {
+      "name": "moss",
+      "hex": "#6FA83C",
+      "roughness": 0.85
+    },
+    {
+      "name": "shroom_red",
+      "hex": "#E2453C",
+      "roughness": 0.5
+    },
+    {
+      "name": "shroom_stem",
+      "hex": "#F4E6CC",
+      "roughness": 0.6
+    }
+  ],
+  "components": [
+    {
+      "id": "bun_bottom",
+      "kind": "pb_bun_bottom",
+      "tier": "primary",
+      "method": "component",
+      "profile": "organic",
+      "material": "crust_bottom",
+      "params": {
+        "crumb_material": "crumb"
+      },
+      "bounds": [
+        [
+          -0.48,
+          -0.48,
+          0.0
+        ],
+        [
+          0.48,
+          0.48,
+          0.32
+        ]
+      ],
+      "source": "observed",
+      "assumption": "下半顆：底部圓潤、側面外鼓的淺金黃麵包（lathe），切口在上方是平的米白麵包心（crumb 材質）。",
+      "confidence": 0.85
+    },
+    {
+      "id": "butter",
+      "kind": "pb_butter",
+      "tier": "primary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "butter",
+      "params": {
+        "yaw_deg": -12
+      },
+      "bounds": [
+        [
+          -0.58,
+          -0.52,
+          0.29
+        ],
+        [
+          0.58,
+          0.44,
+          0.41
+        ]
+      ],
+      "source": "observed",
+      "assumption": "厚奶油片（約 12 cm 厚、邊角圓）：夾在上下兩半之間，前方與左右兩側明顯突出麵包外，略微斜放。",
+      "confidence": 0.85
+    },
+    {
+      "id": "bun_top",
+      "kind": "pb_bun_top",
+      "tier": "primary",
+      "method": "component",
+      "profile": "organic",
+      "material": "crust_top",
+      "params": {
+        "crumb_material": "crumb",
+        "groove_material": "crust_groove",
+        "cells": 22,
+        "groove_depth": 0.05
+      },
+      "bounds": [
+        [
+          -0.5,
+          -0.5,
+          0.36
+        ],
+        [
+          0.5,
+          0.5,
+          0.86
+        ]
+      ],
+      "source": "observed",
+      "assumption": "上半顆菠蘿酥皮圓頂（比下半顆稍寬、高）：表面是一塊塊隆起的龜裂酥皮格（voronoi 格子，格線往內凹、換成深橘褐色 crust_groove），底面是米白麵包心切口。",
+      "confidence": 0.85
+    },
+    {
+      "id": "sign_stakes",
+      "kind": "pb_sign_stakes",
+      "tier": "secondary",
+      "method": "component",
+      "profile": "vegetation",
+      "material": "stake_wood",
+      "params": {
+        "count": 2,
+        "lean_deg": 4
+      },
+      "bounds": [
+        [
+          -0.36,
+          -0.03,
+          0.62
+        ],
+        [
+          0.36,
+          0.09,
+          1.6
+        ]
+      ],
+      "source": "inferred",
+      "assumption": "兩根粗木樁（六角斷面、頂端削平），下端插進菠蘿皮約 12 cm、上端比木板高一點露出來，一根稍微歪。",
+      "confidence": 0.7
+    },
+    {
+      "id": "sign_board",
+      "kind": "pb_sign_board",
+      "tier": "primary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "sign_wood",
+      "params": {
+        "planks": 2,
+        "tilt_deg": -3,
+        "thickness": 0.06
+      },
+      "bounds": [
+        [
+          -0.58,
+          -0.09,
+          0.98
+        ],
+        [
+          0.58,
+          -0.03,
+          1.52
+        ]
+      ],
+      "source": "observed",
+      "assumption": "兩片上下疊的歪斜木板（每片輪廓不規則、左右兩端長短不一），釘在木樁前面，整塊微微傾斜（參考圖二的卡通木牌）。",
+      "confidence": 0.75
+    },
+    {
+      "id": "sign_moss",
+      "kind": "pb_sign_moss",
+      "tier": "tertiary",
+      "method": "component",
+      "profile": "decoration",
+      "material": "moss",
+      "params": {
+        "tufts": 4,
+        "shrooms": 2,
+        "cap_material": "shroom_red",
+        "stem_material": "shroom_stem"
+      },
+      "source": "observed",
+      "assumption": "木板上緣、木樁頂端幾叢青苔（扁平 blob）＋2 朵小紅菇。",
+      "confidence": 0.7,
+      "bounds": [
+        [
+          -0.56,
+          -0.1,
+          1.46
+        ],
+        [
+          0.56,
+          0.0,
+          1.62
+        ]
+      ]
+    }
+  ],
+  "decals": [
+    {
+      "id": "sign_text",
+      "target": "sign_board",
+      "face": "front",
+      "rect": [
+        [
+          -0.5,
+          1.03
+        ],
+        [
+          0.5,
+          1.47
+        ]
+      ],
+      "content": {
+        "type": "image",
+        "path": "../textures/manual/pineapple_bun/decals/sign_text.png"
+      }
+    }
+  ],
+  "export": {
+    "path": "public/models/pineapple_bun/pineapple_bun.glb",
+    "compress": true,
+    "clickable": [],
+    "anim_groups": {}
+  }
+}

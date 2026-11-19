@@ -30,6 +30,7 @@ import {
   type WorldHappyFatShop,
   type WorldBigBun,
   type WorldSausageStall,
+  type WorldMelonTrough,
   type WorldRetroArcade,
   type WorldDanceMachine,
   type WorldPond,
@@ -51,8 +52,10 @@ import { CHINESE_TEMPLE_DEFAULT, formatChineseTempleSettingsForPaste } from './o
 import { BIG_BUN_DEFAULT, formatBigBunSettingsForPaste } from './objects/bigBun';
 import { CANDY_SHOP_DEFAULT, formatCandyShopSettingsForPaste } from './objects/candyShop';
 import { SAUSAGE_STALL_DEFAULT, formatSausageStallSettingsForPaste } from './objects/sausageStall';
+import { MELON_TROUGH_DEFAULT, formatMelonTroughSettingsForPaste } from './objects/melonTrough';
 import { formatRetroArcadePlacementsForPaste } from './objects/retroArcade';
 import { formatDanceMachinePlacementsForPaste } from './objects/danceMachine';
+import { createPineappleBun, formatPineappleBunSettingsForPaste } from './objects/pineappleBun';
 import { CRITTER_MAX, formatCrittersSettingsForPaste } from './objects/critters';
 import { formatGameHallRingsSettingsForPaste } from './objects/gameHallRings';
 import { formatDenpaCharacterSettingsForPaste } from './objects/denpaCharacter';
@@ -285,6 +288,7 @@ const {
   chineseTemple,
   bigBun,
   sausageStall,
+  melonTrough,
   candyShop,
   retroArcades,
   addRetroArcade,
@@ -819,6 +823,34 @@ const logExtraFood = () =>
 ringFolder.add(extraFood, 'mushroomSize', 0.02, 0.15, 0.001).name('香菇大小 (m)').onChange(ketchupExtraFood.apply).onFinishChange(logExtraFood);
 ringFolder.add(extraFood, 'mushroomFloat', -0.3, 0.5, 0.01).name('香菇浮起高度（小=沉）').onChange(ketchupExtraFood.apply).onFinishChange(logExtraFood);
 ringFolder.add(extraFood, 'rim', 0, 1.5, 0.01).name('食物邊緣亮光').onChange(ketchupExtraFood.apply).onFinishChange(logExtraFood);
+
+// 菠蘿麵包：浮在番茄醬圈圈上、在畫面左側（從離鏡頭最近的那一點往左繞固定角度，綠球怎麼轉、視窗多寬位置都不變）
+const pineappleBun = createPineappleBun({
+  camera,
+  ring: ketchupRing.object,
+  getSurfacePoint: ketchupRing.getSurfacePoint,
+  envMap,
+});
+scene.add(pineappleBun.object);
+{
+  const b = pineappleBun.settings;
+  const apply = () => pineappleBun.apply();
+  const log = () => console.log(formatPineappleBunSettingsForPaste(b));
+  const bunFolder = gui.addFolder('菠蘿麵包（番茄醬海左側）');
+  bunFolder.add(b, 'enabled').name('顯示').onChange(apply).onFinishChange(log);
+  bunFolder.add(b, 'ringAngleDegrees', 0, 180, 1).name('沿著醬往左繞 (°)（>90 在綠球後面）').onFinishChange(log);
+  bunFolder.add(b, 'radialOffset', -0.15, 0.25, 0.005).name('往醬外緣挪').onFinishChange(log);
+  bunFolder.add(b, 'lift', -0.15, 0.15, 0.005).name('相對醬面高度（0 = 貼著醬面，負 = 沉進醬裡）').onFinishChange(log);
+  bunFolder.add(b, 'size', 0.05, 1.2, 0.005).name('大小（含木牌高度）').onChange(apply).onFinishChange(log);
+  bunFolder.add(b, 'yawDegrees', -180, 180, 1).name('左右轉 (°)').onFinishChange(log);
+  bunFolder.add(b, 'pitchDegrees', -45, 60, 1).name('往前傾 (°)').onFinishChange(log);
+  bunFolder.add(b, 'bobHeight', 0, 0.08, 0.001).name('起伏高度').onFinishChange(log);
+  bunFolder.add(b, 'bobSpeed', 0, 2, 0.01).name('起伏速度').onFinishChange(log);
+  bunFolder.add(b, 'swayDegrees', 0, 20, 0.5).name('搖晃角度 (°)').onFinishChange(log);
+  bunFolder.add(b, 'turnDegrees', 0, 60, 0.5).name('左右轉幅度 (°)').onFinishChange(log);
+  bunFolder.add(b, 'sauceDent', 0, 0.2, 0.005).name('底下醬面壓凹深度').onFinishChange(log);
+  bunFolder.close();
+}
 
 const sharkFolder = gui.addFolder('番茄醬海・鯊魚');
 const shark = ketchupShark.settings;
@@ -2470,6 +2502,42 @@ if (sausageStallFolder && sausageStall) {
   sausageStallFolder.add({ log: logSausageStall }, 'log').name('印出設定');
 }
 
+const melonTroughFolder = melonTrough ? gui.addFolder('古井冰西瓜') : null;
+function logMelonTrough() {
+  if (melonTrough) console.log(formatMelonTroughSettingsForPaste(melonTrough.settings));
+}
+if (melonTroughFolder && melonTrough) {
+  const mt = melonTrough.settings;
+  const apply = () => melonTrough.apply();
+  melonTroughFolder.add(mt, 'enabled').name('顯示').onChange(apply).onFinishChange(logMelonTrough);
+  melonTroughFolder.add(mt, 'size', 0.03, 0.4, 0.005).name('縮放大小').onChange(apply).onFinishChange(logMelonTrough);
+  melonTroughFolder.add(mt, 'angleFromTopDegrees', 0, 88, 1).name('離頂端 (°)').onChange(apply).onFinishChange(logMelonTrough);
+  melonTroughFolder.add(mt, 'azimuthDegrees', -180, 180, 1).name('方位 (°)').onChange(apply).onFinishChange(logMelonTrough);
+  melonTroughFolder.add(mt, 'spinDegrees', -180, 180, 1).name('自身旋轉 (°)').onChange(apply).onFinishChange(logMelonTrough);
+  melonTroughFolder.add(mt, 'sink', -0.05, 0.12, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(logMelonTrough);
+  melonTroughFolder.add(mt, 'glow', 0, 3, 0.05).name('水面閃光').onFinishChange(logMelonTrough);
+  const melonTroughColorFolder = melonTroughFolder.addFolder('顏色');
+  melonTroughColorFolder.addColor(mt.colors, 'stone').name('洗石子水槽').onChange(apply).onFinishChange(logMelonTrough);
+  melonTroughColorFolder.addColor(mt.colors, 'water').name('水').onChange(apply).onFinishChange(logMelonTrough);
+  melonTroughColorFolder.addColor(mt.colors, 'brick').name('紅磚座').onChange(apply).onFinishChange(logMelonTrough);
+  melonTroughColorFolder.addColor(mt.colors, 'pump').name('幫浦木頭').onChange(apply).onFinishChange(logMelonTrough);
+  melonTroughColorFolder.addColor(mt.colors, 'leaf').name('龜背芋葉子').onChange(apply).onFinishChange(logMelonTrough);
+  melonTroughColorFolder
+    .add(
+      {
+        reset: () => {
+          Object.assign(mt.colors, MELON_TROUGH_DEFAULT.colors);
+          melonTroughColorFolder.controllers.forEach((controller) => controller.updateDisplay());
+          apply();
+          logMelonTrough();
+        },
+      },
+      'reset',
+    )
+    .name('還原預設顏色');
+  melonTroughFolder.add({ log: logMelonTrough }, 'log').name('印出設定');
+}
+
 // 柑仔店 = twRoom 那棟房子的外觀：位置、旋轉、縮放大小在房子面板（點選它就會出現），這裡只管顏色和發光
 const candyShopFolder = candyShop ? gui.addFolder('柑仔店（twRoom 外觀）') : null;
 function logCandyShop() {
@@ -3354,6 +3422,7 @@ let surfaceDragTargets: Array<
   | WorldHappyFatShop
   | WorldBigBun
   | WorldSausageStall
+  | WorldMelonTrough
   | WorldRetroArcade
   | WorldDanceMachine
   | WorldPond
@@ -3365,6 +3434,7 @@ let surfaceDragTargets: Array<
   ...(happyFatShop ? [happyFatShop] : []),
   ...(bigBun ? [bigBun] : []),
   ...(sausageStall ? [sausageStall] : []),
+  ...(melonTrough ? [melonTrough] : []),
   ...retroArcades,
   ...(DANCE_MACHINE_SCENE_EDIT ? danceMachines : []),
   ...(pond ? [pond] : []),
@@ -3386,6 +3456,7 @@ function refreshPuddingDragTargets() {
   if (happyFatShop) surfaceDragTargets.push(happyFatShop);
   if (bigBun) surfaceDragTargets.push(bigBun);
   if (sausageStall) surfaceDragTargets.push(sausageStall);
+  if (melonTrough) surfaceDragTargets.push(melonTrough);
   surfaceDragTargets.push(...retroArcades);
   if (DANCE_MACHINE_SCENE_EDIT) surfaceDragTargets.push(...danceMachines);
   if (pond) surfaceDragTargets.push(pond);
@@ -3453,6 +3524,7 @@ if (HOUSE_DRAG_ENABLED) {
       happyFatFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       bigBunFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       sausageStallFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      melonTroughFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       danceMachineFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       retroArcadeFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       pondFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
@@ -3464,6 +3536,7 @@ if (HOUSE_DRAG_ENABLED) {
       else if (happyFatShop && target.object === happyFatShop.object) logHappyFat();
       else if (bigBun && target.object === bigBun.object) logBigBun();
       else if (sausageStall && target.object === sausageStall.object) logSausageStall();
+      else if (melonTrough && target.object === melonTrough.object) logMelonTrough();
       else if (DANCE_MACHINE_SCENE_EDIT && danceMachines.some((item) => item.object === target.object)) {
         groundDetail?.refreshMasks();
         logDanceMachines();
@@ -3595,6 +3668,15 @@ function render(time: number) {
   backgroundMaterial.uniforms.uTime.value = time * 0.001;
   // enableDamping 開啟時每幀都要 update，否則放開滑鼠後不會有慣性滑動
   controls.update();
+  // 菠蘿麵包跟著鏡頭定位：要用這一幀轉完的鏡頭
+  // 開場：番茄醬繞滿一圈之後菠蘿麵包才浮上來
+  pineappleBun.setSauceReady(ketchupRing.getWrap() >= 0.999);
+  pineappleBun.update(time * 0.001);
+  // 麵包在醬上的位置交給番茄醬：底下的醬壓一個凹洞（醬流過時不會從麵包穿出來）、食物和鯊魚從旁邊繞過
+  {
+    const footprint = pineappleBun.getFootprint();
+    ketchupRing.setFloatingObstacle(footprint?.center ?? null, footprint?.radius, pineappleBun.settings.sauceDent);
+  }
   // 彩虹等跟鏡頭對齊的物件要在 controls 之後更新
   updateObjs(time * 0.001);
   tryUnlockEnterAfterHouses();

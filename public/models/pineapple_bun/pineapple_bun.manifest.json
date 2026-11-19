@@ -1,0 +1,93 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "pineapple_bun",
+  "glb": "pineapple_bun.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp"
+  ],
+  "root": "pineapple_bun_Root",
+  "clickable": [],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 2782,
+    "primitives": 9,
+    "meshes": 7,
+    "materials": 6,
+    "file_bytes": 231636
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "warn",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {
+      "crust_top": {
+        "class": "food",
+        "pattern": "painted",
+        "tier": "standard",
+        "size": 512,
+        "tile_m": 0.3,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "painted",
+          "seed": 3651986580,
+          "hash": "d9ace494d924"
+        }
+      },
+      "crust_bottom": {
+        "class": "food",
+        "pattern": "crust",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.4,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "crust",
+          "seed": 1284679200,
+          "hash": "4c92a620f4ac"
+        }
+      },
+      "sign_wood": {
+        "class": "wood",
+        "pattern": "planks",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.88,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "planks",
+          "seed": 2810810940,
+          "hash": "a789923c9cc7"
+        }
+      },
+      "stake_wood": {
+        "class": "wood",
+        "pattern": "wood_grain",
+        "tier": "prop",
+        "size": 256,
+        "tile_m": 0.6,
+        "provenance": {
+          "source": "procedural",
+          "pattern": "wood_grain",
+          "seed": 1496465058,
+          "hash": "59323ea2965d"
+        }
+      }
+    },
+    "bake": {},
+    "decals": 1,
+    "gpu_texture_mb": 6.71,
+    "flat_ratio": 0.442,
+    "texture_count": 13,
+    "texture_kb": 90.6,
+    "images": 13,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 226.2
+  }
+}
