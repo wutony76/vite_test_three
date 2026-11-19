@@ -29,6 +29,7 @@ import {
   type WorldTreasureChest,
   type WorldHappyFatShop,
   type WorldBigBun,
+  type WorldSausageStall,
   type WorldRetroArcade,
   type WorldDanceMachine,
   type WorldPond,
@@ -49,6 +50,7 @@ import { formatHappyFatShopSettingsForPaste, HAPPY_FAT_SHOP_DEFAULT } from './ob
 import { CHINESE_TEMPLE_DEFAULT, formatChineseTempleSettingsForPaste } from './objects/chineseTemple';
 import { BIG_BUN_DEFAULT, formatBigBunSettingsForPaste } from './objects/bigBun';
 import { CANDY_SHOP_DEFAULT, formatCandyShopSettingsForPaste } from './objects/candyShop';
+import { SAUSAGE_STALL_DEFAULT, formatSausageStallSettingsForPaste } from './objects/sausageStall';
 import { formatRetroArcadePlacementsForPaste } from './objects/retroArcade';
 import { formatDanceMachinePlacementsForPaste } from './objects/danceMachine';
 import { CRITTER_MAX, formatCrittersSettingsForPaste } from './objects/critters';
@@ -282,6 +284,7 @@ const {
   happyFatShop,
   chineseTemple,
   bigBun,
+  sausageStall,
   candyShop,
   retroArcades,
   addRetroArcade,
@@ -2267,6 +2270,42 @@ if (bigBunFolder && bigBun) {
   bigBunFolder.add({ log: logBigBun }, 'log').name('印出設定');
 }
 
+// 打彈珠烤香腸攤：可以拖曳擺放，也可以在這裡調位置、方位、旋轉、縮放大小、顏色
+const sausageStallFolder = sausageStall ? gui.addFolder('打彈珠烤香腸攤') : null;
+function logSausageStall() {
+  if (sausageStall) console.log(formatSausageStallSettingsForPaste(sausageStall.settings));
+}
+if (sausageStallFolder && sausageStall) {
+  const st = sausageStall.settings;
+  const apply = () => sausageStall.apply();
+  sausageStallFolder.add(st, 'enabled').name('顯示').onChange(apply).onFinishChange(logSausageStall);
+  sausageStallFolder.add(st, 'size', 0.03, 0.4, 0.005).name('縮放大小').onChange(apply).onFinishChange(logSausageStall);
+  sausageStallFolder.add(st, 'angleFromTopDegrees', 0, 88, 1).name('離頂端 (°)').onChange(apply).onFinishChange(logSausageStall);
+  sausageStallFolder.add(st, 'azimuthDegrees', -180, 180, 1).name('方位 (°)').onChange(apply).onFinishChange(logSausageStall);
+  sausageStallFolder.add(st, 'spinDegrees', -180, 180, 1).name('自身旋轉 (°)').onChange(apply).onFinishChange(logSausageStall);
+  sausageStallFolder.add(st, 'sink', -0.05, 0.12, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(logSausageStall);
+  sausageStallFolder.add(st, 'glow', 0, 3, 0.05).name('炭火／燈泡發光').onFinishChange(logSausageStall);
+  const sausageStallColorFolder = sausageStallFolder.addFolder('顏色');
+  sausageStallColorFolder.addColor(st.colors, 'canopy').name('條紋布篷').onChange(apply).onFinishChange(logSausageStall);
+  sausageStallColorFolder.addColor(st.colors, 'cart').name('推車車身').onChange(apply).onFinishChange(logSausageStall);
+  sausageStallColorFolder.addColor(st.colors, 'trim').name('檯面／柱子／木框').onChange(apply).onFinishChange(logSausageStall);
+  sausageStallColorFolder.addColor(st.colors, 'board').name('彈珠台盤面').onChange(apply).onFinishChange(logSausageStall);
+  sausageStallColorFolder
+    .add(
+      {
+        reset: () => {
+          Object.assign(st.colors, SAUSAGE_STALL_DEFAULT.colors);
+          sausageStallColorFolder.controllers.forEach((controller) => controller.updateDisplay());
+          apply();
+          logSausageStall();
+        },
+      },
+      'reset',
+    )
+    .name('還原預設顏色');
+  sausageStallFolder.add({ log: logSausageStall }, 'log').name('印出設定');
+}
+
 // 柑仔店 = twRoom 那棟房子的外觀：位置、旋轉、縮放大小在房子面板（點選它就會出現），這裡只管顏色和發光
 const candyShopFolder = candyShop ? gui.addFolder('柑仔店（twRoom 外觀）') : null;
 function logCandyShop() {
@@ -3150,6 +3189,7 @@ let surfaceDragTargets: Array<
   | WorldTreasureChest
   | WorldHappyFatShop
   | WorldBigBun
+  | WorldSausageStall
   | WorldRetroArcade
   | WorldDanceMachine
   | WorldPond
@@ -3160,6 +3200,7 @@ let surfaceDragTargets: Array<
   ...(treasureChest ? [treasureChest] : []),
   ...(happyFatShop ? [happyFatShop] : []),
   ...(bigBun ? [bigBun] : []),
+  ...(sausageStall ? [sausageStall] : []),
   ...retroArcades,
   ...(DANCE_MACHINE_SCENE_EDIT ? danceMachines : []),
   ...(pond ? [pond] : []),
@@ -3180,6 +3221,7 @@ function refreshPuddingDragTargets() {
   if (treasureChest) surfaceDragTargets.push(treasureChest);
   if (happyFatShop) surfaceDragTargets.push(happyFatShop);
   if (bigBun) surfaceDragTargets.push(bigBun);
+  if (sausageStall) surfaceDragTargets.push(sausageStall);
   surfaceDragTargets.push(...retroArcades);
   if (DANCE_MACHINE_SCENE_EDIT) surfaceDragTargets.push(...danceMachines);
   if (pond) surfaceDragTargets.push(pond);
@@ -3246,6 +3288,7 @@ if (HOUSE_DRAG_ENABLED) {
       treasureFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       happyFatFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       bigBunFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      sausageStallFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       danceMachineFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       retroArcadeFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       pondFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
@@ -3256,6 +3299,7 @@ if (HOUSE_DRAG_ENABLED) {
       else if (treasureChest && target.object === treasureChest.object) logTreasure();
       else if (happyFatShop && target.object === happyFatShop.object) logHappyFat();
       else if (bigBun && target.object === bigBun.object) logBigBun();
+      else if (sausageStall && target.object === sausageStall.object) logSausageStall();
       else if (DANCE_MACHINE_SCENE_EDIT && danceMachines.some((item) => item.object === target.object)) {
         groundDetail?.refreshMasks();
         logDanceMachines();

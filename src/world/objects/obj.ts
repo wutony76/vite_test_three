@@ -66,6 +66,7 @@ import { createHappyFatShop, type HappyFatShopSettings } from './happyFatShop';
 import { createChineseTemple, type ChineseTempleSettings } from './chineseTemple';
 import { createBigBun, type BigBunSettings } from './bigBun';
 import { createCandyShop, type CandyShopSettings } from './candyShop';
+import { createSausageStall, type SausageStallSettings } from './sausageStall';
 import {
   createRetroArcade,
   RETRO_ARCADE_DEFAULT,
@@ -767,6 +768,15 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     bigBunRuntime.setIntroGrow(0);
   }
 
+  // 打彈珠烤香腸攤：夜市推車（整台用程式拼，不用 GLB），可在面板調位置、拖曳擺放
+  const sausageStallRuntime = puddingAxes
+    ? createSausageStall({ groundRadius: GROUND_RADIUS, up: puddingAxes.up, front: puddingAxes.front, envMap: eggEnvMap })
+    : null;
+  if (sausageStallRuntime) {
+    ground.add(sausageStallRuntime.object);
+    sausageStallRuntime.setIntroGrow(0);
+  }
+
 
   // 復古街機：第一台放在 GameHall（電 • 波 • 町 遊樂中心）左邊；可以複製很多台（跟烤玉米一樣）
   type RetroArcadeRuntime = ReturnType<typeof createRetroArcade>;
@@ -983,6 +993,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     if (treasureRuntime?.settings.enabled) roots.push(treasureRuntime.object);
     if (happyFatRuntime?.settings.enabled) roots.push(happyFatRuntime.object);
     if (bigBunRuntime?.settings.enabled) roots.push(bigBunRuntime.object);
+    if (sausageStallRuntime?.settings.enabled) roots.push(sausageStallRuntime.object);
     for (const { world } of retroArcadeEntries) if (world.settings.enabled) roots.push(world.object);
     for (const { world } of danceMachineEntries) if (world.settings.enabled) roots.push(world.object);
     // 水潭也是障礙：小豬繞著走，草叢、小石頭不會長在水面上
@@ -1420,6 +1431,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         treasureRuntime?.setIntroGrow(1);
         happyFatRuntime?.setIntroGrow(1);
         bigBunRuntime?.setIntroGrow(1);
+        sausageStallRuntime?.setIntroGrow(1);
         for (const { runtime } of retroArcadeEntries) runtime.setIntroGrow(1);
         for (const { runtime } of danceMachineEntries) runtime.setIntroGrow(1);
         pondRuntime?.setIntroGrow(1);
@@ -1535,6 +1547,14 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         const bunStart = housesIntroEnd + 0.4;
         const bunT = THREE.MathUtils.clamp((introElapsed - bunStart) / 0.9, 0, 1);
         bigBunRuntime.setIntroGrow(easeOutBack(bunT, 2.4));
+      }
+    }
+    if (sausageStallRuntime) {
+      sausageStallRuntime.update(deltaTime);
+      if (!introDone) {
+        const stallStart = housesIntroEnd + 0.35;
+        const stallT = THREE.MathUtils.clamp((introElapsed - stallStart) / 0.9, 0, 1);
+        sausageStallRuntime.setIntroGrow(easeOutBack(stallT, 1.8));
       }
     }
     // 柑仔店（twRoom）：招牌閃爍、棒棒糖轉。長出來的動畫跟著房子一起
@@ -1667,6 +1687,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     treasureRuntime?.setIntroGrow(0);
     happyFatRuntime?.setIntroGrow(0);
     bigBunRuntime?.setIntroGrow(0);
+    sausageStallRuntime?.setIntroGrow(0);
     for (const { runtime } of retroArcadeEntries) runtime.setIntroGrow(0);
     for (const { runtime } of danceMachineEntries) runtime.setIntroGrow(0);
     pondRuntime?.setIntroGrow(0);
@@ -1768,6 +1789,17 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
           getNormal: bigBunRuntime.getNormal,
           setNormal: bigBunRuntime.setNormal,
         } as WorldBigBun)
+      : null,
+    sausageStall: sausageStallRuntime
+      ? ({
+          id: 'sausage_stall',
+          label: '打彈珠烤香腸攤',
+          object: sausageStallRuntime.object,
+          settings: sausageStallRuntime.settings,
+          apply: sausageStallRuntime.applySettings,
+          getNormal: sausageStallRuntime.getNormal,
+          setNormal: sausageStallRuntime.setNormal,
+        } as WorldSausageStall)
       : null,
     // 柑仔店的顏色、發光（位置、大小、旋轉在房子面板的 twRoom）
     candyShop: {
@@ -1945,6 +1977,16 @@ export type WorldBigBun = {
   label: string;
   object: THREE.Object3D;
   settings: BigBunSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldSausageStall = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: SausageStallSettings;
   apply: () => void;
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;
