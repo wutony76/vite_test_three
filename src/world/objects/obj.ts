@@ -663,8 +663,8 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
   // TW
   const twRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   Object.assign(twRoom.settings, {
-    angleFromTopDegrees: 22,
-    azimuthDegrees: -80,
+    angleFromTopDegrees: 19,
+    azimuthDegrees: -107,
     spinDegrees: 135,
     sink: 0.03,
     scale: 0.15,
