@@ -48,6 +48,7 @@ import { formatPigAdventureSettingsForPaste } from './objects/pigAdventure';
 import { formatHappyFatShopSettingsForPaste, HAPPY_FAT_SHOP_DEFAULT } from './objects/happyFatShop';
 import { CHINESE_TEMPLE_DEFAULT, formatChineseTempleSettingsForPaste } from './objects/chineseTemple';
 import { BIG_BUN_DEFAULT, formatBigBunSettingsForPaste } from './objects/bigBun';
+import { CANDY_SHOP_DEFAULT, formatCandyShopSettingsForPaste } from './objects/candyShop';
 import { formatRetroArcadePlacementsForPaste } from './objects/retroArcade';
 import { formatDanceMachinePlacementsForPaste } from './objects/danceMachine';
 import { CRITTER_MAX, formatCrittersSettingsForPaste } from './objects/critters';
@@ -281,6 +282,7 @@ const {
   happyFatShop,
   chineseTemple,
   bigBun,
+  candyShop,
   retroArcades,
   addRetroArcade,
   removeRetroArcade,
@@ -869,7 +871,7 @@ let selectedHouse: WorldHouse | null = houses[0];
  * 鎖定的房子：不能在畫面上拖動、面板也不顯示調整滑桿（避免不小心改到已經定案的擺放）。
  * 點選、顯示標籤、按「進入」都照常。要解鎖就從這裡拿掉名字。
  */
-const LOCKED_HOUSES = new Set(['mainHall', 'projectRoom', 'bgRoom', 'Gamehall']);
+const LOCKED_HOUSES = new Set(['mainHall', 'projectRoom', 'bgRoom', 'twRoom', 'Gamehall']);
 const isHouseLocked = (target: { object: THREE.Object3D }) =>
   houses.some((house) => house.object === target.object && LOCKED_HOUSES.has(house.label));
 
@@ -2265,6 +2267,38 @@ if (bigBunFolder && bigBun) {
   bigBunFolder.add({ log: logBigBun }, 'log').name('印出設定');
 }
 
+// 柑仔店 = twRoom 那棟房子的外觀：位置、旋轉、縮放大小在房子面板（點選它就會出現），這裡只管顏色和發光
+const candyShopFolder = candyShop ? gui.addFolder('柑仔店（twRoom 外觀）') : null;
+function logCandyShop() {
+  if (candyShop) console.log(formatCandyShopSettingsForPaste(candyShop.settings));
+}
+if (candyShopFolder && candyShop) {
+  const r = candyShop.settings;
+  const apply = () => candyShop.apply();
+  candyShopFolder.add(r, 'glow', 0, 3, 0.05).name('招牌／窗戶發光').onFinishChange(logCandyShop);
+  const candyShopColorFolder = candyShopFolder.addFolder('顏色');
+  candyShopColorFolder.addColor(r.colors, 'wall').name('二樓牆').onChange(apply).onFinishChange(logCandyShop);
+  candyShopColorFolder.addColor(r.colors, 'wood').name('一樓木牆／櫃台').onChange(apply).onFinishChange(logCandyShop);
+  candyShopColorFolder.addColor(r.colors, 'awning').name('招牌／遮雨棚／紅色小物').onChange(apply).onFinishChange(logCandyShop);
+  candyShopColorFolder.addColor(r.colors, 'roofTile').name('側面屋瓦').onChange(apply).onFinishChange(logCandyShop);
+  candyShopColorFolder.addColor(r.colors, 'pavement').name('地磚台座').onChange(apply).onFinishChange(logCandyShop);
+  candyShopColorFolder.addColor(r.colors, 'sign').name('直立燈箱').onChange(apply).onFinishChange(logCandyShop);
+  candyShopColorFolder
+    .add(
+      {
+        reset: () => {
+          Object.assign(r.colors, CANDY_SHOP_DEFAULT.colors);
+          candyShopColorFolder.controllers.forEach((controller) => controller.updateDisplay());
+          apply();
+          logCandyShop();
+        },
+      },
+      'reset',
+    )
+    .name('還原預設顏色');
+  candyShopFolder.add({ log: logCandyShop }, 'log').name('印出設定');
+}
+
 // 點心樓 = bgRoom 那棟房子的外觀：位置、旋轉、大小在房子面板（點選它就會出現），這裡只管顏色和包子擺動
 const templeFolder = gui.addFolder('點心樓（bgRoom 外觀）');
 function logTemple() {
@@ -3013,6 +3047,7 @@ const HOUSE_LABEL_DISPLAY: Record<string, { title: string; note?: string }> = {
   mainHall: { title: '龍兔的家', note: '（點擊進入會看到詳細資訊）' },
   projectRoom: { title: '工作間' },
   bgRoom: { title: '金 • 彩 • 閣', note: '（過來試試手氣吧！）' },
+  twRoom: { title: '台味雜貨', note: '（今仔日，好天氣，好運叩叩來）' },
   Gamehall: { title: '電 • 波 • 町', note: '（好像是一個玩遊戲的地方）' },
 };
 let renderedHouseLabel = '';

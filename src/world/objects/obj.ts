@@ -65,6 +65,7 @@ import { createProjectRoomStyle } from './projectRoomStyle';
 import { createHappyFatShop, type HappyFatShopSettings } from './happyFatShop';
 import { createChineseTemple, type ChineseTempleSettings } from './chineseTemple';
 import { createBigBun, type BigBunSettings } from './bigBun';
+import { createCandyShop, type CandyShopSettings } from './candyShop';
 import {
   createRetroArcade,
   RETRO_ARCADE_DEFAULT,
@@ -104,16 +105,17 @@ export type MainHallDoorSettings = {
 };
 
 export const MAIN_HALL_DOOR_DEFAULT: MainHallDoorSettings = { scale: 0.8, width: 1, height: 1 };
-const TW_HALL_MODEL_URL = `${import.meta.env.BASE_URL}models/twhall/twhall.glb`;
+// twRoom 的外觀：柑仔店（程式拼的，見 candyShop.ts），取代原本的 twhall 模型。
+// twhall 模型還在 public/models/twhall/twhall.glb，想換回來：把 attachProceduralModel(twRoom, …) 換回
+// attachHouseModel(twRoom, `${import.meta.env.BASE_URL}models/twhall/twhall.glb`)，並把網址加回 WORLD_GLTF_URLS
 // bgRoom 的外觀：點心樓（程式拼出來的圓形中式樓閣，見 chineseTemple.ts），取代原本的日式洗衣店小樓。
 // 洗衣店模型還在 public/models/laundry/laundry.glb（plan 在 tools/blender/plans/laundry.plan.json），
-// 想換回來：把 attachChineseTemple 換回 attachHouseModel(bgRoom, 那個網址)，並把網址加回 WORLD_GLTF_URLS
+// 想換回來：把 attachProceduralModel(bgRoom, …) 換回 attachHouseModel(bgRoom, 那個網址)，並把網址加回 WORLD_GLTF_URLS
 
 export const WORLD_GLTF_URLS = [
   MODEL_URL,
   PROJECT_ROOM_MODEL_URL,
   GAME_HALL_MODEL_URL,
-  TW_HALL_MODEL_URL,
   `${import.meta.env.BASE_URL}models/pudding/pudding.glb`,
   `${import.meta.env.BASE_URL}models/grilled_corn/grilled_corn.glb`,
   `${import.meta.env.BASE_URL}models/salmon_steak/salmon_steak.glb`,
@@ -659,25 +661,28 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
   ground.add(bgRoom.object);
   // 點心樓：金色用不染色的環境貼圖，才不會反射出紅色
   const chineseTempleRuntime = createChineseTemple({ envMap: eggEnvMap });
-  attachChineseTemple(bgRoom, chineseTempleRuntime.object);
+  attachProceduralModel(bgRoom, chineseTempleRuntime.object);
 
   // TW
   const twRoom = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   Object.assign(twRoom.settings, {
-    angleFromTopDegrees: 19,
-    azimuthDegrees: -107,
-    spinDegrees: 135,
-    sink: 0.03,
-    scale: 0.15,
-    // twhall 立面偏高（約 8.6×7.5 m），盒子略拉高避免 fit 時壓扁
-    width: 1.25,
-    height: 1.12,
-    depth: 0.92,
+    angleFromTopDegrees: 21,
+    azimuthDegrees: -116,
+    spinDegrees: 120,
+    sink: 0.025,
+    scale: 0.28,
+    // 柑仔店含電線桿、棒棒糖約 3.2 × 2.9 × 3.0（寬×高×深），盒子比例跟著改，
+    // fitIntoHouseBox 等比縮放才不會被最緊的那一邊卡得很小。原本 twhall 的值：width 1.25、height 1.12、depth 0.92
+    width: 1.3,
+    height: 1.2,
+    depth: 1.25,
     color: '#8280ea',
   });
   twRoom.applySettings();
   ground.add(twRoom.object);
-  attachHouseModel(twRoom, TW_HALL_MODEL_URL);
+  // 柑仔店（程式拼的，見 candyShop.ts）取代原本的 twhall 模型
+  const candyShopRuntime = createCandyShop({ envMap: eggEnvMap });
+  attachProceduralModel(twRoom, candyShopRuntime.object);
 
   const Gamehall = createHouse({ groundRadius: GROUND_RADIUS, ...getGroundAxes(ketchup.ringObject, camera) });
   // 換成「電 • 波 • 町」香菇電子遊樂中心：長方體比例改成跟模型一樣（寬 9.1、高 10.2、深 6.6 → 1.25 : 1.40 : 0.91；
@@ -1532,6 +1537,8 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         bigBunRuntime.setIntroGrow(easeOutBack(bunT, 2.4));
       }
     }
+    // 柑仔店（twRoom）：招牌閃爍、棒棒糖轉。長出來的動畫跟著房子一起
+    candyShopRuntime.update(deltaTime);
     // 點心樓（bgRoom）：金幣自轉閃光、包子晃動。長出來的動畫跟著房子一起，不用另外算
     chineseTempleRuntime.update(deltaTime);
     // 溜滑梯：房子長完才開始算（長大途中屋身一直在變，算了也白算），然後從三樓往水潭伸出去
@@ -1762,6 +1769,11 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
           setNormal: bigBunRuntime.setNormal,
         } as WorldBigBun)
       : null,
+    // 柑仔店的顏色、發光（位置、大小、旋轉在房子面板的 twRoom）
+    candyShop: {
+      settings: candyShopRuntime.settings,
+      apply: candyShopRuntime.applySettings,
+    } as WorldCandyShop,
     // 點心樓的顏色、包子擺動（位置、大小、旋轉在房子面板的 bgRoom）
     chineseTemple: {
       settings: chineseTempleRuntime.settings,
@@ -1936,6 +1948,11 @@ export type WorldBigBun = {
   apply: () => void;
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldCandyShop = {
+  settings: CandyShopSettings;
+  apply: () => void;
 };
 
 export type WorldChineseTemple = {
@@ -2269,10 +2286,10 @@ function lightUpGlowDecals(model: THREE.Object3D) {
  * 所以只把它「藏起來」，模型當成它的子物件，長方體怎麼移動、縮放，模型都會跟著走
  */
 /**
- * 把程式拼出來的模型（點心樓）塞進房子：跟 attachHouseModel 一樣藏起長方體、把模型縮進長方體範圍，
+ * 把程式拼出來的模型（點心樓、柑仔店）塞進房子：跟 attachHouseModel 一樣藏起長方體、把模型縮進長方體範圍，
  * 只是模型已經在手上，不用等載入
  */
-function attachChineseTemple(house: ReturnType<typeof createHouse>, model: THREE.Object3D) {
+function attachProceduralModel(house: ReturnType<typeof createHouse>, model: THREE.Object3D) {
   // 長方體不畫但還在：射線點得到，點選、拖曳、名牌都靠它
   house.object.material.visible = false;
   fitIntoHouseBox(model, house.settings);
