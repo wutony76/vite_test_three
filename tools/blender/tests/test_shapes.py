@@ -305,6 +305,31 @@ def test_mushroom_arcade_parts_are_closed():
     assert "spot_white" in built["glow_shrooms"][1].mats
 
 
+def _signed_volume(data):
+    """封閉網格的有號體積：面都朝外時是正的，整個翻過來（面朝內）是負的"""
+    volume = 0.0
+    for face in data.faces:
+        a0 = data.verts[face[0]]
+        for i in range(1, len(face) - 1):
+            b, c = data.verts[face[i]], data.verts[face[i + 1]]
+            volume += (a0[0] * (b[1] * c[2] - b[2] * c[1]) - a0[1] * (b[0] * c[2] - b[2] * c[0]) + a0[2] * (b[0] * c[1] - b[1] * c[0])) / 6
+    return volume
+
+
+def test_dance_machine_parts_are_closed_and_face_out():
+    """跳舞機：機身是 1 個封閉島；8 個箭頭各 1 個島、四種顏色都有；扶手（U 形管＋直柱）2 個島；
+    每個零件的面都朝外（有號體積 > 0）—— prism 用奇數次軸互換時輪廓方向要反過來，漏了會整塊翻面。"""
+    _doc, _lay, built = _build_all("dance_machine.plan.json")
+    _closed_single(built["cabinet"][1])
+    _closed_single(built["arrows"][1], islands=8)
+    _closed_single(built["bar"][1], islands=2)
+    _closed_single(built["speakers"][1], islands=6)
+    _closed_single(built["stage"][1], islands=3)
+    assert {"arrow_yellow", "arrow_cyan", "arrow_magenta", "arrow_lime"} <= set(built["arrows"][1].mats)
+    for cid, (_ctx, data) in built.items():
+        assert _signed_volume(data) > 0, cid
+
+
 def test_retro_arcade_parts_are_closed():
     """復古街機：機身是 1 個封閉島；斜螢幕框（斜面上的六面體）、左側 kitbash 的旋轉體都封閉，島數照設計。"""
     _doc, _lay, built = _build_all("retro_arcade.plan.json")

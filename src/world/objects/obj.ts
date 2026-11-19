@@ -5,6 +5,13 @@ import { createHouse, type HouseSettings } from './house';
 import { createCartoonRainbow } from './rainbow';
 import { createGameHallLights } from './gameHallLights';
 import { createGameHallRings } from './gameHallRings';
+import {
+  createDanceMachine,
+  DANCE_MACHINE_DEFAULT,
+  DANCE_MACHINE_PLACEMENTS,
+  type DanceMachinePlacement,
+  type DanceMachineSettings,
+} from './danceMachine';
 import { createDenpaCharacter } from './denpaCharacter';
 import { createGroundFlowers, type GroundFlowers } from './groundFlowers';
 import {
@@ -813,6 +820,60 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     return spawnRetroArcade(nextRetroArcadeId(), base, introDone);
   }
 
+  // 跳舞機「電波 STEP!」：放在 GameHall 附近；可以複製很多台（跟復古街機一樣）
+  type DanceMachineRuntime = ReturnType<typeof createDanceMachine>;
+  const danceMachineEntries: Array<{ world: WorldDanceMachine; runtime: DanceMachineRuntime }> = [];
+  const danceMachines: WorldDanceMachine[] = [];
+
+  function spawnDanceMachine(id: string, layout: DanceMachineSettings, grown = false) {
+    if (!puddingAxes) return null;
+    const runtime = createDanceMachine({ groundRadius: GROUND_RADIUS, up: puddingAxes.up, front: puddingAxes.front, envMap, layout });
+    ground.add(runtime.object);
+    const n = Number(id.match(/(\d+)$/)?.[1] ?? danceMachineEntries.length + 1);
+    const world: WorldDanceMachine = {
+      id,
+      label: `跳舞機 ${n}`,
+      object: runtime.object,
+      settings: runtime.settings,
+      apply: runtime.applySettings,
+      getNormal: runtime.getNormal,
+      setNormal: runtime.setNormal,
+      setHighlighted: runtime.setHighlighted,
+    };
+    danceMachineEntries.push({ world, runtime });
+    danceMachines.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  if (puddingAxes) {
+    for (const placement of DANCE_MACHINE_PLACEMENTS) {
+      const { id, ...layout } = placement;
+      spawnDanceMachine(id, layout);
+    }
+  }
+
+  function addDanceMachine(seed?: Partial<DanceMachinePlacement>): WorldDanceMachine | null {
+    if (!puddingAxes) return null;
+    const { id: _ignored, ...rest } = seed ?? {};
+    const base: DanceMachineSettings = { ...DANCE_MACHINE_DEFAULT, ...rest, enabled: true };
+    // 往旁邊錯開 10°：不錯開的話新的一台會跟原本那台完全疊在一起，看起來像沒新增
+    base.azimuthDegrees = wrapDegrees((seed?.azimuthDegrees ?? DANCE_MACHINE_DEFAULT.azimuthDegrees) + 10);
+    let n = danceMachineEntries.length + 1;
+    while (danceMachines.some((item) => item.id === `dance_machine_${n}`)) n += 1;
+    return spawnDanceMachine(`dance_machine_${n}`, base, introDone);
+  }
+
+  function removeDanceMachine(entry: WorldDanceMachine) {
+    const index = danceMachineEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    danceMachineEntries[index].runtime.dispose();
+    danceMachineEntries.splice(index, 1);
+    const machineIndex = danceMachines.indexOf(entry);
+    if (machineIndex >= 0) danceMachines.splice(machineIndex, 1);
+    return true;
+  }
+
   function removeRetroArcade(entry: WorldRetroArcade) {
     const index = retroArcadeEntries.findIndex((item) => item.world === entry);
     if (index < 0) return false;
@@ -917,6 +978,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     if (happyFatRuntime?.settings.enabled) roots.push(happyFatRuntime.object);
     if (bigBunRuntime?.settings.enabled) roots.push(bigBunRuntime.object);
     for (const { world } of retroArcadeEntries) if (world.settings.enabled) roots.push(world.object);
+    for (const { world } of danceMachineEntries) if (world.settings.enabled) roots.push(world.object);
     // 水潭也是障礙：小豬繞著走，草叢、小石頭不會長在水面上
     if (pondRuntime?.settings.enabled) roots.push(pondRuntime.object);
     for (const { world } of puddingEntries) roots.push(world.object);
@@ -1071,6 +1133,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
               // 水潭、街機不算撒點的障礙（改用下面的 getMasks）：不然它們一動，整顆球的草全部重排
               if (pondRuntime && root === pondRuntime.object) continue;
               if (retroArcades.some((item) => item.object === root)) continue;
+              if (danceMachines.some((item) => item.object === root)) continue;
               const footprint = measureGroundFootprint(root);
               if (footprint) list.push(footprint);
             }
@@ -1095,6 +1158,11 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
             for (const { world } of retroArcadeEntries) {
               if (!world.settings.enabled) continue;
               masks.push({ normal: world.getNormal(), radiusRad: Math.atan((world.settings.size * 0.55) / GROUND_RADIUS) });
+            }
+            // 跳舞機：機台＋舞台，佔地約最長邊的一半
+            for (const { world } of danceMachineEntries) {
+              if (!world.settings.enabled) continue;
+              masks.push({ normal: world.getNormal(), radiusRad: Math.atan((world.settings.size * 0.5) / GROUND_RADIUS) });
             }
             return masks;
           },
@@ -1332,6 +1400,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         happyFatRuntime?.setIntroGrow(1);
         bigBunRuntime?.setIntroGrow(1);
         for (const { runtime } of retroArcadeEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of danceMachineEntries) runtime.setIntroGrow(1);
         pondRuntime?.setIntroGrow(1);
         slideRuntime.setIntroGrow(1);
         floatingIsland.setIntroGrow(1);
@@ -1341,6 +1410,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     rainbow.update(deltaTime);
     gameHallLights?.update(time);
     gameHallRings.update(time);
+    for (const { runtime } of danceMachineEntries) runtime.update(time);
     denpaCharacterRuntime.update(time);
 
     puddingEntries.forEach(({ runtime }, index) => {
@@ -1421,6 +1491,11 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         const arcadeStart = housesIntroEnd + 0.4 + index * 0.1;
         const arcadeT = THREE.MathUtils.clamp((introElapsed - arcadeStart) / 0.8, 0, 1);
         runtime.setIntroGrow(easeOutBack(arcadeT, 2.2));
+      });
+      danceMachineEntries.forEach(({ runtime }, index) => {
+        const machineStart = housesIntroEnd + 0.5 + index * 0.1;
+        const machineT = THREE.MathUtils.clamp((introElapsed - machineStart) / 0.8, 0, 1);
+        runtime.setIntroGrow(easeOutBack(machineT, 2.2));
       });
 
     }
@@ -1569,6 +1644,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     happyFatRuntime?.setIntroGrow(0);
     bigBunRuntime?.setIntroGrow(0);
     for (const { runtime } of retroArcadeEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of danceMachineEntries) runtime.setIntroGrow(0);
     pondRuntime?.setIntroGrow(0);
     slideRuntime.setIntroGrow(0);
     floatingIsland.setIntroGrow(0);
@@ -1640,6 +1716,9 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       apply: denpaCharacterRuntime.applySettings,
       setSelected: denpaCharacterRuntime.setSelected,
     },
+    danceMachines,
+    addDanceMachine,
+    removeDanceMachine,
     retroArcades,
     addRetroArcade,
     removeRetroArcade,
@@ -1787,6 +1866,18 @@ export type WorldPig = {
     getPhase: () => string;
     getLastFailReason: () => string;
   } | null;
+};
+
+export type WorldDanceMachine = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: DanceMachineSettings;
+  apply: () => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+  /** 面板選中時整台發光 */
+  setHighlighted: (value: boolean) => void;
 };
 
 export type WorldRetroArcade = {

@@ -30,6 +30,7 @@ import {
   type WorldHappyFatShop,
   type WorldBigBun,
   type WorldRetroArcade,
+  type WorldDanceMachine,
   type WorldPond,
   type WorldFrenchFries,
   type WorldFrenchFryStick,
@@ -48,6 +49,7 @@ import { formatHappyFatShopSettingsForPaste, HAPPY_FAT_SHOP_DEFAULT } from './ob
 import { CHINESE_TEMPLE_DEFAULT, formatChineseTempleSettingsForPaste } from './objects/chineseTemple';
 import { BIG_BUN_DEFAULT, formatBigBunSettingsForPaste } from './objects/bigBun';
 import { formatRetroArcadePlacementsForPaste } from './objects/retroArcade';
+import { formatDanceMachinePlacementsForPaste } from './objects/danceMachine';
 import { formatGameHallRingsSettingsForPaste } from './objects/gameHallRings';
 import { formatDenpaCharacterSettingsForPaste } from './objects/denpaCharacter';
 import { formatFloatingIslandSettingsForPaste } from './objects/floatingIsland';
@@ -281,6 +283,9 @@ const {
   retroArcades,
   addRetroArcade,
   removeRetroArcade,
+  danceMachines,
+  addDanceMachine,
+  removeDanceMachine,
   denpaCharacter,
   pond,
   mainHallSlide,
@@ -836,7 +841,7 @@ let selectedHouse: WorldHouse | null = houses[0];
  * 鎖定的房子：不能在畫面上拖動、面板也不顯示調整滑桿（避免不小心改到已經定案的擺放）。
  * 點選、顯示標籤、按「進入」都照常。要解鎖就從這裡拿掉名字。
  */
-const LOCKED_HOUSES = new Set(['mainHall', 'projectRoom']);
+const LOCKED_HOUSES = new Set(['mainHall', 'projectRoom', 'bgRoom', 'Gamehall']);
 const isHouseLocked = (target: { object: THREE.Object3D }) =>
   houses.some((house) => house.object === target.object && LOCKED_HOUSES.has(house.label));
 
@@ -1999,6 +2004,84 @@ function bindRetroArcadePanel(entry: WorldRetroArcade) {
   // 不預先選取：選中會整台發光，等使用者在場景上點了再選
 }
 
+// 跳舞機「電波 STEP!」（點選或拖曳選取後調整，可複製）——選取、編輯方式跟復古街機一樣
+// 已擺好（佈局寫在 danceMachine.ts 的 DANCE_MACHINE_PLACEMENTS）：關閉編輯 → 不顯示面板、場景上不能點選或拖曳。
+// 要再調整時改成 true：面板、點選、拖曳、複製都會回來
+const DANCE_MACHINE_SCENE_EDIT = false;
+const danceMachineFolder = gui.addFolder('跳舞機');
+if (!DANCE_MACHINE_SCENE_EDIT) danceMachineFolder.hide();
+let selectedDanceMachine: WorldDanceMachine | null = null;
+
+function logDanceMachines() {
+  if (danceMachines.length === 0) return;
+  const text = formatDanceMachinePlacementsForPaste(danceMachines.map((m) => ({ id: m.id, settings: m.settings })));
+  console.log(text);
+  return text;
+}
+
+const DANCE_MACHINE_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+
+function clearDanceMachinePanelSliders() {
+  danceMachineFolder.title('跳舞機');
+  for (const controller of [...danceMachineFolder.controllers]) {
+    if (DANCE_MACHINE_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+function bindDanceMachinePanel(entry: WorldDanceMachine) {
+  const alreadyShowing =
+    entry === selectedDanceMachine && danceMachineFolder.controllers.length > DANCE_MACHINE_PANEL_ACTIONS.size;
+  selectedDanceMachine = entry;
+  // 選中的那台整台發光，其他台還原
+  for (const machine of danceMachines) machine.setHighlighted(machine === entry);
+  if (alreadyShowing) return;
+
+  clearDanceMachinePanelSliders();
+  danceMachineFolder.title(`跳舞機 · ${entry.label}`);
+  const d = entry.settings;
+  const apply = () => entry.apply();
+  danceMachineFolder.add(d, 'enabled').name('顯示').onChange(apply).onFinishChange(logDanceMachines);
+  danceMachineFolder.add(d, 'size', 0.02, 0.3, 0.005).name('整體大小').onChange(apply).onFinishChange(logDanceMachines);
+  danceMachineFolder.add(d, 'angleFromTopDegrees', 0, 88, 1).name('離頂端 (°)').onChange(apply).onFinishChange(logDanceMachines);
+  danceMachineFolder.add(d, 'azimuthDegrees', -180, 180, 1).name('方位 (°)').onChange(apply).onFinishChange(logDanceMachines);
+  danceMachineFolder.add(d, 'spinDegrees', -180, 180, 1).name('自身旋轉 (°)').onChange(apply).onFinishChange(logDanceMachines);
+  danceMachineFolder.add(d, 'sink', -0.03, 0.05, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(logDanceMachines);
+  danceMachineFolder.add(d, 'glow', 0, 3, 0.05).name('螢幕／招牌發光').onChange(apply).onFinishChange(logDanceMachines);
+  danceMachineFolder.add(d, 'arrowGlow', 0, 4, 0.05).name('箭頭發光').onFinishChange(logDanceMachines);
+  danceMachineFolder.add(d, 'bpm', 0, 200, 1).name('節拍 BPM（0=不閃）').onFinishChange(logDanceMachines);
+}
+
+{
+  const danceMachineControls = {
+    add() {
+      const created = addDanceMachine(selectedDanceMachine ? { ...selectedDanceMachine.settings } : undefined);
+      if (!created) return;
+      bindDanceMachinePanel(created);
+      refreshPuddingDragTargets();
+      groundDetail?.refreshMasks();
+      logDanceMachines();
+    },
+    remove() {
+      if (!selectedDanceMachine) return;
+      if (!removeDanceMachine(selectedDanceMachine)) return;
+      selectedDanceMachine = null;
+      clearDanceMachinePanelSliders();
+      const next = danceMachines[danceMachines.length - 1];
+      if (next) bindDanceMachinePanel(next);
+      refreshPuddingDragTargets();
+      groundDetail?.refreshMasks();
+      logDanceMachines();
+    },
+    log() {
+      logDanceMachines();
+    },
+  };
+  danceMachineFolder.add(danceMachineControls, 'add').name('複製跳舞機');
+  danceMachineFolder.add(danceMachineControls, 'remove').name('移除選中跳舞機');
+  danceMachineFolder.add(danceMachineControls, 'log').name('印出全部佈局 (console)');
+}
+
 // 「電」字霓虹（從舊招牌獨立出來的一個字，立在 GameHall 屋頂上；位置用 GameHall 長方體的座標）
 const denpaCharacterFolder = gui.addFolder('「電」字霓虹（GameHall 屋頂）');
 function logDenpaCharacter() {
@@ -2961,6 +3044,7 @@ let surfaceDragTargets: Array<
   | WorldHappyFatShop
   | WorldBigBun
   | WorldRetroArcade
+  | WorldDanceMachine
   | WorldPond
 > = [
   ...houses,
@@ -2970,6 +3054,7 @@ let surfaceDragTargets: Array<
   ...(happyFatShop ? [happyFatShop] : []),
   ...(bigBun ? [bigBun] : []),
   ...retroArcades,
+  ...(DANCE_MACHINE_SCENE_EDIT ? danceMachines : []),
   ...(pond ? [pond] : []),
   ...(PUDDING_SCENE_EDIT ? puddings : []),
   ...(CORN_SCENE_EDIT && foodVisibility.showCorn ? grilledCorns : []),
@@ -2989,6 +3074,7 @@ function refreshPuddingDragTargets() {
   if (happyFatShop) surfaceDragTargets.push(happyFatShop);
   if (bigBun) surfaceDragTargets.push(bigBun);
   surfaceDragTargets.push(...retroArcades);
+  if (DANCE_MACHINE_SCENE_EDIT) surfaceDragTargets.push(...danceMachines);
   if (pond) surfaceDragTargets.push(pond);
   if (PUDDING_SCENE_EDIT) surfaceDragTargets.push(...puddings);
   if (CORN_SCENE_EDIT && foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
@@ -3024,6 +3110,10 @@ if (HOUSE_DRAG_ENABLED) {
       }
       const retroArcadeEntry = retroArcades.find((item) => item.object === target.object);
       if (retroArcadeEntry) bindRetroArcadePanel(retroArcadeEntry);
+      if (DANCE_MACHINE_SCENE_EDIT) {
+        const danceMachineEntry = danceMachines.find((item) => item.object === target.object);
+        if (danceMachineEntry) bindDanceMachinePanel(danceMachineEntry);
+      }
       const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
       if (salmonEntry) bindSalmonPanel(salmonEntry);
       const shiitakeEntry = shiitakes.find((item) => item.object === target.object);
@@ -3049,6 +3139,7 @@ if (HOUSE_DRAG_ENABLED) {
       treasureFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       happyFatFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       bigBunFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      danceMachineFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       retroArcadeFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       pondFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
     },
@@ -3058,6 +3149,10 @@ if (HOUSE_DRAG_ENABLED) {
       else if (treasureChest && target.object === treasureChest.object) logTreasure();
       else if (happyFatShop && target.object === happyFatShop.object) logHappyFat();
       else if (bigBun && target.object === bigBun.object) logBigBun();
+      else if (DANCE_MACHINE_SCENE_EDIT && danceMachines.some((item) => item.object === target.object)) {
+        groundDetail?.refreshMasks();
+        logDanceMachines();
+      }
       else if (retroArcades.some((item) => item.object === target.object)) {
         // 街機搬家：只更新它腳下的草（遮罩），不重撒
         groundDetail?.refreshMasks();
@@ -3088,6 +3183,10 @@ if (HOUSE_DRAG_ENABLED) {
       }
       const retroArcadeEntry = retroArcades.find((item) => item.object === target.object);
       if (retroArcadeEntry) bindRetroArcadePanel(retroArcadeEntry);
+      if (DANCE_MACHINE_SCENE_EDIT) {
+        const danceMachineEntry = danceMachines.find((item) => item.object === target.object);
+        if (danceMachineEntry) bindDanceMachinePanel(danceMachineEntry);
+      }
       const salmonEntry = salmonSteaks.find((item) => item.object === target.object);
       if (salmonEntry) bindSalmonPanel(salmonEntry);
       const shiitakeEntry = shiitakes.find((item) => item.object === target.object);

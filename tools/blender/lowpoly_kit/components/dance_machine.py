@@ -142,6 +142,8 @@ def build_dm_speakers(ctx):
     cone = ctx.param_mat("cone_material", ctx.material)
     (x0, y0, z0), (x1, y1, z1) = ctx.comp["bounds"]
     width = ctx.param("tower_width", 0.34)
+    # 喇叭往前凸 0.06：bounds 的前緣留給喇叭，箱體從 y0 + 0.06 開始
+    y0 += 0.06
     data = shapes.MeshData()
     for tx0, tx1 in ((x0, x0 + width), (x1 - width, x1)):
         data.extend(_box(tx0, y0, z0, tx1, y1, z1, ctx.material))

@@ -1,0 +1,43 @@
+{
+  "schema": "lowpoly.manifest/1",
+  "kind": "asset",
+  "id": "dance_machine",
+  "glb": "dance_machine.glb",
+  "requires": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_materials_emissive_strength"
+  ],
+  "root": "dance_machine_Root",
+  "clickable": [
+    "dance_machine_stage"
+  ],
+  "anim_groups": {},
+  "stats": {
+    "triangles": 1216,
+    "primitives": 12,
+    "meshes": 11,
+    "materials": 3,
+    "file_bytes": 82224
+  },
+  "qa": {
+    "topology": "pass",
+    "geometry": "pass",
+    "texture": "warn",
+    "glb_texture": "pass"
+  },
+  "textures": {
+    "materials": {},
+    "bake": {},
+    "decals": 2,
+    "gpu_texture_mb": 5.37,
+    "flat_ratio": 1.0,
+    "texture_count": 3,
+    "texture_kb": 13.4,
+    "images": 3,
+    "mime_types": [
+      "image/webp"
+    ],
+    "file_kb": 80.3
+  }
+}
