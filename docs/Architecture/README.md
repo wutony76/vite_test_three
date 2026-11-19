@@ -123,7 +123,7 @@ vite_test_three/
 │     ├─ softLayerPass.ts     柔邊圖層：浮空小星球（layer 2）單獨畫到 RenderTarget → 兩趟高斯模糊 → 輪廓用模糊版合成回畫面（天空背景之後、主場景之前）
 │     ├─ foregroundBlur.ts    前景模糊（移軸）：主場景畫完後複製畫面 → 半解析度高斯模糊 → 依畫面高度疊回（底部最糊，主要是前景番茄醬）
 │     ├─ debug/               surfaceDrag（貼球面拖曳）、cameraPlaneDrag（鏡頭座標拖曳）、groundPathEditor（在綠球上編輯小徑路點）
-│     └─ objects/             obj.ts 組裝；ketchup（醬汁質感：清漆、亮邊、接觸陰影、流動高光、氣泡、小豬漣漪）、house、pig／pigCloud／pigRig（存錢筒小豬的腳、耳朵、尾巴動作）、campfire、shiitake、treasureChest（寶箱＋滿出來的漢堡＋金色閃光）、retroArcade（GameHall 左邊的復古街機）、danceMachine（跳舞機「電波 STEP!」：可複製、箭頭跟著 BPM 閃）、happyFatShop（Happy Fat 小店：厚度、換色、煙囪冒煙）、pond（小水潭：程式產生，水面 shader 漣漪＋岸邊石頭、荷葉、香蒲；草叢用遮罩避開）、mainHallSlide（龍兔的家三樓 → 水潭的溜滑梯，終點跟著水潭走；getRide 給小豬滑）、pigAdventure（小豬溜滑梯冒險：進門 → 溜滑梯 → 水潭濺水花、噴魚排、撿魚排）、projectRoomStyle（projectRoom 的香菇屋風格：換色＋圓塔、凸窗、背面窗、石台，可開關）、floatingIsland、groundDetail（綠球斑塊／陰影帶／草叢／小徑／小道具；自訂小徑存在 groundPathsLayout.ts）、各種食物
+│     └─ objects/             obj.ts 組裝；ketchup（醬汁質感：清漆、亮邊、接觸陰影、流動高光、氣泡、小豬漣漪）、house、pig／pigCloud／pigRig（存錢筒小豬的腳、耳朵、尾巴動作）、campfire、shiitake、treasureChest（寶箱＋滿出來的漢堡＋金色閃光）、retroArcade（GameHall 左邊的復古街機）、danceMachine（跳舞機「電波 STEP!」：可複製、箭頭跟著 BPM 閃）、critters（島上生物：蝴蝶、蜜蜂、蜻蜓、蚱蜢、小蜘蛛，輪流出現）、happyFatShop（Happy Fat 小店：厚度、換色、煙囪冒煙）、pond（小水潭：程式產生，水面 shader 漣漪＋岸邊石頭、荷葉、香蒲；草叢用遮罩避開）、mainHallSlide（龍兔的家三樓 → 水潭的溜滑梯，終點跟著水潭走；getRide 給小豬滑）、pigAdventure（小豬溜滑梯冒險：進門 → 溜滑梯 → 水潭濺水花、噴魚排、撿魚排）、projectRoomStyle（projectRoom 的香菇屋風格：換色＋圓塔、凸窗、背面窗、石台，可開關）、floatingIsland、groundDetail（綠球斑塊／陰影帶／草叢／小徑／小道具；自訂小徑存在 groundPathsLayout.ts）、各種食物
 ├─ openspec/
 │  ├─ project.md              專案規範（改程式前必讀）
 │  ├─ config.yaml             OpenSpec CLI 設定（schema: spec-driven）

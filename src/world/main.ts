@@ -50,6 +50,7 @@ import { CHINESE_TEMPLE_DEFAULT, formatChineseTempleSettingsForPaste } from './o
 import { BIG_BUN_DEFAULT, formatBigBunSettingsForPaste } from './objects/bigBun';
 import { formatRetroArcadePlacementsForPaste } from './objects/retroArcade';
 import { formatDanceMachinePlacementsForPaste } from './objects/danceMachine';
+import { CRITTER_MAX, formatCrittersSettingsForPaste } from './objects/critters';
 import { formatGameHallRingsSettingsForPaste } from './objects/gameHallRings';
 import { formatDenpaCharacterSettingsForPaste } from './objects/denpaCharacter';
 import { formatFloatingIslandSettingsForPaste } from './objects/floatingIsland';
@@ -286,6 +287,7 @@ const {
   danceMachines,
   addDanceMachine,
   removeDanceMachine,
+  critters,
   denpaCharacter,
   pond,
   mainHallSlide,
@@ -1615,6 +1617,25 @@ if (pigFolder && pig) {
   pigFolder.add(pig.settings, 'visitWatchMaxSeconds', 0.5, 20, 0.5).name('看烤雞最長 (秒)').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'visitCooldownSeconds', 0, 120, 1).name('看完多久才會再去 (秒)').onFinishChange(logPigSettings);
   pigFolder.add({ visit: () => { if (!pig.visitNow()) console.warn('[pig] 篝火關閉、沒有烤雞，或位置去不了'); } }, 'visit').name('現在去看烤雞');
+  // 測試：原地繞圈圈（觀察頭上的雲、點心雨用）。勾選＝開始繞，取消＝回到平常的亂逛
+  const circleTest = { on: pig.isCircling() };
+  const restartCircle = () => {
+    if (circleTest.on) pig.setCircling(true);
+  };
+  const circleFolder = pigFolder.addFolder('測試：原地繞圈圈').close();
+  circleFolder
+    .add(circleTest, 'on')
+    .name('繞圈圈')
+    .onChange((on: boolean) => pig.setCircling(on));
+  circleFolder.add(pig.circle, 'radiusDegrees', 0.5, 15, 0.5).name('圓的半徑 (°)').onFinishChange(restartCircle);
+  circleFolder.add(pig.circle, 'clockwise').name('順時針（俯看）').onFinishChange(restartCircle);
+  // 去溜滑梯等任務會自動停止繞圈：勾選框跟著同步
+  setInterval(() => {
+    if (circleTest.on !== pig.isCircling()) {
+      circleTest.on = pig.isCircling();
+      circleFolder.controllers[0].updateDisplay();
+    }
+  }, 300);
   // 跟「現在去看烤雞」放在一起，不用打開「溜滑梯冒險」子資料夾就能按
   if (pig.adventure) {
     const adventure = pig.adventure;
@@ -1680,6 +1701,12 @@ if (pigFolder && pig) {
   cloudFolder.add(pig.cloud, 'weightRain', 0, 10, 0.5).name('權重：下雨').onFinishChange(logCloud);
   cloudFolder.add(pig.cloud, 'weightThunder', 0, 10, 0.5).name('權重：打雷').onFinishChange(logCloud);
   cloudFolder.add(pig.cloud, 'weightStorm', 0, 10, 0.5).name('權重：暴雨').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'weightPopcorn', 0, 10, 0.5).name('權重：爆米花（淡黃雲）').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'weightDonut', 0, 10, 0.5).name('權重：甜甜圈（粉紅雲）').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'popcornSize', 0.05, 0.8, 0.01).name('爆米花大小 (身長倍)').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'donutSize', 0.05, 1, 0.01).name('甜甜圈大小 (身長倍)').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'popcornCount', 0, 20, 1).name('爆米花數量').onFinishChange(logCloud);
+  cloudFolder.add(pig.cloud, 'donutCount', 0, 20, 1).name('甜甜圈數量').onFinishChange(logCloud);
 }
 
 // 畫面風格統一：全場色調統一（陰影偏淡紫、整體往粉色靠）＋寫實貼圖降對比
@@ -2002,6 +2029,24 @@ function bindRetroArcadePanel(entry: WorldRetroArcade) {
   retroArcadeFolder.add(retroArcadeControls, 'remove').name('移除選中街機');
   retroArcadeFolder.add(retroArcadeControls, 'log').name('印出全部佈局 (console)');
   // 不預先選取：選中會整台發光，等使用者在場景上點了再選
+}
+
+// 島上的小生物：蝴蝶、蜜蜂、蜻蜓、蚱蜢、小蜘蛛（數量、大小、速度）
+if (critters) {
+  const folder = gui.addFolder('島上生物');
+  const log = () => console.log(formatCrittersSettingsForPaste(critters));
+  folder.add(critters, 'enabled').name('顯示').onFinishChange(log);
+  folder.add(critters, 'butterflies', 0, CRITTER_MAX, 1).name('蝴蝶（同時最多）').onFinishChange(log);
+  folder.add(critters, 'bees', 0, CRITTER_MAX, 1).name('蜜蜂（同時最多）').onFinishChange(log);
+  folder.add(critters, 'dragonflies', 0, CRITTER_MAX, 1).name('蜻蜓（同時最多）').onFinishChange(log);
+  folder.add(critters, 'grasshoppers', 0, CRITTER_MAX, 1).name('蚱蜢（同時最多）').onFinishChange(log);
+  folder.add(critters, 'spiders', 0, CRITTER_MAX, 1).name('小蜘蛛（同時最多）').onFinishChange(log);
+  folder.add(critters, 'frequency', 0.1, 5, 0.1).name('出現頻率（越大越常來）').onFinishChange(log);
+  folder.add(critters, 'stayMinSeconds', 2, 60, 1).name('停留最短 (秒)').onFinishChange(log);
+  folder.add(critters, 'stayMaxSeconds', 2, 120, 1).name('停留最長 (秒)').onFinishChange(log);
+  folder.add(critters, 'size', 0.3, 3, 0.05).name('大小倍率').onFinishChange(log);
+  folder.add(critters, 'speed', 0, 3, 0.05).name('速度倍率').onFinishChange(log);
+  folder.add({ log }, 'log').name('印出設定');
 }
 
 // 跳舞機「電波 STEP!」（點選或拖曳選取後調整，可複製）——選取、編輯方式跟復古街機一樣

@@ -5,6 +5,7 @@ import { createHouse, type HouseSettings } from './house';
 import { createCartoonRainbow } from './rainbow';
 import { createGameHallLights } from './gameHallLights';
 import { createGameHallRings } from './gameHallRings';
+import { createCritters } from './critters';
 import {
   createDanceMachine,
   DANCE_MACHINE_DEFAULT,
@@ -1041,6 +1042,16 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       console.error('[pig] 建立失敗，已略過（world 其餘場景照常）', error);
     }
   }
+  // 島上的小生物：蝴蝶、蜜蜂、蜻蜓、蚱蜢、小蜘蛛（避開房子、食物：問小豬的障礙清單）
+  const crittersRuntime = puddingAxes
+    ? createCritters({
+        groundRadius: GROUND_RADIUS,
+        up: puddingAxes.up,
+        isOpenGround: (normal, radiusRad) => pigRuntime?.isOpenGround(normal, radiusRad) ?? true,
+      })
+    : null;
+  if (crittersRuntime) ground.add(crittersRuntime.object);
+
   // 小豬的溜滑梯冒險：走進龍兔的家大門 → 從三樓溜滑梯滑進水潭（濺水花、有機率噴出魚排）
   const pigAdventure =
     pigRuntime && puddingAxes
@@ -1192,6 +1203,9 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       getCloudState: pigRuntime.cloud.getState,
       visitNow: pigRuntime.visitNow,
       isVisiting: pigRuntime.isVisiting,
+      circle: pigRuntime.circle,
+      setCircling: pigRuntime.setCircling,
+      isCircling: pigRuntime.isCircling,
       adventure: pigAdventure
         ? {
             settings: pigAdventure.settings,
@@ -1566,6 +1580,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       // 小豬走到醬邊時，醬面起一圈漣漪
       if (introDone) ketchup.touch(pigRuntime.object.getWorldPosition(pigTouchScratch));
     }
+    crittersRuntime?.update(deltaTime, introDone);
     // 醬的接觸陰影要知道綠球中心在哪（入場時綠球會移動）
     ketchup.setBallCenter(ground.getWorldPosition(ballCenterScratch));
 
@@ -1716,6 +1731,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       apply: denpaCharacterRuntime.applySettings,
       setSelected: denpaCharacterRuntime.setSelected,
     },
+    critters: crittersRuntime ? crittersRuntime.settings : null,
     danceMachines,
     addDanceMachine,
     removeDanceMachine,
@@ -1854,6 +1870,10 @@ export type WorldPig = {
   /** 立刻跑去篝火看烤雞（測試用） */
   visitNow: () => boolean;
   isVisiting: () => boolean;
+  /** 測試：原地繞圈圈（半徑、方向）。改了之後重新 setCircling(true) 才會用新的圓 */
+  circle: { radiusDegrees: number; clockwise: boolean };
+  setCircling: (on: boolean) => void;
+  isCircling: () => boolean;
   /** 溜滑梯冒險（走進龍兔的家 → 溜滑梯 → 水潭濺水、噴魚排） */
   adventure: {
     settings: PigAdventureSettings;

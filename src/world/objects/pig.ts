@@ -237,6 +237,18 @@ export function createPig({
    */
   /** isWalkable 檢查「頂端附近的點」時暫時放寬頂端限制（例如龍兔的家大門口） */
   let allowNearTopCheck = false;
+
+  /**
+   * 測試用：原地繞圈圈。開啟時以「小豬右手邊 radius 度」為圓心，沿圓周一直繞；
+   * 走路速度、腳步、搖晃都跟平常一樣，只是不避障、不會自己去篝火或停下來看東西（測試時才好觀察雲、點心雨）。
+   */
+  let circling = false;
+  const circle = { radiusDegrees: 3, clockwise: false };
+  const circleCenter = new THREE.Vector3();
+  /** 圓心看出去，小豬在哪個方向（圓心當地 east/north 的 bearing） */
+  let circleAngle = 0;
+  const circleNext = new THREE.Vector3();
+
   let puppet = false;
   let puppetScale = 1;
   let puppetWaddle = 0;
@@ -821,6 +833,38 @@ export function createPig({
     return false;
   }
 
+  /** 開始繞圈：圓心放在小豬右手邊 radius 度的地方，小豬一開始就站在圓周上、鼻頭剛好沿著圓周 */
+  function startCircle() {
+    const rRad = THREE.MathUtils.degToRad(Math.max(0.3, circle.radiusDegrees));
+    tangentFromFacing(probe2);
+    if (probe2.lengthSq() < 1e-8) tangentFromBearing(surfaceNormal, bearing, probe2);
+    // 右手邊 = 鼻頭方向 × 頭頂方向；逆時針繞（從上面看）時圓心在左手邊
+    probe.crossVectors(probe2, surfaceNormal).normalize();
+    if (!circle.clockwise) probe.negate();
+    circleCenter.copy(rotateAlong(surfaceNormal, probe, rRad, circleNext));
+    circleAngle = bearingTowardDirection(circleCenter, surfaceNormal);
+    circling = true;
+    pauseRemaining = 0;
+    visiting = false;
+  }
+
+  /** 繞圈的一格：沿圓周往前走「跑速」那麼遠，鼻頭朝著前進方向 */
+  function updateCircle(deltaTime: number) {
+    const rRad = THREE.MathUtils.degToRad(Math.max(0.3, circle.radiusDegrees));
+    // 角速度 = 線速度 ÷ 半徑：半徑越小繞得越快，但腳步的速度跟平常走路一樣
+    const omega = settings.roamSpeedDegrees / Math.max(0.3, circle.radiusDegrees);
+    circleAngle += (circle.clockwise ? -1 : 1) * omega * deltaTime;
+    tangentFromBearing(circleCenter, circleAngle, probe);
+    rotateAlong(circleCenter, probe, rRad, circleNext);
+    // 鼻頭方向 = 這一格移動的方向（投影到地表切平面）
+    facingForward.subVectors(circleNext, surfaceNormal);
+    surfaceNormal.copy(circleNext);
+    facingForward.addScaledVector(surfaceNormal, -facingForward.dot(surfaceNormal));
+    if (facingForward.lengthSq() > 1e-12) facingForward.normalize();
+    syncBearingFromFacing();
+    return true;
+  }
+
   /** 障礙清單裡代表篝火的那一個（離目標最近、2° 以內）；沒有就 null */
   function visitTargetObstacle() {
     let best: PigObstacle | null = null;
@@ -1074,7 +1118,9 @@ export function createPig({
     visitCooldown = Math.max(0, visitCooldown - deltaTime);
 
     let movedThisFrame = false;
-    if (pauseRemaining > 0) {
+    if (circling) {
+      movedThisFrame = updateCircle(deltaTime);
+    } else if (pauseRemaining > 0) {
       // 停下來看東西：轉頭面向物件，不走、不冒煙
       pauseRemaining -= deltaTime;
       bearing = bearingTowardDirection(surfaceNormal, pauseLookAt);
@@ -1158,12 +1204,27 @@ export function createPig({
     },
     isVisiting: () => visiting,
     /** 下指令：走到某處（走到／放棄會呼叫 onDone） */
-    goTo: startGoTo,
+    goTo: (options: PigGoToOptions) => {
+      // 被派任務（例如去溜滑梯）：先停止繞圈
+      circling = false;
+      return startGoTo(options);
+    },
     cancelGoTo: () => {
       if (command) finishCommand(false);
     },
     /** 正在忙（去篝火、走指令、停下來看東西、被操偶）：外部想派任務前先問 */
-    isBusy: () => visiting || command !== null || puppet || pauseRemaining > 0,
+    isBusy: () => visiting || command !== null || puppet || pauseRemaining > 0 || circling,
+    /** 測試：原地繞圈圈的設定（半徑、方向）；改了之後呼叫 setCircling(true) 重新開始 */
+    circle,
+    /** 測試：開始／停止原地繞圈圈 */
+    setCircling: (on: boolean) => {
+      if (on) startCircle();
+      else {
+        circling = false;
+        wanderTimer = settings.wanderSeconds * (0.55 + Math.random() * 0.9);
+      }
+    },
+    isCircling: () => circling,
     /** 小豬避障用的半徑（弧度） */
     getBodyRadiusRad: () => pigBodyRadiusRad(),
     /** 某個物件的避障範圍（弧度，含餘量）；不在障礙清單裡回傳 null */
@@ -1181,6 +1242,19 @@ export function createPig({
         allowNearTopCheck = false;
       }
     },
+    /**
+     * 給島上的小生物（蝴蝶、蚱蜢……）用：這個地表位置是空地嗎（不在房子、食物等障礙裡、在小豬的活動範圍內）。
+     * 跟 isWalkable 不同：不重算障礙清單，直接用小豬這一格算好的（小豬每格都會更新），
+     * 二十幾隻生物每格各問幾次也不會拖慢。radiusRad = 生物自己的佔地（弧度）
+     */
+    isOpenGround: (normal: THREE.Vector3, radiusRad = 0) => {
+      const col = colatitudeFromNormal(normal);
+      if (col < settings.roamColatitudeMin || col > effectiveColatMax) return false;
+      for (const obstacle of obstacleScratch) {
+        if (angularDistance(normal, obstacle.normal) < radiusRad + obstacle.clearanceRad) return false;
+      }
+      return true;
+    },
     /** 停下來看某處幾秒（例如吃魚排） */
     pauseFor: (seconds: number, lookAt: THREE.Vector3) => {
       pauseRemaining = seconds;
@@ -1193,6 +1267,7 @@ export function createPig({
         if (command) finishCommand(false);
         visiting = false;
         pauseRemaining = 0;
+        circling = false;
       }
       puppet = on;
       puppetScale = 1;
