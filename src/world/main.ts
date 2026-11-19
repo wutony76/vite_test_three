@@ -56,6 +56,7 @@ import { MELON_TROUGH_DEFAULT, formatMelonTroughSettingsForPaste } from './objec
 import { formatRetroArcadePlacementsForPaste } from './objects/retroArcade';
 import { formatDanceMachinePlacementsForPaste } from './objects/danceMachine';
 import { createPineappleBun, formatPineappleBunSettingsForPaste } from './objects/pineappleBun';
+import { createGodRays, formatGodRaySettingsForPaste } from './godRays';
 import { CRITTER_MAX, formatCrittersSettingsForPaste } from './objects/critters';
 import { formatGameHallRingsSettingsForPaste } from './objects/gameHallRings';
 import { formatDenpaCharacterSettingsForPaste } from './objects/denpaCharacter';
@@ -823,6 +824,24 @@ const logExtraFood = () =>
 ringFolder.add(extraFood, 'mushroomSize', 0.02, 0.15, 0.001).name('香菇大小 (m)').onChange(ketchupExtraFood.apply).onFinishChange(logExtraFood);
 ringFolder.add(extraFood, 'mushroomFloat', -0.3, 0.5, 0.01).name('香菇浮起高度（小=沉）').onChange(ketchupExtraFood.apply).onFinishChange(logExtraFood);
 ringFolder.add(extraFood, 'rim', 0, 1.5, 0.01).name('食物邊緣亮光').onChange(ketchupExtraFood.apply).onFinishChange(logExtraFood);
+
+// 畫面上方的森林光束（平行、左上往右下）：最後一步疊在整個畫面上（跟鏡頭無關，綠球怎麼轉都在畫面上方）
+const godRays = createGodRays();
+{
+  const g = godRays.settings;
+  const log = () => console.log(formatGodRaySettingsForPaste(g));
+  const rayFolder = gui.addFolder('畫面上方光束（森林光）');
+  rayFolder.add(g, 'enabled').name('顯示').onFinishChange(log);
+  rayFolder.addColor(g, 'color').name('顏色').onFinishChange(log);
+  rayFolder.add(g, 'intensity', 0, 1, 0.01).name('亮度').onFinishChange(log);
+  rayFolder.add(g, 'angleDegrees', 0, 80, 1).name('斜度 (°)（0 直下、45 對角）').onFinishChange(log);
+  rayFolder.add(g, 'originX', -0.5, 1, 0.01).name('最亮處（0 左上角）').onFinishChange(log);
+  rayFolder.add(g, 'density', 2, 40, 0.5).name('密度（條數）').onFinishChange(log);
+  rayFolder.add(g, 'sharpness', 0.5, 8, 0.05).name('銳利度').onFinishChange(log);
+  rayFolder.add(g, 'reach', 0.2, 3, 0.01).name('往右下延伸多遠').onFinishChange(log);
+  rayFolder.add(g, 'speed', 0, 1, 0.01).name('飄移速度').onFinishChange(log);
+  rayFolder.close();
+}
 
 // 菠蘿麵包：浮在番茄醬圈圈上、在畫面左側（從離鏡頭最近的那一點往左繞固定角度，綠球怎麼轉、視窗多寬位置都不變）
 const pineappleBun = createPineappleBun({
@@ -3696,6 +3715,8 @@ function render(time: number) {
   renderer.clearDepth();
   renderer.render(scene, camera);
   foregroundBlur.render();
+  // 森林光束最後疊上去：蓋在所有東西上面，只會讓畫面變亮
+  godRays.render(renderer, time * 0.001);
 }
 renderer.setAnimationLoop(render);
 // 蓋板後先等 glb、分幀掛載、著色器預熱，再旋開，避免重整時畫面頓一下
