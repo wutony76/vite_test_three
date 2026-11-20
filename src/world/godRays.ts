@@ -6,8 +6,8 @@ import * as THREE from 'three';
  * 做法：最後一步在整個畫面上再畫一張全螢幕的四邊形（疊加發光，只會讓畫面變亮、不會遮住東西）。
  *   - 光束方向固定（angleDegrees：從「直直往下」往右轉幾度），所有光束互相平行（不是從一點放射出去）
  *   - 每個像素算「橫跨光束的座標」（跟光束方向垂直），用兩層 1D 雜訊決定哪裡有光：寬窄不一、慢慢飄移
- *   - 左上角（光進來的地方）最亮，沿著光的方向往右下慢慢淡出（reach）
- * 跟場景、鏡頭無關（貼在畫面上），所以綠球怎麼轉、視窗多寬，光束都在同一個地方。
+ *   - 只有從上緣 originX 往右 width 那一段射進來的光（入射窗口），沿著光的方向往右下慢慢淡出（reach）
+ * 跟場景、鏡頭無關（貼在畫面上），所以綠球怎麼轉，光束都在同一個地方；位置以畫面中心、畫面高度為準，視窗拉寬也不會整片移動。
  */
 export type GodRaySettings = {
   enabled: boolean;
@@ -17,8 +17,10 @@ export type GodRaySettings = {
   intensity: number;
   /** 光束的斜度（°）：0 = 直直往下，45 = 左上到右下的對角線 */
   angleDegrees: number;
-  /** 最亮的位置在畫面上緣的哪裡（0 = 最左、1 = 最右）：光從這附近進來 */
+  /** 光從畫面上緣的哪裡開始射進來：離畫面中心多遠（畫面高度的倍數，負 = 左邊）；比它更左邊不會有光。視窗寬窄改變也不會移動 */
   originX: number;
+  /** 光束範圍有多寬（從最亮處往右，畫面高度的倍數）：只有從這段上緣射進來的光 */
+  width: number;
   /** 光束的密度（畫面高度內大約幾條；越大越多、越細） */
   density: number;
   /** 光束的銳利度（越大光束越細、邊緣越清楚，光束之間越暗） */
@@ -32,9 +34,10 @@ export type GodRaySettings = {
 export const GOD_RAY_DEFAULT: GodRaySettings = {
   enabled: true,
   color: '#fff3d1',
-  intensity: 0.45,
+  intensity: 0.15,
   angleDegrees: 38,
-  originX: 0.15,
+  originX: -1.2,
+  width: 2.41,
   density: 9,
   sharpness: 2.6,
   reach: 1.1,
@@ -55,6 +58,7 @@ const FRAGMENT = /* glsl */ `
   uniform float uAspect;
   uniform float uAngle;
   uniform float uOriginX;
+  uniform float uWidth;
   uniform float uDensity;
   uniform float uSharpness;
   uniform float uReach;
@@ -70,8 +74,10 @@ const FRAGMENT = /* glsl */ `
   }
 
   void main() {
-    // 畫面座標換成「寬高等比」的空間：x 乘上寬高比，斜度才不會被拉扁
-    vec2 p = vec2(vUv.x * uAspect, vUv.y);
+    // 畫面座標：以「畫面中心」為 x 的原點、以「畫面高度」為單位（x 乘上寬高比，斜度才不會被拉扁）。
+    // 綠球永遠在畫面中間：視窗拉寬時只是兩側多出空間，光束相對綠球不動。
+    // （用「畫面寬度的比例」的話，視窗一拉寬，起點和整片光紋都會跟著滑動）
+    vec2 p = vec2((vUv.x - 0.5) * uAspect, vUv.y);
     // 光的方向：往下（-y）再往右轉 uAngle → 左上往右下；across 跟它垂直，用來分出一條一條的光束
     vec2 dir = vec2(sin(uAngle), -cos(uAngle));
     vec2 across = vec2(-dir.y, dir.x);
@@ -82,13 +88,17 @@ const FRAGMENT = /* glsl */ `
     rays = pow(smoothstep(0.28, 0.85, rays), uSharpness * 0.5);
     // 整體慢慢呼吸（亮暗起伏），像雲飄過去
     float breathe = 0.8 + 0.2 * sin(uTime * 2.3) * sin(uTime * 1.1 + 1.7);
-    // 光從左上角附近進來：離那一點越遠越淡（沿著光的方向走得越遠越淡，橫向也稍微淡一點）
-    vec2 origin = vec2(uOriginX * uAspect, 1.0);
-    vec2 d = p - origin;
-    float alongDist = max(dot(d, dir), 0.0);
-    float sideDist = abs(dot(d, across));
-    float fall = 1.0 - smoothstep(0.0, uReach, alongDist + sideDist * 0.35);
-    fall *= fall;
+    // 入射窗口：沿著光束往回推，這個像素的光是從畫面上緣哪裡射進來的（entryX）。
+    // 只有從 originX 往右一段（uWidth）射進來的才有光 —— 光束是平行的，只看「離最亮點多遠」的話，
+    // 最亮點左上方（光的上游，例如彩虹那一帶）也會被照到
+    float originX = uOriginX;
+    float entryX = p.x - (1.0 - p.y) * (dir.x / -dir.y);
+    float window = smoothstep(originX - 0.12, originX + 0.08, entryX)
+                 * (1.0 - smoothstep(originX + uWidth * 0.55, originX + uWidth, entryX));
+    // 從上緣射進來之後，沿著光的方向走越遠越淡
+    float alongDist = (1.0 - p.y) / -dir.y;
+    float fall = 1.0 - smoothstep(0.0, uReach, alongDist);
+    fall *= fall * window;
     float light = rays * fall * breathe * uIntensity;
     gl_FragColor = vec4(uColor * light, 1.0);
   }
@@ -106,6 +116,7 @@ export function createGodRays(settings: GodRaySettings = { ...GOD_RAY_DEFAULT })
       uAspect: { value: 1 },
       uAngle: { value: 0 },
       uOriginX: { value: 0 },
+      uWidth: { value: 1 },
       uDensity: { value: 10 },
       uSharpness: { value: 2 },
       uReach: { value: 1 },
@@ -132,6 +143,7 @@ export function createGodRays(settings: GodRaySettings = { ...GOD_RAY_DEFAULT })
     u.uAspect.value = size.x / Math.max(size.y, 1);
     u.uAngle.value = THREE.MathUtils.degToRad(settings.angleDegrees);
     u.uOriginX.value = settings.originX;
+    u.uWidth.value = settings.width;
     u.uDensity.value = settings.density;
     u.uSharpness.value = settings.sharpness;
     u.uReach.value = settings.reach;
@@ -154,6 +166,7 @@ export function formatGodRaySettingsForPaste(s: GodRaySettings) {
     `  intensity: ${s.intensity.toFixed(2)},\n` +
     `  angleDegrees: ${Math.round(s.angleDegrees)},\n` +
     `  originX: ${s.originX.toFixed(2)},\n` +
+    `  width: ${s.width.toFixed(2)},\n` +
     `  density: ${s.density.toFixed(1)},\n` +
     `  sharpness: ${s.sharpness.toFixed(2)},\n` +
     `  reach: ${s.reach.toFixed(2)},\n` +

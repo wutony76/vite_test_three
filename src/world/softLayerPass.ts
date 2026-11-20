@@ -207,18 +207,23 @@ export function createSoftLayerPass({
     const previousMask = camera.layers.mask;
     const previousAlpha = renderer.getClearAlpha();
     renderer.getClearColor(clearColor);
-    const previousShadowAuto = renderer.shadowMap.autoUpdate;
+    const previousShadowEnabled = renderer.shadowMap.enabled;
 
     // 1. 只畫這一層，透明背景
     camera.layers.set(layer);
-    // 陰影貼圖主場景會更新；這一趟不用再算一次（小島本來就不投影、不接影）
-    renderer.shadowMap.autoUpdate = false;
+    // 這一層畫的時候把陰影整個關掉（不只是不更新）：
+    //   - 小島本來就不投影、不接影，關掉看起來完全一樣，也省掉一次陰影計算
+    //   - 開著的話，three.js 還是會在小島的 shader 裡放 sampler2DShadow（讀太陽、手電筒的陰影貼圖）；
+    //     這一層在主場景「之前」畫，開場時某一幀綁上的不是深度貼圖，WebGL 就報
+    //     「Mismatch between texture format and sampler type」，那一幀小島也畫不對
+    // 陰影開關是 shader 的編譯條件之一：小島的材質只在這裡畫，所以一直用「沒有陰影」的版本，不會來回重編
+    renderer.shadowMap.enabled = false;
     renderer.setRenderTarget(sharpTarget);
     renderer.setClearColor(0x000000, 0);
     renderer.clear(true, true, false);
     renderer.render(scene, camera);
     camera.layers.mask = previousMask;
-    renderer.shadowMap.autoUpdate = previousShadowAuto;
+    renderer.shadowMap.enabled = previousShadowEnabled;
 
     if (settings.enabled) {
       // 2、3. 橫向 + 直向高斯模糊（offset 用 UV 單位：1 像素 = 1/寬）
@@ -258,7 +263,28 @@ export function createSoftLayerPass({
     shareLightsWithLayer();
   }
 
-  return { settings, render, dispose, prepareForCompile };
+  /**
+   * 開場預熱：只編這一層、而且跟實際畫的時候一樣「關掉陰影」，編出來的 shader 才是同一個版本
+   * （主場景預熱時如果把這一層也一起編，編到的是「有陰影」的版本，實際畫的時候用不到、還要再編一次）。
+   * compileAsync 的「建立 shader」這一步是同步做完的，所以陰影開關、layer 可以在呼叫後立刻還原，再等它編完。
+   */
+  function compileLayer(): Promise<unknown> {
+    shareLightsWithLayer();
+    const previousMask = camera.layers.mask;
+    const previousShadowEnabled = renderer.shadowMap.enabled;
+    camera.layers.set(layer);
+    renderer.shadowMap.enabled = false;
+    try {
+      if (typeof renderer.compileAsync === 'function') return renderer.compileAsync(scene, camera);
+      renderer.compile(scene, camera);
+      return Promise.resolve();
+    } finally {
+      camera.layers.mask = previousMask;
+      renderer.shadowMap.enabled = previousShadowEnabled;
+    }
+  }
+
+  return { settings, render, dispose, prepareForCompile, compileLayer };
 }
 
 export function formatSoftLayerSettingsForPaste(s: SoftLayerSettings) {

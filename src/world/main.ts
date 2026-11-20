@@ -835,7 +835,8 @@ const godRays = createGodRays();
   rayFolder.addColor(g, 'color').name('顏色').onFinishChange(log);
   rayFolder.add(g, 'intensity', 0, 1, 0.01).name('亮度').onFinishChange(log);
   rayFolder.add(g, 'angleDegrees', 0, 80, 1).name('斜度 (°)（0 直下、45 對角）').onFinishChange(log);
-  rayFolder.add(g, 'originX', -0.5, 1, 0.01).name('最亮處（0 左上角）').onFinishChange(log);
+  rayFolder.add(g, 'originX', -2.5, 2.5, 0.01).name('光從上緣哪裡開始（0 畫面中心、負 = 左）').onFinishChange(log);
+  rayFolder.add(g, 'width', 0.1, 2.5, 0.01).name('光束範圍寬').onFinishChange(log);
   rayFolder.add(g, 'density', 2, 40, 0.5).name('密度（條數）').onFinishChange(log);
   rayFolder.add(g, 'sharpness', 0.5, 8, 0.05).name('銳利度').onFinishChange(log);
   rayFolder.add(g, 'reach', 0.2, 3, 0.01).name('往右下延伸多遠').onFinishChange(log);
@@ -3722,17 +3723,19 @@ renderer.setAnimationLoop(render);
 // 蓋板後先等 glb、分幀掛載、著色器預熱，再旋開，避免重整時畫面頓一下
 async function warmSceneShaders() {
   const compileMs = 10_000;
-  // 浮空小星球在自己的 layer（主鏡頭平常看不到），預熱時要把那一層也打開，
-  // 不然它的 shader 會拖到第一次畫的時候才編譯，畫面會卡一下
+  // 浮空小星球在自己的 layer（主鏡頭平常看不到），要另外預熱，
+  // 不然它的 shader 會拖到第一次畫的時候才編譯，畫面會卡一下。
+  // 它畫的時候陰影是關掉的（見 softLayerPass），所以用 compileLayer 編「沒有陰影」的版本，不能跟主場景一起編
   islandSoftPass.prepareForCompile();
-  camera.layers.enable(FLOATING_ISLAND_LAYER);
   const work = (async () => {
+    const islandWork = islandSoftPass.compileLayer();
     if (typeof renderer.compileAsync === 'function') {
-      await renderer.compileAsync(scene, camera);
+      await Promise.all([renderer.compileAsync(scene, camera), islandWork]);
       return;
     }
     renderer.compile(scene, camera);
-  })().finally(() => camera.layers.disable(FLOATING_ISLAND_LAYER));
+    await islandWork;
+  })();
   await Promise.race([
     work,
     new Promise<void>((_, reject) => {
