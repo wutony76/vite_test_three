@@ -67,7 +67,7 @@ export const TREE_HOUSE_PLACEMENTS: TreeHousePlacement[] = [
   {
     id: 'tree_house_1',
     angleFromTopDegrees: 46,
-    azimuthDegrees: 40,
+    azimuthDegrees: 56,
     spinDegrees: 100,
     sink: 0.004,
     placementScale: 0.85,

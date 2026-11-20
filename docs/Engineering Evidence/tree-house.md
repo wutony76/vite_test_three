@@ -22,3 +22,8 @@
 
 - [x] proposal / design / tasks / validation 完成
 - [x] Architecture README 已更新
+
+## 後續
+
+- 使用者要求移除芭蕉葉叢：`bananaLeaves.ts`／`bananaLeavesLayout.ts` 與面板、拖曳處理全部刪除（需要時可從 commit 4daf9c1 取回）。
+- 樹屋佈局依面板截圖更新（方位 56°）。

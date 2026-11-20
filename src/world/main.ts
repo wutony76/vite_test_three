@@ -26,7 +26,7 @@ import {
   type WorldLemonSlice,
   type WorldTreeStump,
   type WorldTreeHouse,
-  type WorldBananaLeafCluster,
+  type WorldCandyJar,
   type WorldCampfire,
   type WorldShiitake,
   type WorldTreasureChest,
@@ -46,7 +46,7 @@ import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
 import { formatTreeStumpPlacementsForPaste } from './objects/treeStump';
 import { formatTreeHousePlacementsForPaste } from './objects/treeHouse';
-import { formatBananaLeafClustersForPaste, type BananaLeaf } from './objects/bananaLeaves';
+import { formatCandyJarPlacementsForPaste } from './objects/candyJar';
 import { CAMPFIRE_CHICKEN_SPIN_AXES, formatCampfireSettingsForPaste } from './objects/campfire';
 import { formatShiitakePlacementsForPaste } from './objects/shiitake';
 import { formatTreasureChestSettingsForPaste } from './objects/treasureChest';
@@ -285,9 +285,9 @@ const {
   treeHouses,
   addTreeHouse,
   removeTreeHouse,
-  bananaClusters,
-  addBananaCluster,
-  removeBananaCluster,
+  candyJars,
+  addCandyJar,
+  removeCandyJar,
   frenchFries,
   addFrenchFries,
   removeFrenchFries,
@@ -3185,259 +3185,91 @@ function logTreeHousePlacements() {
   // 一開始不自動選取（不然開場就有一個在發亮）；拖曳或點一下豬豬樹屋才選取
 }
 
-// 芭蕉葉叢（綠球上的獨立物件；拖曳選取後調整，可複製）——跟檸檬片一樣
-// 操作：直接拖 = 整叢在綠球上移動；Alt（⌥）拖葉子 = 只移動那一片；Shift 上下拖 = 那一片上浮／下沉
-const BANANA_SCENE_EDIT = true;
-const bananaFolder = gui.addFolder('芭蕉葉叢');
-if (!BANANA_SCENE_EDIT) bananaFolder.hide();
-let selectedCluster: WorldBananaLeafCluster | null = null;
-const BANANA_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+// 糖果罐（綠球上；拖曳選取後調整，可複製）——選取、編輯方式跟檸檬片一樣
+const candyJarFolder = gui.addFolder('糖果罐（柑仔店屋頂那罐的獨立版）');
+// 開關：false = 隱藏面板、不能拖曳（調好位置後關掉）
+const CANDY_JAR_SCENE_EDIT = true;
+if (!CANDY_JAR_SCENE_EDIT) candyJarFolder.hide();
+let selectedCandyJar: WorldCandyJar | null = null;
 
-function highlightCluster(entry: WorldBananaLeafCluster | null) {
-  for (const cluster of bananaClusters) cluster.setHighlighted(cluster === entry);
+/** 選中的那個整個微微發亮，一眼看得出選了哪個；其他的還原 */
+function highlightCandyJar(entry: WorldCandyJar | null) {
+  for (const jar of candyJars) jar.setHighlighted(jar === entry);
 }
 
-function logBananaClusters() {
-  if (bananaClusters.length === 0) return;
-  const text = formatBananaLeafClustersForPaste(bananaClusters.map((item) => ({ id: item.id, settings: item.settings })));
-  console.log(text);
-  return text;
-}
+const CANDY_JAR_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
 
-function clearBananaPanelSliders() {
-  bananaFolder.title('芭蕉葉叢');
-  for (const controller of [...bananaFolder.controllers]) {
-    if (BANANA_PANEL_ACTIONS.has(String(controller.property))) continue;
+function clearCandyJarPanelSliders() {
+  candyJarFolder.title('糖果罐（柑仔店屋頂那罐的獨立版）');
+  for (const controller of [...candyJarFolder.controllers]) {
+    if (CANDY_JAR_PANEL_ACTIONS.has(String(controller.property))) continue;
     controller.destroy();
   }
 }
 
-function bindBananaPanel(entry: WorldBananaLeafCluster) {
-  const alreadyShowing = entry === selectedCluster && bananaFolder.controllers.length > BANANA_PANEL_ACTIONS.size;
-  selectedCluster = entry;
-  highlightCluster(entry);
+function bindCandyJarPanel(entry: WorldCandyJar) {
+  const alreadyShowing = entry === selectedCandyJar && candyJarFolder.controllers.length > CANDY_JAR_PANEL_ACTIONS.size;
+  selectedCandyJar = entry;
+  highlightCandyJar(entry);
   if (alreadyShowing) return;
-  clearBananaPanelSliders();
-  bananaFolder.title(`芭蕉葉叢 · ${entry.label}`);
+
+  clearCandyJarPanelSliders();
+  candyJarFolder.title(`糖果罐 · ${entry.label}`);
+
   const settings = entry.settings;
   const apply = () => entry.apply();
+  const applyVisuals = () => entry.applyVisuals();
   type NumberKey = { [K in keyof typeof settings]: (typeof settings)[K] extends number ? K : never }[keyof typeof settings];
   const slider = (key: NumberKey, min: number, max: number, step: number, name: string, onChange = apply) =>
-    bananaFolder.add(settings, key, min, max, step).name(name).onChange(onChange).onFinishChange(logBananaClusters);
+    candyJarFolder.add(settings, key, min, max, step).name(name).onChange(onChange).onFinishChange(logCandyJarPlacements);
+
   slider('angleFromTopDegrees', 0, 90, 1, '離頂端 (°)');
   slider('azimuthDegrees', -180, 180, 1, '方位 (°)');
   slider('spinDegrees', -180, 180, 1, '自轉 (°)');
   slider('sink', -0.1, 0.1, 0.001, '下沉（負值上浮）');
   slider('placementScale', 0.2, 4, 0.01, '縮放');
   slider('size', 0.03, 0.5, 0.005, '大小 (m)');
-  slider('groupYaw', -180, 180, 1, '整組旋轉 (°)');
-  slider('groupTiltX', -90, 90, 1, '整組前後傾 (°)');
-  slider('groupTiltZ', -90, 90, 1, '整組左右傾 (°)');
-  slider('groupScale', 0.3, 3, 0.01, '整組放大');
-  slider('groupRise', -0.8, 1.5, 0.005, '整組上升／下降');
-  slider('colorBoost', 0.6, 1.5, 0.01, '亮度', () => entry.applyVisuals());
+  slider('candyCount', 0, 200, 1, '糖球數量');
+  candyJarFolder.addColor(settings, 'lidColor').name('罐蓋顏色').onChange(applyVisuals).onFinishChange(logCandyJarPlacements);
+  slider('colorBoost', 0.6, 1.5, 0.01, '亮度', applyVisuals);
+}
+
+function logCandyJarPlacements() {
+  if (candyJars.length === 0) return;
+  const text = formatCandyJarPlacementsForPaste(
+    candyJars.map((jar) => ({ id: jar.id, settings: jar.settings })),
+  );
+  console.log(text);
+  return text;
 }
 
 {
-  const bananaControls = {
+  const candyJarControls = {
     add() {
-      const created = addBananaCluster(selectedCluster ? { ...selectedCluster.settings } : undefined);
+      // 有選中就複製選中那個（大小、顏色都一樣），沒有就用預設值
+      const created = addCandyJar(selectedCandyJar ? { ...selectedCandyJar.settings } : undefined);
       if (!created) return;
-      bindBananaPanel(created);
+      bindCandyJarPanel(created);
       refreshPuddingDragTargets();
-      logBananaClusters();
     },
     remove() {
-      if (!selectedCluster || bananaClusters.length === 0) return;
-      if (!removeBananaCluster(selectedCluster)) return;
-      selectedCluster = null;
-      selectedLeaf = null;
-      clearBananaPanelSliders();
-      clearLeafPanelSliders();
-      const next = bananaClusters[bananaClusters.length - 1];
-      if (next) bindBananaPanel(next);
-      else highlightCluster(null);
+      if (!selectedCandyJar || candyJars.length === 0) return;
+      if (!removeCandyJar(selectedCandyJar)) return;
+      selectedCandyJar = null;
+      clearCandyJarPanelSliders();
+      const next = candyJars[candyJars.length - 1];
+      if (next) bindCandyJarPanel(next);
+      else highlightCandyJar(null);
       refreshPuddingDragTargets();
-      logBananaClusters();
     },
     log() {
-      logBananaClusters();
+      logCandyJarPlacements();
     },
   };
-  bananaFolder.add(bananaControls, 'add').name('複製芭蕉葉叢');
-  bananaFolder.add(bananaControls, 'remove').name('移除選中芭蕉葉叢');
-  bananaFolder.add(bananaControls, 'log').name('印出全部佈局 (console)');
-}
-
-// 單片芭蕉葉（點一下葉子就選到那一片）
-const leafFolder = gui.addFolder('芭蕉葉（單片）');
-if (!BANANA_SCENE_EDIT) leafFolder.hide();
-let selectedLeaf: BananaLeaf | null = null;
-const LEAF_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
-
-function allBananaLeaves() {
-  return bananaClusters.flatMap((cluster) => cluster.getLeaves());
-}
-
-function clusterOfLeaf(leaf: BananaLeaf) {
-  return bananaClusters.find((cluster) => cluster.getLeaves().includes(leaf)) ?? null;
-}
-
-function highlightLeaf(entry: BananaLeaf | null) {
-  for (const leaf of allBananaLeaves()) leaf.setHighlighted(leaf === entry);
-}
-
-function clearLeafPanelSliders() {
-  leafFolder.title('芭蕉葉（單片）');
-  for (const controller of [...leafFolder.controllers]) {
-    if (LEAF_PANEL_ACTIONS.has(String(controller.property))) continue;
-    controller.destroy();
-  }
-}
-
-function bindLeafPanel(entry: BananaLeaf) {
-  const alreadyShowing = entry === selectedLeaf && leafFolder.controllers.length > LEAF_PANEL_ACTIONS.size;
-  selectedLeaf = entry;
-  highlightLeaf(entry);
-  if (alreadyShowing) return;
-  clearLeafPanelSliders();
-  const cluster = clusterOfLeaf(entry);
-  leafFolder.title(`芭蕉葉 · ${cluster ? `${cluster.label} / ` : ''}${entry.label}`);
-  const settings = entry.settings;
-  const apply = () => entry.apply();
-  type LeafNumberKey = { [K in keyof typeof settings]: (typeof settings)[K] extends number ? K : never }[keyof typeof settings];
-  const slider = (key: LeafNumberKey, min: number, max: number, step: number, name: string) =>
-    leafFolder.add(settings, key, min, max, step).name(name).onChange(apply).onFinishChange(logBananaClusters);
-  slider('azimuth', -180, 180, 1, '位置：方位 (°)');
-  slider('elevation', -10, 88, 1, '位置：高度 (°)');
-  slider('lift', -0.2, 1.2, 0.005, '離中心距離');
-  slider('rise', -0.5, 1.5, 0.005, '上浮（垂直）');
-  slider('tilt', 0, 180, 1, '往外倒 (°)');
-  slider('yaw', -180, 180, 1, '左右轉 (°)');
-  slider('roll', -180, 180, 1, '葉面自轉 (°)');
-  slider('pitch', -180, 180, 1, '向下旋轉 (°)');
-  slider('length', 0.1, 2, 0.01, '長度');
-  slider('width', 0.05, 1, 0.01, '寬度');
-  slider('droop', 0, 1.2, 0.01, '下垂');
-  leafFolder.addColor(settings, 'color').name('顏色').onChange(apply).onFinishChange(logBananaClusters);
-}
-
-{
-  const leafControls = {
-    add() {
-      // 複製選中那片（同一叢）；沒選就加到第一叢
-      const cluster = (selectedLeaf && clusterOfLeaf(selectedLeaf)) || bananaClusters[0];
-      if (!cluster) return;
-      const created = cluster.addLeaf(selectedLeaf ? { ...selectedLeaf.settings } : undefined);
-      bindLeafPanel(created);
-      logBananaClusters();
-    },
-    remove() {
-      if (!selectedLeaf) return;
-      selectedLeaf.remove();
-      selectedLeaf = null;
-      clearLeafPanelSliders();
-      const next = allBananaLeaves().at(-1);
-      if (next) bindLeafPanel(next);
-      logBananaClusters();
-    },
-    log() {
-      logBananaClusters();
-    },
-  };
-  leafFolder.add(leafControls, 'add').name('複製這片葉子');
-  leafFolder.add(leafControls, 'remove').name('移除選中葉子');
-  leafFolder.add(leafControls, 'log').name('印出全部佈局 (console)');
-}
-
-/**
- * 芭蕉葉的點選／單片拖曳。用「捕捉階段」(capture)，而且比 surfaceDrag 早註冊 → 先收到事件：
- *   - 點到葉子：選取那一片（單片面板）和它那一叢（葉叢面板）
- *   - 沒按 Alt／Shift：不攔截，讓 surfaceDrag 接手 → 整叢在綠球上拖
- *   - 按住 Alt 或 Shift：stopImmediatePropagation 攔下來，只動那一片
- */
-if (BANANA_SCENE_EDIT) {
-  const leafRaycaster = new THREE.Raycaster();
-  const leafPointer = new THREE.Vector2();
-  let draggingLeaf: BananaLeaf | null = null;
-  let leafMoved = false;
-  // Shift 上下拖 = 調「上浮」：按下 Shift 那一刻記下滑鼠高度與上浮值
-  let shiftActive = false;
-  let riseStartY = 0;
-  let riseStart = 0;
-  const updateLeafRay = (event: PointerEvent) => {
-    const rect = renderer.domElement.getBoundingClientRect();
-    leafPointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
-    leafRaycaster.setFromCamera(leafPointer, camera);
-  };
-  renderer.domElement.addEventListener(
-    'pointerdown',
-    (event) => {
-      if (event.button !== 0) return;
-      updateLeafRay(event);
-      const leaves = allBananaLeaves().filter((leaf) => leaf.object.visible);
-      const hit = leafRaycaster.intersectObjects(leaves.map((leaf) => leaf.object), false)[0];
-      if (!hit) return;
-      const leaf = leaves.find((item) => item.object === hit.object);
-      if (!leaf) return;
-      bindLeafPanel(leaf);
-      const cluster = clusterOfLeaf(leaf);
-      if (cluster) bindBananaPanel(cluster);
-      highlightLeaf(leaf);
-      if (!event.altKey && !event.shiftKey) return; // 交給 surfaceDrag：整叢拖
-      event.stopImmediatePropagation();
-      leaf.beginDrag(leafRaycaster.ray);
-      shiftActive = false;
-      draggingLeaf = leaf;
-      leafMoved = false;
-      controls.enabled = false;
-      renderer.domElement.setPointerCapture(event.pointerId);
-    },
-    { capture: true },
-  );
-  renderer.domElement.addEventListener(
-    'pointermove',
-    (event) => {
-      if (!draggingLeaf) return;
-      event.stopImmediatePropagation();
-      updateLeafRay(event);
-      if (event.shiftKey) {
-        if (!shiftActive) {
-          shiftActive = true;
-          riseStartY = event.clientY;
-          riseStart = draggingLeaf.settings.rise;
-        }
-        // Shift：只往上浮／往下沉，不改位置。每 100 像素約 0.3（模型單位）
-        draggingLeaf.settings.rise = Math.round((riseStart + (riseStartY - event.clientY) * 0.003) * 1000) / 1000;
-        draggingLeaf.apply();
-        leafMoved = true;
-        leafFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
-        return;
-      }
-      // 放開 Shift 後回到 Alt 拖曳：以目前滑鼠位置重新當起點，葉子不會跳
-      if (shiftActive) {
-        shiftActive = false;
-        draggingLeaf.beginDrag(leafRaycaster.ray);
-      }
-      if (draggingLeaf.moveToRay(leafRaycaster.ray)) {
-        leafMoved = true;
-        leafFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
-      }
-    },
-    { capture: true },
-  );
-  renderer.domElement.addEventListener(
-    'pointerup',
-    (event) => {
-      if (!draggingLeaf) return;
-      event.stopImmediatePropagation();
-      draggingLeaf = null;
-      controls.enabled = true;
-      renderer.domElement.releasePointerCapture(event.pointerId);
-      if (leafMoved) logBananaClusters();
-    },
-    { capture: true },
-  );
+  candyJarFolder.add(candyJarControls, 'add').name('複製糖果罐');
+  candyJarFolder.add(candyJarControls, 'remove').name('移除選中糖果罐');
+  candyJarFolder.add(candyJarControls, 'log').name('印出全部佈局 (console)');
+  // 一開始不自動選取（不然開場就有一個在發亮）；拖曳或點一下糖果罐才選取
 }
 
 // 薯條（綠球上；拖曳、複製、躺下）
@@ -3906,7 +3738,7 @@ let surfaceDragTargets: Array<
   | WorldLemonSlice
   | WorldTreeStump
   | WorldTreeHouse
-  | WorldBananaLeafCluster
+  | WorldCandyJar
   | WorldFrenchFries
   | WorldFrenchFryStick
   | WorldCampfire
@@ -3938,7 +3770,7 @@ let surfaceDragTargets: Array<
   ...lemonSlices,
   ...(STUMP_SCENE_EDIT ? treeStumps : []),
   ...(TREE_HOUSE_SCENE_EDIT ? treeHouses : []),
-  ...(BANANA_SCENE_EDIT ? bananaClusters : []),
+  ...(CANDY_JAR_SCENE_EDIT ? candyJars : []),
   ...(foodVisibility.showFrenchFries ? frenchFries : []),
   ...(foodVisibility.showFrenchFryStick ? frenchFrySticks : []),
 ];
@@ -3962,7 +3794,7 @@ function refreshPuddingDragTargets() {
   if (foodVisibility.showLemon) surfaceDragTargets.push(...lemonSlices);
   if (STUMP_SCENE_EDIT) surfaceDragTargets.push(...treeStumps);
   if (TREE_HOUSE_SCENE_EDIT) surfaceDragTargets.push(...treeHouses);
-  if (BANANA_SCENE_EDIT) surfaceDragTargets.push(...bananaClusters);
+  if (CANDY_JAR_SCENE_EDIT) surfaceDragTargets.push(...candyJars);
   if (foodVisibility.showFrenchFries) surfaceDragTargets.push(...frenchFries);
   if (foodVisibility.showFrenchFryStick) surfaceDragTargets.push(...frenchFrySticks);
 }
@@ -4011,9 +3843,9 @@ if (HOUSE_DRAG_ENABLED) {
         const treeHouseEntry = treeHouses.find((item) => item.object === target.object);
         if (treeHouseEntry) bindTreeHousePanel(treeHouseEntry);
       }
-      if (BANANA_SCENE_EDIT) {
-        const clusterEntry = bananaClusters.find((item) => item.object === target.object);
-        if (clusterEntry) bindBananaPanel(clusterEntry);
+      if (CANDY_JAR_SCENE_EDIT) {
+        const candyJarEntry = candyJars.find((item) => item.object === target.object);
+        if (candyJarEntry) bindCandyJarPanel(candyJarEntry);
       }
       const friesEntry = frenchFries.find((item) => item.object === target.object);
       if (friesEntry) bindFriesPanel(friesEntry);
@@ -4029,7 +3861,7 @@ if (HOUSE_DRAG_ENABLED) {
       lemonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       stumpFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       treeHouseFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
-      bananaFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      candyJarFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       friesFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       fryStickFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       campfireFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
@@ -4072,7 +3904,7 @@ if (HOUSE_DRAG_ENABLED) {
       else if (lemonSlices.some((item) => item.object === target.object)) logLemonPlacements();
       else if (STUMP_SCENE_EDIT && treeStumps.some((item) => item.object === target.object)) logStumpPlacements();
       else if (TREE_HOUSE_SCENE_EDIT && treeHouses.some((item) => item.object === target.object)) logTreeHousePlacements();
-      else if (BANANA_SCENE_EDIT && bananaClusters.some((item) => item.object === target.object)) logBananaClusters();
+      else if (CANDY_JAR_SCENE_EDIT && candyJars.some((item) => item.object === target.object)) logCandyJarPlacements();
       else if (frenchFries.some((item) => item.object === target.object)) logFrenchFriesPlacements();
       else if (frenchFrySticks.some((item) => item.object === target.object)) logFrenchFryStickPlacements();
     },
@@ -4106,9 +3938,9 @@ if (HOUSE_DRAG_ENABLED) {
         const treeHouseEntry = treeHouses.find((item) => item.object === target.object);
         if (treeHouseEntry) bindTreeHousePanel(treeHouseEntry);
       }
-      if (BANANA_SCENE_EDIT) {
-        const clusterEntry = bananaClusters.find((item) => item.object === target.object);
-        if (clusterEntry) bindBananaPanel(clusterEntry);
+      if (CANDY_JAR_SCENE_EDIT) {
+        const candyJarEntry = candyJars.find((item) => item.object === target.object);
+        if (candyJarEntry) bindCandyJarPanel(candyJarEntry);
       }
       const friesEntry = frenchFries.find((item) => item.object === target.object);
       if (friesEntry) bindFriesPanel(friesEntry);

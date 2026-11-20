@@ -45,13 +45,8 @@ import {
 } from './lemonSliceLayout';
 import { createTreeStump, type TreeStumpSettings } from './treeStump';
 import { createTreeHouse, type TreeHouseSettings } from './treeHouse';
-import { createBananaLeafCluster, type BananaLeaf, type BananaLeafClusterSettings } from './bananaLeaves';
-import {
-  BANANA_LEAF_CLUSTER_DEFAULT,
-  BANANA_LEAF_CLUSTER_PLACEMENTS,
-  type BananaLeafClusterLayout,
-  type BananaLeafLayout,
-} from './bananaLeavesLayout';
+import { createCandyJar, type CandyJarSettings } from './candyJar';
+import { CANDY_JAR_LAYOUT_DEFAULT, CANDY_JAR_PLACEMENTS, type CandyJarLayout } from './candyJarLayout';
 import {
   TREE_HOUSE_LAYOUT_DEFAULT,
   TREE_HOUSE_PLACEMENTS,
@@ -499,57 +494,56 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     return true;
   }
 
-  // 芭蕉葉叢（綠球上；拖曳選取後調整，可複製）——生成、複製、移除方式跟檸檬片一樣
-  type BananaClusterRuntime = ReturnType<typeof createBananaLeafCluster>;
-  const bananaClusterEntries: Array<{ world: WorldBananaLeafCluster; runtime: BananaClusterRuntime }> = [];
-  const bananaClusters: WorldBananaLeafCluster[] = [];
+  // 糖果罐（綠球上；拖曳選取後調整，可複製）——生成、複製、移除方式跟檸檬片一樣
+  type CandyJarRuntime = ReturnType<typeof createCandyJar>;
+  const candyJarEntries: Array<{ world: WorldCandyJar; runtime: CandyJarRuntime }> = [];
+  const candyJars: WorldCandyJar[] = [];
 
-  function spawnBananaCluster(id: string, layout: BananaLeafClusterLayout, grown = false) {
+  function spawnCandyJar(id: string, layout: CandyJarLayout, grown = false) {
     if (!puddingAxes) return null;
-    const runtime = createBananaLeafCluster({ ...puddingAxes, layout: { ...layout } });
+    const runtime = createCandyJar({ ...puddingAxes, layout: { ...layout } });
     ground.add(runtime.object);
-    const world = exposeBananaLeafCluster(id, runtime);
-    bananaClusterEntries.push({ world, runtime });
-    bananaClusters.push(world);
+    const world = exposeCandyJar(id, runtime);
+    candyJarEntries.push({ world, runtime });
+    candyJars.push(world);
     runtime.setIntroGrow(grown ? 1 : 0);
     return world;
   }
 
   if (puddingAxes) {
-    for (const placement of BANANA_LEAF_CLUSTER_PLACEMENTS) {
+    for (const placement of CANDY_JAR_PLACEMENTS) {
       const { id, ...layout } = placement;
-      spawnBananaCluster(id, layout);
+      spawnCandyJar(id, layout);
     }
   }
 
-  function nextBananaClusterId() {
-    let n = bananaClusterEntries.length + 1;
-    let id = `banana_leaves_${n}`;
-    while (bananaClusters.some((item) => item.id === id)) {
+  function nextCandyJarId() {
+    let n = candyJarEntries.length + 1;
+    let id = `candy_jar_${n}`;
+    while (candyJars.some((item) => item.id === id)) {
       n += 1;
-      id = `banana_leaves_${n}`;
+      id = `candy_jar_${n}`;
     }
     return id;
   }
 
   /** 複製時沿用選中那個的設定（seed），再往旁邊挪一點，不會疊在同一個位置 */
-  function addBananaCluster(seed?: Partial<BananaLeafClusterLayout>): WorldBananaLeafCluster | null {
+  function addCandyJar(seed?: Partial<CandyJarLayout>): WorldCandyJar | null {
     if (!puddingAxes) return null;
-    // leaves 是陣列：深複製，複製出來的葉叢才不會跟原本的共用同一組葉子
-    const base: BananaLeafClusterLayout = { ...BANANA_LEAF_CLUSTER_DEFAULT, ...seed, leaves: (seed?.leaves ?? BANANA_LEAF_CLUSTER_DEFAULT.leaves).map((leaf) => ({ ...leaf })) };
-    const azimuth = seed?.azimuthDegrees ?? BANANA_LEAF_CLUSTER_DEFAULT.azimuthDegrees;
+    const base: CandyJarLayout = { ...CANDY_JAR_LAYOUT_DEFAULT, ...seed };
+    const azimuth = seed?.azimuthDegrees ?? CANDY_JAR_LAYOUT_DEFAULT.azimuthDegrees;
     base.azimuthDegrees = wrapDegrees(azimuth + 18);
-    return spawnBananaCluster(nextBananaClusterId(), base, introDone);
+    return spawnCandyJar(nextCandyJarId(), base, introDone);
   }
 
-  function removeBananaCluster(entry: WorldBananaLeafCluster) {
-    const index = bananaClusterEntries.findIndex((item) => item.world === entry);
+  function removeCandyJar(entry: WorldCandyJar) {
+    const index = candyJarEntries.findIndex((item) => item.world === entry);
     if (index < 0) return false;
-    const { runtime, world } = bananaClusterEntries[index];
+    const { runtime, world } = candyJarEntries[index];
     runtime.dispose();
-    bananaClusterEntries.splice(index, 1);
-    const clusterIndex = bananaClusters.indexOf(world);
-    if (clusterIndex >= 0) bananaClusters.splice(clusterIndex, 1);
+    candyJarEntries.splice(index, 1);
+    const jarIndex = candyJars.indexOf(world);
+    if (jarIndex >= 0) candyJars.splice(jarIndex, 1);
     return true;
   }
 
@@ -1197,7 +1191,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     for (const { world } of lemonSliceEntries) roots.push(world.object);
     for (const { world } of treeStumpEntries) roots.push(world.object);
     for (const { world } of treeHouseEntries) roots.push(world.object);
-    for (const { world } of bananaClusterEntries) roots.push(world.object);
+    for (const { world } of candyJarEntries) roots.push(world.object);
     for (const { world } of frenchFriesEntries) roots.push(world.object);
     for (const { world } of frenchFryStickEntries) roots.push(world.object);
     for (const { world } of friedEggEntries) {
@@ -1566,7 +1560,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
   for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
   for (const { runtime } of treeStumpEntries) runtime.setIntroGrow(0);
   for (const { runtime } of treeHouseEntries) runtime.setIntroGrow(0);
-  for (const { runtime } of bananaClusterEntries) runtime.setIntroGrow(0);
+  for (const { runtime } of candyJarEntries) runtime.setIntroGrow(0);
   for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(0);
   for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(0);
   pigRuntime?.setIntroGrow(0);
@@ -1629,7 +1623,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(1);
         for (const { runtime } of treeStumpEntries) runtime.setIntroGrow(1);
         for (const { runtime } of treeHouseEntries) runtime.setIntroGrow(1);
-        for (const { runtime } of bananaClusterEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of candyJarEntries) runtime.setIntroGrow(1);
         for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(1);
         for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(1);
         pigRuntime?.setIntroGrow(1);
@@ -1698,12 +1692,12 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         : THREE.MathUtils.clamp((introElapsed - stumpStart) / 0.85, 0, 1);
       runtime.setIntroGrow(easeOutBack(stumpT, 2.0));
     });
-    bananaClusterEntries.forEach(({ runtime }, index) => {
-      const clusterStart = housesIntroEnd + 0.15 + index * 0.08;
-      const clusterT = introDone
+    candyJarEntries.forEach(({ runtime }, index) => {
+      const jarStart = housesIntroEnd + 0.1 + index * 0.08;
+      const jarT = introDone
         ? 1
-        : THREE.MathUtils.clamp((introElapsed - clusterStart) / 0.85, 0, 1);
-      runtime.setIntroGrow(easeOutBack(clusterT, 2.0));
+        : THREE.MathUtils.clamp((introElapsed - jarStart) / 0.85, 0, 1);
+      runtime.setIntroGrow(easeOutBack(jarT, 2.0));
     });
     treeHouseEntries.forEach(({ runtime }, index) => {
       const houseStart = housesIntroEnd + 0.1 + index * 0.1;
@@ -1918,7 +1912,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
     for (const { runtime } of treeStumpEntries) runtime.setIntroGrow(0);
     for (const { runtime } of treeHouseEntries) runtime.setIntroGrow(0);
-    for (const { runtime } of bananaClusterEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of candyJarEntries) runtime.setIntroGrow(0);
     for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(0);
     for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(0);
     pigRuntime?.setIntroGrow(0);
@@ -1995,9 +1989,9 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     treeHouses,
     addTreeHouse,
     removeTreeHouse,
-    bananaClusters,
-    addBananaCluster,
-    removeBananaCluster,
+    candyJars,
+    addCandyJar,
+    removeCandyJar,
     frenchFries,
     addFrenchFries,
     removeFrenchFries,
@@ -2174,19 +2168,16 @@ export type WorldTreeHouse = {
   setNormal: (normal: THREE.Vector3) => void;
 };
 
-export type WorldBananaLeafCluster = {
+export type WorldCandyJar = {
   id: string;
   label: string;
   object: THREE.Object3D;
-  settings: BananaLeafClusterSettings;
+  settings: CandyJarSettings;
   apply: () => void;
   applyVisuals: () => void;
   setHighlighted: (value: boolean) => void;
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;
-  /** 這叢的芭蕉葉（每片可獨立選取、編輯） */
-  getLeaves: () => BananaLeaf[];
-  addLeaf: (seed?: Partial<BananaLeafLayout>) => BananaLeaf;
 };
 
 export type WorldFrenchFries = {
@@ -2465,19 +2456,17 @@ function exposeTreeHouse(id: string, house: ReturnType<typeof createTreeHouse>):
   };
 }
 
-function exposeBananaLeafCluster(id: string, cluster: ReturnType<typeof createBananaLeafCluster>): WorldBananaLeafCluster {
+function exposeCandyJar(id: string, jar: ReturnType<typeof createCandyJar>): WorldCandyJar {
   return {
     id,
     label: id,
-    object: cluster.object,
-    settings: cluster.settings,
-    apply: cluster.applySettings,
-    applyVisuals: cluster.applyVisuals,
-    setHighlighted: cluster.setHighlighted,
-    getNormal: cluster.getNormal,
-    setNormal: cluster.setNormal,
-    getLeaves: cluster.getLeaves,
-    addLeaf: cluster.addLeaf,
+    object: jar.object,
+    settings: jar.settings,
+    apply: jar.applySettings,
+    applyVisuals: jar.applyVisuals,
+    setHighlighted: jar.setHighlighted,
+    getNormal: jar.getNormal,
+    setNormal: jar.setNormal,
   };
 }
 
