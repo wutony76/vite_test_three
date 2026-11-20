@@ -49,9 +49,9 @@ export type MelonTroughSettings = {
 
 export const MELON_TROUGH_DEFAULT: MelonTroughSettings = {
   enabled: true,
-  angleFromTopDegrees: 19,
-  azimuthDegrees: 130,
-  spinDegrees: -104,
+  angleFromTopDegrees: 35,
+  azimuthDegrees: -149,
+  spinDegrees: -72,
   size: 0.12,
   sink: 0.003,
   glow: 1,
