@@ -155,7 +155,8 @@ function butterflyWing(colorIndex: number, mirror: boolean) {
   ]);
 }
 
-function beeBody() {
+/** 蜜蜂身體（黃黑條紋），模型座標：身長約 1、往前 +Z、往上 +Y；蜜蜂巢的蜂群也用它 */
+export function beeBody() {
   // 肚子是一顆拉長的球，依前後位置塗成黃、黑相間的條紋
   const belly = new THREE.IcosahedronGeometry(0.3, 2);
   belly.scale(1, 0.95, 1.45);
@@ -179,7 +180,8 @@ function beeBody() {
   ]);
 }
 
-function beeWing(mirror: boolean) {
+/** 蜜蜂一邊的翅膀（半透明那種）；mirror = 左邊 */
+export function beeWing(mirror: boolean) {
   return merge([
     wing([[0.02, 0.05], [0.3, 0.15], [0.55, 0.0], [0.4, -0.18], [0.05, -0.08]], 0xeaf6ff, mirror, 0.25),
   ]);

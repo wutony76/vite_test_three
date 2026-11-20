@@ -1062,6 +1062,19 @@ export function createPigAdventure({
     canPlay: () => !!getRide() && !!getPond()?.settings.enabled && !!getHouse()?.door,
     testSplashFish,
     getPhase: () => phase,
+    /**
+     * 取消「還在走去大門」的冒險（例如小豬被叫去逗弄蜜蜂）：先回到 idle 再取消走路，
+     * goTo 的 onDone(false) 看到 phase 已經不是 toDoor 就會略過（不會重新規劃路線把別人的指令蓋掉）。
+     * 已經進屋、溜滑梯（操偶中）就不能中途取消 → 回傳 false
+     */
+    cancelWalk: () => {
+      if (phase === 'idle') return true;
+      if (phase !== 'toDoor') return false;
+      setPhase('idle');
+      pig.cancelGoTo();
+      cooldown = randomCooldown();
+      return true;
+    },
     getLastFailReason: () => lastFailReason,
     getFishCount: () => fishes.length,
   };

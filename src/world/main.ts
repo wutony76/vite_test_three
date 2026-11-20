@@ -43,6 +43,7 @@ import { whenGltfMountsIdle, whenGltfsReady } from './objects/sharedGltf';
 import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
 import { formatPigHousePlacementsForPaste } from './objects/pigHouse';
+import { formatBeeSwarmSettingsForPaste } from './objects/beeSwarm';
 import { CAMPFIRE_CHICKEN_SPIN_AXES, formatCampfireSettingsForPaste } from './objects/campfire';
 import { formatShiitakePlacementsForPaste } from './objects/shiitake';
 import { formatTreasureChestSettingsForPaste } from './objects/treasureChest';
@@ -285,6 +286,7 @@ const {
   addFrenchFryStick,
   removeFrenchFryStick,
   pig,
+  beeSwarm,
   campfire,
   shiitakes,
   addShiitake,
@@ -1841,6 +1843,8 @@ if (pigFolder && pig) {
   pigFolder.add(pig.settings, 'visitWatchMaxSeconds', 0.5, 20, 0.5).name('看烤雞最長 (秒)').onFinishChange(logPigSettings);
   pigFolder.add(pig.settings, 'visitCooldownSeconds', 0, 120, 1).name('看完多久才會再去 (秒)').onFinishChange(logPigSettings);
   pigFolder.add({ visit: () => { if (!pig.visitNow()) console.warn('[pig] 篝火關閉、沒有烤雞，或位置去不了'); } }, 'visit').name('現在去看烤雞');
+  // 動作：逗弄蜜蜂——跑去有蜂巢的香菇，走到就一定放出蜜蜂追牠
+  pigFolder.add({ tease: () => { if (!pig.teaseBees()) console.warn('[pig] 沒有開著蜂巢的香菇，或小豬正在溜滑梯'); } }, 'tease').name('逗弄蜜蜂（跑去香菇那）');
   // 測試：原地繞圈圈（觀察頭上的雲、點心雨用）。勾選＝開始繞，取消＝回到平常的亂逛
   const circleTest = { on: pig.isCircling() };
   const restartCircle = () => {
@@ -2761,6 +2765,14 @@ function bindShiitakePanel(entry: WorldShiitake) {
   shiitakeFolder.add(settings, 'sink', -0.03, 0.03, 0.001).name('下沉（負=浮起）').onChange(apply).onFinishChange(log);
   shiitakeFolder.add(settings, 'swayDegrees', 0, 15, 0.5).name('晃動幅度 (°)').onFinishChange(log);
   shiitakeFolder.add(settings, 'swaySpeed', 0, 4, 0.05).name('晃動速度').onFinishChange(log);
+  // 蜜蜂巢（任何一顆香菇都可以掛；小豬經過有蜂巢的香菇會被蜜蜂追）
+  // 這幾個欄位在型別上是選填（舊擺設沒有），香菇建立時已補上預設值 → 這裡當必填用
+  const hive = settings as Required<typeof settings>;
+  shiitakeFolder.add(hive, 'beehive').name('蜜蜂巢').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(hive, 'hiveAngle', -180, 180, 1).name('蜂巢方向 (°)').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(hive, 'hiveRadius', 0, 1.1, 0.01).name('蜂巢離中心距離').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(hive, 'hiveLift', -1.5, 0.8, 0.01).name('蜂巢上下').onChange(apply).onFinishChange(log);
+  shiitakeFolder.add(hive, 'hiveSize', 0.3, 2.5, 0.01).name('蜂巢大小').onChange(apply).onFinishChange(log);
 }
 
 const shiitakeControls = {
@@ -2973,6 +2985,22 @@ if (lemonFolder) {
   lemonFolder.add(lemonControls, 'remove').name('移除選中檸檬片');
   lemonFolder.add(lemonControls, 'log').name('印出全部佈局 (console)');
   if (lemonSlices[0]) bindLemonPanel(lemonSlices[0]);
+}
+
+// 蜜蜂巢（香菇 shiitake_3 菇傘下）：小豬經過時有機率飛出一群蜜蜂追牠，小豬會加速
+if (beeSwarm) {
+  const beeFolder = gui.addFolder('蜜蜂巢（香菇 shiitake_3）');
+  const logBees = () => console.log(formatBeeSwarmSettingsForPaste(beeSwarm.settings));
+  beeFolder.add(beeSwarm.settings, 'chance', 0, 1, 0.01).name('經過時觸發機率').onFinishChange(logBees);
+  beeFolder.add(beeSwarm.settings, 'beeCount', 1, 40, 1).name('蜜蜂數量').onFinishChange(logBees);
+  beeFolder.add(beeSwarm.settings, 'chaseSeconds', 1, 20, 0.5).name('追幾秒').onFinishChange(logBees);
+  beeFolder.add(beeSwarm.settings, 'pigSpeedBoost', 1, 3, 0.05).name('小豬加速倍率').onFinishChange(logBees);
+  beeFolder.add(beeSwarm.settings, 'triggerDegrees', 2, 20, 0.5).name('經過範圍 (°)').onFinishChange(logBees);
+  beeFolder.add(beeSwarm.settings, 'beeScale', 0.5, 3, 0.05).name('蜜蜂大小（1 = 跟島上蜜蜂一樣）').onFinishChange(logBees);
+  beeFolder.add(beeSwarm.settings, 'autoTease').name('小豬偶爾自己去逗弄').onFinishChange(logBees);
+  beeFolder.add(beeSwarm.settings, 'autoTeaseSeconds', 10, 300, 5).name('自己去逗弄的平均間隔 (秒)').onFinishChange(logBees);
+  beeFolder.add({ release: () => beeSwarm.releaseNow() }, 'release').name('立刻放出蜜蜂（看效果）');
+  beeFolder.add({ log: logBees }, 'log').name('印出設定 (console)');
 }
 
 // 豬屋（綠球上；拖曳選取後調整，可複製）——選取、編輯方式跟檸檬片一樣

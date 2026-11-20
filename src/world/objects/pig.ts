@@ -117,7 +117,11 @@ export const PIG_LAYOUT_DEFAULT: PigSettings = {
  * 煙團共用一份幾何（20 面體、無細分 = low poly 小石頭感），
  * 每團各自一份材質，因為要各自淡出（opacity 是材質屬性，共用的話會一起變透明）。
  */
-const SMOKE_POOL_SIZE = 24;
+const SMOKE_POOL_SIZE = 40; // 被蜜蜂追時煙塵會變多，池子留大一點
+/** 被蜜蜂追（逃跑）時：煙塵變多、變大、往後踢得比較遠 */
+const FLEE_SMOKE_RATE = 4;
+const FLEE_SMOKE_SIZE = 1.35;
+const FLEE_SMOKE_KICK = 1.8;
 const smokeGeometry = new THREE.IcosahedronGeometry(1, 0);
 const smokeSpawn = new THREE.Vector3();
 const smokeDrift = new THREE.Vector3();
@@ -295,6 +299,24 @@ export function createPig({
   const side = new THREE.Vector3().crossVectors(up, front).normalize();
   const obstacleScratch: PigObstacle[] = [];
 
+  /** 暫時的速度倍率（例如被蜜蜂追的時候跑快一點）；1 = 平常速度，不會寫進設定 */
+  let speedMultiplier = 1;
+
+  // ── 逃跑模式（被蜜蜂追）：一直 S 形亂跑，不停下來 ──
+  // 主方向存成「地表上的方向向量」（每格投影回當地切平面），不存角度：角度是相對當地東北方的，
+  // 小豬一移動座標系就變，存角度會越跑越歪
+  let fleeing = false;
+  let fleeTime = 0;
+  const fleeDir = new THREE.Vector3();
+  /**
+   * S 形左右擺的幅度（弧度，約 ±66°）與速度（一個來回約 2π / FLEE_WEAVE_SPEED ≈ 3 秒）。
+   * 幅度太小、擺太快的話，跑速下每次只往旁邊偏一點點，看起來就是直線（實測 ±50°、2 秒一個來回只偏 1.3°）
+   */
+  const FLEE_WEAVE_AMP = 1.15;
+  const FLEE_WEAVE_SPEED = 2.1;
+  /** 主方向的慢速漂移相位（每次逃跑隨機），用平滑的 sin 漂，不用每格亂數（會抖成小鋸齒） */
+  let fleeDriftPhase = 0;
+
   function normalFromAngles(colatitudeDeg: number, azimuthDeg: number, target = surfaceNormal) {
     direction.copy(front).applyAxisAngle(up, THREE.MathUtils.degToRad(azimuthDeg));
     const angle = THREE.MathUtils.degToRad(colatitudeDeg);
@@ -361,6 +383,18 @@ export function createPig({
    * checkView 只在挑出生點時開：跑動中若把「鏡頭背面」也當障礙，
    * 一轉動場景小豬就會整片被擋住 → 卡住 → 觸發重生，看起來就是一直閃現回畫面。
    */
+  /** 這個位置陷進障礙避障範圍的總深度（弧度）：0 = 完全不在任何範圍裡 */
+  function obstaclePenetration(n: THREE.Vector3, footprint: number, scale: number) {
+    let total = 0;
+    for (const obstacle of obstacleScratch) {
+      if (obstacle === ignoredObstacle) continue;
+      const limit = footprint + obstacle.clearanceRad * scale;
+      const distance = angularDistance(n, obstacle.normal);
+      if (distance < limit) total += limit - distance;
+    }
+    return total;
+  }
+
   function isBlocked(n: THREE.Vector3, checkView = false, from?: THREE.Vector3) {
     if (checkView && !isVisibleHemisphere(n)) return true;
     const col = colatitudeFromNormal(n);
@@ -375,11 +409,13 @@ export function createPig({
     const scale = command?.obstacleScale ?? 1;
     if (scale <= 0) return false;
     const footprint = pigBodyRadiusRad() * scale;
-    for (const obstacle of obstacleScratch) {
-      if (obstacle === ignoredObstacle) continue;
-      if (angularDistance(n, obstacle.normal) < footprint + obstacle.clearanceRad * scale) return true;
-    }
-    return false;
+    const here = obstaclePenetration(n, footprint, scale);
+    if (here <= 0) return false;
+    // 已經陷在避障範圍裡（例如走指令時放寬避障擠進香菇叢，指令結束後避障恢復）：
+    // 只要這一步讓「陷進所有障礙的總深度」變小（整體在往外脫困）就放行。
+    // 只看單一障礙不夠：卡在好幾個障礙中間時，離開這個就會靠近那個，每個方向都會被擋、卡死在原地
+    if (from && here < obstaclePenetration(from, footprint, scale) - 1e-6) return false;
+    return true;
   }
 
   /**
@@ -718,15 +754,17 @@ export function createPig({
     puff.mesh.position.copy(smokeSpawn);
     puff.mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
     // 往上飄、往後退、左右散開
+    // 逃跑時往後踢得比較遠、左右散得比較開（跑很快揚起一大片）
+    const kick = fleeing ? FLEE_SMOKE_KICK : 1;
     puff.velocity
       .copy(surfaceNormal)
       .multiplyScalar(length * (0.55 + Math.random() * 0.35))
-      .addScaledVector(probe2, -length * 0.35)
-      .addScaledVector(placeEast, (Math.random() - 0.5) * length * 0.5);
+      .addScaledVector(probe2, -length * 0.35 * kick)
+      .addScaledVector(placeEast, (Math.random() - 0.5) * length * 0.5 * kick);
     puff.spin.set((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
     puff.age = 0;
     puff.life = settings.smokeLifeSeconds * (0.8 + Math.random() * 0.4);
-    puff.baseSize = length * 0.11 * settings.smokeSize * (0.8 + Math.random() * 0.4);
+    puff.baseSize = length * 0.11 * settings.smokeSize * (fleeing ? FLEE_SMOKE_SIZE : 1) * (0.8 + Math.random() * 0.4);
     puff.mesh.scale.setScalar(puff.baseSize * 0.4);
     puff.mesh.material.opacity = 0.85;
     puff.mesh.visible = true;
@@ -737,7 +775,8 @@ export function createPig({
 
     if (moving && settings.smokeEnabled && settings.smokeRate > 0) {
       smokeTimer -= deltaTime;
-      const interval = 1 / settings.smokeRate;
+      // 被蜜蜂追時煙塵冒得比較密（FLEE_SMOKE_RATE 倍）
+      const interval = 1 / (settings.smokeRate * (fleeing ? FLEE_SMOKE_RATE : 1));
       while (smokeTimer <= 0) {
         emitSmokePuff();
         smokeTimer += interval * (0.7 + Math.random() * 0.6);
@@ -856,11 +895,45 @@ export function createPig({
     visiting = false;
   }
 
+  /**
+   * 逃跑的一格：主方向 fleeDir 慢慢隨機漂移，再用 sin 左右擺 → S 形；轉向速度加快，甩得出來。
+   * 被障礙擋住（或前方有障礙、tryAdvance 換了方向）→ 主方向改成那個走得通的方向，從那裡繼續 S 形跑。
+   * 跑到醬邊（界外）就把主方向轉回往頂端。
+   */
+  function updateFlee(deltaTime: number) {
+    fleeTime += deltaTime;
+    // 主方向投影回當地切平面；第一次（或退化）就用鼻頭方向
+    fleeDir.addScaledVector(surfaceNormal, -fleeDir.dot(surfaceNormal));
+    if (fleeDir.lengthSq() < 1e-8) tangentFromFacing(fleeDir);
+    fleeDir.normalize();
+    // 主方向慢慢漂（平滑的慢波：一下偏左、一下偏右，整條路線不是直線）
+    fleeDir.applyAxisAngle(surfaceNormal, Math.sin(fleeTime * 0.45 + fleeDriftPhase) * 0.6 * deltaTime);
+    // 快跑到醬邊：主方向轉回頂端
+    if (colatitudeFromNormal(surfaceNormal) > effectiveColatMax - 2) {
+      tangentFromBearing(surfaceNormal, bearingTowardTop(surfaceNormal), fleeDir);
+    }
+    const base = bearingTowardDirection(surfaceNormal, fleeDir);
+    const weave = Math.sin(fleeTime * FLEE_WEAVE_SPEED) * FLEE_WEAVE_AMP;
+    const wanted = base + weave;
+    bearing = wanted;
+    turnBoost = 2.8; // 轉快一點，左右甩才明顯
+    blendFacingForward(deltaTime);
+    const stepRad = THREE.MathUtils.degToRad(settings.roamSpeedDegrees * speedMultiplier) * deltaTime;
+    const moved = tryAdvance(stepRad);
+    // tryAdvance 為了避開障礙改了方向（前方被擋或整個走不動）→ 主方向改成「它挑的方向扣掉目前的擺動」，
+    // S 形的節奏照常繼續（不重新開始擺，不然一直碰到東西就一直重來，S 形出不來）
+    if (!moved || Math.abs(wrapAngle(bearing - wanted)) > 0.35) {
+      tangentFromBearing(surfaceNormal, bearing - weave, fleeDir);
+    }
+    stuckSeconds = moved ? 0 : stuckSeconds + deltaTime;
+    return moved;
+  }
+
   /** 繞圈的一格：沿圓周往前走「跑速」那麼遠，鼻頭朝著前進方向 */
   function updateCircle(deltaTime: number) {
     const rRad = THREE.MathUtils.degToRad(Math.max(0.3, circle.radiusDegrees));
     // 角速度 = 線速度 ÷ 半徑：半徑越小繞得越快，但腳步的速度跟平常走路一樣
-    const omega = settings.roamSpeedDegrees / Math.max(0.3, circle.radiusDegrees);
+    const omega = (settings.roamSpeedDegrees * speedMultiplier) / Math.max(0.3, circle.radiusDegrees);
     circleAngle += (circle.clockwise ? -1 : 1) * omega * deltaTime;
     tangentFromBearing(circleCenter, circleAngle, probe);
     rotateAlong(circleCenter, probe, rRad, circleNext);
@@ -1126,7 +1199,9 @@ export function createPig({
     visitCooldown = Math.max(0, visitCooldown - deltaTime);
 
     let movedThisFrame = false;
-    if (circling) {
+    if (fleeing) {
+      movedThisFrame = updateFlee(deltaTime);
+    } else if (circling) {
       movedThisFrame = updateCircle(deltaTime);
     } else if (pauseRemaining > 0) {
       // 停下來看東西：轉頭面向物件，不走、不冒煙
@@ -1158,7 +1233,7 @@ export function createPig({
 
       blendFacingForward(deltaTime);
 
-      const stepRad = THREE.MathUtils.degToRad(settings.roamSpeedDegrees) * deltaTime;
+      const stepRad = THREE.MathUtils.degToRad(settings.roamSpeedDegrees * speedMultiplier) * deltaTime;
       if (stepRad > 0) {
         movedThisFrame = tryAdvance(stepRad);
         if (!movedThisFrame) {
@@ -1211,6 +1286,30 @@ export function createPig({
       return startVisit();
     },
     isVisiting: () => visiting,
+    /** 暫時改變走路速度（例如被蜜蜂追：1.2 倍）；1 = 恢復平常 */
+    setSpeedMultiplier: (value: number) => {
+      speedMultiplier = Math.max(0.1, value);
+    },
+    getSpeedMultiplier: () => speedMultiplier,
+    /**
+     * 逃跑模式（被蜜蜂追）：開著的時候一直 S 形亂跑，不停下來看東西、不去篝火、不繞圈。
+     * 開的那一刻從鼻頭方向開始跑；關掉就回到平常的走路
+     */
+    setFleeing: (on: boolean) => {
+      if (on === fleeing) return;
+      fleeing = on;
+      if (on) {
+        pauseRemaining = 0;
+        visiting = false;
+        circling = false;
+        fleeTime = 0;
+        fleeDriftPhase = Math.random() * Math.PI * 2;
+        tangentFromFacing(fleeDir);
+      } else {
+        wanderTimer = settings.wanderSeconds * (0.55 + Math.random() * 0.9);
+      }
+    },
+    isFleeing: () => fleeing,
     /** 下指令：走到某處（走到／放棄會呼叫 onDone） */
     goTo: (options: PigGoToOptions) => {
       // 被派任務（例如去溜滑梯）：先停止繞圈
@@ -1221,7 +1320,7 @@ export function createPig({
       if (command) finishCommand(false);
     },
     /** 正在忙（去篝火、走指令、停下來看東西、被操偶）：外部想派任務前先問 */
-    isBusy: () => visiting || command !== null || puppet || pauseRemaining > 0 || circling,
+    isBusy: () => visiting || command !== null || puppet || pauseRemaining > 0 || circling || fleeing,
     /** 測試：原地繞圈圈的設定（半徑、方向）；改了之後呼叫 setCircling(true) 重新開始 */
     circle,
     /** 測試：開始／停止原地繞圈圈 */
@@ -1330,6 +1429,18 @@ export function createPig({
       applyPlacement();
     },
     isPuppet: () => puppet,
+    /** 除錯用：小豬目前的狀態（為什麼不走） */
+    getDebugState: () => ({
+      puppet,
+      circling,
+      visiting,
+      command: command !== null,
+      pauseRemaining: +pauseRemaining.toFixed(2),
+      stuckSeconds: +stuckSeconds.toFixed(2),
+      colatitude: +colatitudeFromNormal(surfaceNormal).toFixed(1),
+      colatMax: +effectiveColatMax.toFixed(1),
+      speedMultiplier,
+    }),
   };
 }
 

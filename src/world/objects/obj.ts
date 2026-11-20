@@ -63,6 +63,7 @@ import {
 } from './frenchFryStickLayout';
 import { createPig, type PigSettings } from './pig';
 import { createPigAdventure, type PigAdventureSettings } from './pigAdventure';
+import { createBeeSwarm, type BeeSwarmSettings } from './beeSwarm';
 import type { PigCloudSettings, PigCloudState } from './pigCloud';
 import { createCampfire, type CampfireSettings } from './campfire';
 import { createShiitake, SHIITAKE_DEFAULT, SHIITAKE_PLACEMENTS, type ShiitakeSettings } from './shiitake';
@@ -148,6 +149,8 @@ const USE_MODEL = false;
 
 // 綠球（地表）的半徑：房子要種在球面上，得知道表面離球心多遠
 const GROUND_RADIUS = 1;
+/** 開場結束後，第一次「小豬自己去逗弄蜜蜂」最快幾秒後（不要一開場就跑去） */
+const BEE_AUTO_TEASE_FIRST_DELAY = 30;
 
 // 模型縮放後「最長邊」的長度：2 = 跟原本半徑 1 的球一樣大，鏡頭和燈光都不用重調
 const MODEL_SIZE = 2;
@@ -1288,6 +1291,133 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       : null;
   if (groundDetail) ground.add(groundDetail.object);
 
+  // ── 蜜蜂巢：小豬經過有蜂巢的香菇（shiitake_3）時，有機率飛出一群蜜蜂追著小豬跑 ──
+  // 每次「走進範圍」只擲一次骰子（待在範圍裡不會一直觸發），走出去再回來才會再擲
+  const beeSwarm = pigRuntime ? createBeeSwarm() : null;
+  if (beeSwarm) ground.add(beeSwarm.object);
+  let pigNearHive = false;
+  const hiveMouthScratch = new THREE.Vector3();
+  const pigLocalScratch = new THREE.Vector3();
+
+  /** 找一顆有蜂巢、小豬附近的香菇；force = 不管距離（面板測試用） */
+  function hiveNearPig(force: boolean) {
+    if (!pigRuntime || !beeSwarm) return null;
+    // 小豬在 ground 座標裡的方向：用模型實際的世界位置換回 ground 座標（跟香菇的 getNormal 同一個座標系）
+    const pigNormal = ground.worldToLocal(pigRuntime.object.getWorldPosition(pigLocalScratch)).normalize();
+    const limit = Math.cos(THREE.MathUtils.degToRad(beeSwarm.settings.triggerDegrees));
+    for (const { runtime } of shiitakeEntries) {
+      if (!runtime.settings.beehive || !runtime.settings.enabled) continue;
+      if (!force && pigNormal.dot(runtime.getNormal()) < limit) continue;
+      if (!runtime.getBeehiveMouth(hiveMouthScratch)) continue;
+      return ground.worldToLocal(hiveMouthScratch); // 蜂群在 ground 座標裡飛
+    }
+    return null;
+  }
+
+  /**
+  /**
+   * 小豬動作「逗弄蜜蜂」：小豬跑去有蜂巢的香菇，走到之後一定放出蜜蜂（不擲骰子）追牠。
+   * 回傳 false = 沒有開著蜂巢的香菇，或小豬正在溜滑梯（操偶中）
+   */
+  let teasing = false;
+  /**
+   * 走過去的避障放寬順序：蜂巢香菇常常躲在建築、香菇群後面，小豬照平常避障會在外面繞來繞去走不到
+   * （實測照平常避障要 40 幾秒還進不去）。點了按鈕要很快跑到 → 一開始就用 0.3（擦過東西、從縫鑽過去），
+   * 走不到再 0（直直走過去，模型穿插一點沒關係）
+   */
+  const TEASE_OBSTACLE_SCALES = [0.3, 0];
+  function teaseBees() {
+    if (!pigRuntime || !beeSwarm) return false;
+    const target = shiitakeEntries.find(({ runtime }) => runtime.settings.beehive && runtime.settings.enabled);
+    if (!target) return false;
+    // 小豬如果正在走去溜滑梯（冒險的第一段）：先取消冒險，不然冒險走不到會重新規劃路線、把逗弄的指令蓋掉；
+    // 已經進屋、溜滑梯中（操偶）就不打斷
+    if (pigAdventure && !pigAdventure.cancelWalk()) return false;
+    // 停在香菇旁邊：到「避障範圍」邊緣就算到了（香菇本身是障礙，走不進正中央）
+    const clearance = pigRuntime.getObstacleClearance(target.runtime.object) ?? THREE.MathUtils.degToRad(3);
+    const pig = pigRuntime;
+    teasing = true;
+    const attempt = (level: number) => {
+      const scale = TEASE_OBSTACLE_SCALES[level];
+      const distanceDeg = THREE.MathUtils.radToDeg(pig.getNormal().angleTo(target.runtime.getNormal()));
+      pig.goTo({
+        getTarget: () => (target.runtime.settings.enabled ? target.runtime.getNormal() : null),
+        arriveRad: clearance + THREE.MathUtils.degToRad(1.5),
+        ignoreRoot: target.runtime.object, // 快到的時候不把香菇當障礙，不然會一直繞
+        obstacleScale: scale,
+        // 每一段給的時間：直線所需秒數 ×1.5 ＋ 3（最少 5、最多 12 秒），走不到就換下一級
+        timeoutSeconds: THREE.MathUtils.clamp((distanceDeg / Math.max(pig.settings.roamSpeedDegrees, 0.5)) * 1.5 + 3, 5, 12),
+        onDone: (arrived) => {
+          if (!arrived) {
+            if (teasing && level + 1 < TEASE_OBSTACLE_SCALES.length) attempt(level + 1);
+            else teasing = false;
+            return;
+          }
+          teasing = false;
+          if (!beeSwarm) return;
+          // 逗弄成功：一定放出蜜蜂（如果走進範圍時 80% 已經觸發過，就不重複放）
+          if (!beeSwarm.isActive() && target.runtime.getBeehiveMouth(hiveMouthScratch)) {
+            beeSwarm.start(ground.worldToLocal(hiveMouthScratch));
+          }
+        },
+      });
+    };
+    attempt(0);
+    return true;
+  }
+
+  /** 立刻放出蜜蜂（面板測試用）：找不到蜂巢回傳 false */
+  function releaseBees() {
+    if (!beeSwarm) return false;
+    const mouth = hiveNearPig(true);
+    if (!mouth) return false;
+    beeSwarm.start(mouth);
+    return true;
+  }
+
+  /**
+   * 小豬偶爾自己去逗弄蜜蜂（跟偶爾自己去溜滑梯一樣）：倒數到了，小豬閒著就出發；
+   * 正在忙（冒險、篝火、停下來看東西、走指令、蜂群還在飛）就 5 秒後再看一次
+   */
+  let autoTeaseTimer = BEE_AUTO_TEASE_FIRST_DELAY;
+  function nextAutoTeaseDelay() {
+    return Math.max(5, beeSwarm?.settings.autoTeaseSeconds ?? 45) * (0.6 + Math.random() * 0.8);
+  }
+  function updateAutoTease(deltaTime: number) {
+    if (!beeSwarm || !pigRuntime || !introDone || !beeSwarm.settings.autoTease) return;
+    autoTeaseTimer -= deltaTime;
+    if (autoTeaseTimer > 0) return;
+    const adventureIdle = !pigAdventure || pigAdventure.getPhase() === 'idle';
+    if (teasing || beeSwarm.isActive() || pigRuntime.isBusy() || pigRuntime.isPuppet() || !adventureIdle) {
+      autoTeaseTimer = 5;
+      return;
+    }
+    autoTeaseTimer = nextAutoTeaseDelay();
+    teaseBees();
+  }
+
+  function updateBees(deltaTime: number) {
+    if (!beeSwarm || !pigRuntime) return;
+    updateAutoTease(deltaTime);
+    const mouth = introDone ? hiveNearPig(false) : null;
+    if (mouth && !pigNearHive) {
+      pigNearHive = true;
+      // 走進範圍：擲骰子（預設 80%），蜂群不在外面飛的時候才放
+      if (!beeSwarm.isActive() && Math.random() < beeSwarm.settings.chance) beeSwarm.start(mouth);
+    } else if (!mouth) {
+      pigNearHive = false;
+    }
+    // 小豬實際的位置（ground 座標）：蜜蜂繞著牠頭上一點飛
+    ground.worldToLocal(pigRuntime.object.getWorldPosition(pigLocalScratch));
+    pigLocalScratch.setLength(GROUND_RADIUS);
+    // 蜜蜂大小跟島上生物的蜜蜂一樣（島上生物的「大小」調了，蜂群也跟著變）
+    beeSwarm.update(deltaTime, pigLocalScratch, GROUND_RADIUS, crittersRuntime?.settings.size ?? 1);
+    // 被追的時候小豬跑快一點（預設 3 倍），而且一直 S 形亂跑、不停下來、煙塵變多
+    const chased = beeSwarm.isChasing();
+    pigRuntime.setSpeedMultiplier(chased ? beeSwarm.settings.pigSpeedBoost : 1);
+    pigRuntime.setFleeing(chased);
+  }
+
   const pig: WorldPig | null = pigRuntime ?
     {
       label: '小豬',
@@ -1299,6 +1429,10 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       getCloudState: pigRuntime.cloud.getState,
       visitNow: pigRuntime.visitNow,
       isVisiting: pigRuntime.isVisiting,
+      teaseBees,
+      isTeasing: () => teasing,
+      getDebugState: pigRuntime.getDebugState,
+      isFleeing: pigRuntime.isFleeing,
       circle: pigRuntime.circle,
       setCircling: pigRuntime.setCircling,
       isCircling: pigRuntime.isCircling,
@@ -1702,6 +1836,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       try {
         pigRuntime.update(deltaTime, introDone);
         pigAdventure?.update(deltaTime, introDone);
+        updateBees(deltaTime);
       } catch (error) {
         console.error('[pig] update 失敗', error);
       }
@@ -1859,6 +1994,16 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     addFrenchFryStick,
     removeFrenchFryStick,
     pig,
+    beeSwarm: beeSwarm
+      ? {
+          settings: beeSwarm.settings as BeeSwarmSettings,
+          releaseNow: releaseBees,
+          isChasing: beeSwarm.isChasing,
+          isActive: beeSwarm.isActive,
+          /** 小豬目前的速度倍率（被追時是 pigSpeedBoost） */
+          pigSpeedMultiplier: () => pigRuntime?.getSpeedMultiplier() ?? 1,
+        }
+      : null,
     campfire,
     shiitakes,
     addShiitake,
@@ -2053,6 +2198,14 @@ export type WorldPig = {
   /** 立刻跑去篝火看烤雞（測試用） */
   visitNow: () => boolean;
   isVisiting: () => boolean;
+  /** 動作「逗弄蜜蜂」：跑去蜂巢香菇，走到就放出蜜蜂追牠；去不了回傳 false */
+  teaseBees: () => boolean;
+  /** 正在跑去逗弄蜜蜂的路上 */
+  isTeasing: () => boolean;
+  /** 除錯用：小豬目前的狀態（為什麼不走） */
+  getDebugState: () => Record<string, unknown>;
+  /** 正在逃跑（被蜜蜂追：S 形亂跑） */
+  isFleeing: () => boolean;
   /** 測試：原地繞圈圈（半徑、方向）。改了之後重新 setCircling(true) 才會用新的圓 */
   circle: { radiusDegrees: number; clockwise: boolean };
   setCircling: (on: boolean) => void;

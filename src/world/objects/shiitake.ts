@@ -46,6 +46,16 @@ export type ShiitakeSettings = {
   swaySpeed: number;
   /** 菇傘顏色（傘面的主色；捲邊、菌褶會照原本的深淺比例跟著變） */
   capColor: string;
+  /** 菇傘下掛一個蜜蜂巢（小豬經過時可能會飛出一群蜜蜂追牠） */
+  beehive?: boolean;
+  /** 蜂巢在菇柄的哪一邊（°，繞菇柄轉；洞口一直朝外） */
+  hiveAngle?: number;
+  /** 蜂巢離菇柄多遠：0 = 菇柄正下方，1 = 傘緣 */
+  hiveRadius?: number;
+  /** 蜂巢上下：0 = 預設高度；正值往上縮進菌褶，負值往下垂（以菇傘厚度為單位） */
+  hiveLift?: number;
+  /** 蜂巢大小倍率 */
+  hiveSize?: number;
 };
 
 export const SHIITAKE_DEFAULT: ShiitakeSettings = {
@@ -118,6 +128,11 @@ export const SHIITAKE_PLACEMENTS: ShiitakePlacement[] = [
     swayDegrees: 3,
     swaySpeed: 1,
     capColor: '#6d433c',
+    beehive: true,
+    hiveAngle: -145,
+    hiveRadius: 0.57,
+    hiveLift: -0.37,
+    hiveSize: 1,
   },
   {
     id: 'shiitake_4',
@@ -225,6 +240,75 @@ type CreateShiitakeOptions = {
   layout?: ShiitakeSettings;
 };
 
+/**
+ * 卡通蜜蜂巢：胖胖的水滴形（上窄下寬），一圈一圈橫向的鼓起（深淺金黃相間），
+ * 下半部正面一個深色圓洞（蜜蜂進出口），底部一滴蜂蜜；頂端一小段細枝綁在菇傘底下。
+ * 原點 = 吊掛點（頂端），往 -y 垂下來；height 是蜂巢本體高度（世界單位）。
+ */
+function buildBeehive(height: number) {
+  const group = new THREE.Group();
+  group.name = 'shiitake_beehive';
+  const W = height * 0.46; // 最寬處的半徑
+  const RINGS = 5;
+  const profile: THREE.Vector2[] = [];
+  for (let k = 0; k <= 40; k++) {
+    const t = k / 40; // 0 = 頂端，1 = 底部
+    // 水滴形：頂端窄、偏下最胖、底部收圓；再加一圈圈鼓起（cos 讓每一圈中間最鼓）
+    const base = Math.sin(Math.PI * Math.pow(t, 0.75));
+    const ridge = 1 + 0.07 * Math.cos(t * RINGS * Math.PI * 2);
+    profile.push(new THREE.Vector2(Math.max(0.0005, W * base * ridge), -t * height));
+  }
+  const body = new THREE.LatheGeometry(profile, 28);
+  // 一圈深、一圈淺的金黃色（頂點色）
+  const pos = body.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const light = new THREE.Color('#ffc94a');
+  const dark = new THREE.Color('#e59a2a');
+  const c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const t = -pos.getY(i) / height;
+    const band = 0.5 + 0.5 * Math.cos(t * RINGS * Math.PI * 2);
+    c.copy(dark).lerp(light, band);
+    c.toArray(colors, i * 3);
+  }
+  body.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const bodyMaterial = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.55,
+    metalness: 0,
+    emissive: 0xffa21f,
+    emissiveIntensity: 0.12, // 一點暖暖的自發光，在菇傘陰影下也看得到
+  });
+  const hive = new THREE.Mesh(body, bodyMaterial);
+  hive.castShadow = true;
+  group.add(hive);
+  // 進出口：下半部正面一個深色扁圓
+  const holeY = -height * 0.62;
+  const holeR = W * 0.95; // 洞口那一圈的大概半徑
+  const hole = new THREE.Mesh(new THREE.SphereGeometry(W * 0.26, 16, 10), new THREE.MeshStandardMaterial({ color: 0x4a2a14, roughness: 0.9 }));
+  hole.scale.set(1, 0.8, 0.35);
+  hole.position.set(0, holeY, holeR);
+  group.add(hole);
+  // 蜜蜂飛出來的位置（洞口正前方一點）
+  const mouth = new THREE.Object3D();
+  mouth.name = 'shiitake_beehive_mouth';
+  mouth.position.set(0, holeY, holeR + W * 0.3);
+  group.add(mouth);
+  // 底部一滴蜂蜜
+  const drip = new THREE.Mesh(
+    new THREE.SphereGeometry(W * 0.16, 12, 10),
+    new THREE.MeshStandardMaterial({ color: 0xffa31a, roughness: 0.2, emissive: 0xff8a00, emissiveIntensity: 0.25 }),
+  );
+  drip.scale.set(1, 1.4, 1);
+  drip.position.set(W * 0.15, -height * 1.02, 0);
+  group.add(drip);
+  // 頂端的細枝（往上伸進菇傘底下）
+  const stalk = new THREE.Mesh(new THREE.CylinderGeometry(W * 0.07, W * 0.09, height * 0.35, 8), new THREE.MeshStandardMaterial({ color: 0x7a4a2a, roughness: 0.8 }));
+  stalk.position.y = height * 0.12;
+  group.add(stalk);
+  return { group, mouth };
+}
+
 export function createShiitake({ groundRadius, up, front, envMap, layout = SHIITAKE_DEFAULT }: CreateShiitakeOptions) {
   const settings: ShiitakeSettings = { ...layout };
 
@@ -255,6 +339,77 @@ export function createShiitake({ groundRadius, up, front, envMap, layout = SHIIT
    */
   const baseStemScale = new THREE.Vector3(1, 1, 1);
   const baseCapScale = new THREE.Vector3(1, 1, 1);
+  /** 菇傘下的蜜蜂巢（settings.beehive 開著才有） */
+  let beehive: ReturnType<typeof buildBeehive> | null = null;
+  let beehiveKey = '';
+  /** 量到的菇傘範圍（sway 座標）：擺蜂巢位置用 */
+  const capMeasure = { radius: 0, bottom: 0, height: 0 };
+  // 蜂巢位置的預設值（舊的擺設沒有這幾個欄位）
+  settings.beehive ??= false;
+  settings.hiveAngle ??= 0;
+  settings.hiveRadius ??= 0.5;
+  settings.hiveLift ??= 0;
+  settings.hiveSize ??= 1;
+
+  /** 只擺位置（拖滑桿時不用重建蜂巢） */
+  function positionBeehive() {
+    if (!beehive) return;
+    const angle = THREE.MathUtils.degToRad(settings.hiveAngle ?? 0);
+    const r = capMeasure.radius * (settings.hiveRadius ?? 0.5);
+    const y = capMeasure.bottom + capMeasure.height * (0.18 + (settings.hiveLift ?? 0));
+    beehive.group.position.set(Math.cos(angle) * r, y, -Math.sin(angle) * r);
+    // 洞口在蜂巢模型的 +z；轉 angle + 90° 讓洞口朝外（背對菇柄）
+    beehive.group.rotation.y = angle + Math.PI / 2;
+  }
+
+  /**
+   * 掛蜜蜂巢：量出菇傘在 sway 座標裡的範圍（傘緣多低、多寬），掛在傘緣往內一點的底下。
+   * 掛在 sway 上（不是菇傘節點上）：菇傘被壓扁／拉寬時蜂巢才不會跟著變形；整顆香菇晃，蜂巢也跟著晃。
+   */
+  function placeBeehive() {
+    const want = !!settings.beehive && !!cap;
+    const key = want ? [settings.size, settings.capScale, settings.stemHeight, settings.capThickness, settings.hiveSize].join('|') : 'none';
+    if (key === beehiveKey) {
+      positionBeehive();
+      return;
+    }
+    beehiveKey = key;
+    if (beehive) {
+      sway.remove(beehive.group);
+      beehive.group.traverse((node) => {
+        const mesh = node as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+      });
+      beehive = null;
+    }
+    if (!want || !cap) return;
+    // 量菇傘在 sway 座標裡的包圍盒：從菇傘節點往上一層層乘「局部矩陣」乘到 sway 為止
+    // （不經過世界座標：開場時 anchor 縮到 0.0001，用世界座標再換回來會算錯，蜂巢會被埋進地裡）
+    // 晃動的旋轉暫時不算（用歸零的矩陣），量的是香菇站直時的樣子
+    const capNode = cap as THREE.Object3D;
+    const capMesh = capNode as THREE.Mesh;
+    capMesh.geometry.computeBoundingBox();
+    const toSway = new THREE.Matrix4();
+    const local = new THREE.Matrix4();
+    const still = new THREE.Quaternion();
+    for (let node: THREE.Object3D | null = capNode; node && node !== sway; node = node.parent) {
+      // 菇傘自己有晃動的旋轉：量的時候當作沒轉
+      local.compose(node.position, node === capNode ? still : node.quaternion, node.scale);
+      toSway.premultiply(local);
+    }
+    const box = capMesh.geometry.boundingBox!.clone().applyMatrix4(toSway);
+    const capRadius = (box.max.x - box.min.x) / 2;
+    const capHeight = box.max.y - box.min.y;
+    capMeasure.radius = capRadius;
+    capMeasure.bottom = box.min.y;
+    capMeasure.height = capHeight;
+    beehive = buildBeehive(capRadius * 0.72 * Math.max(0.2, settings.hiveSize ?? 1));
+    sway.add(beehive.group);
+    // 預設掛在傘緣往內一半、略高於傘緣最低點（看起來是從菌褶裡垂下來）
+    positionBeehive();
+  }
 
   function currentNormal(target: THREE.Vector3) {
     direction.copy(front).applyAxisAngle(up, THREE.MathUtils.degToRad(settings.azimuthDegrees));
@@ -378,6 +533,7 @@ export function createShiitake({ groundRadius, up, front, envMap, layout = SHIIT
         sway.add(model);
         if (highlighted) setHighlight(true);
         applyPlacement();
+        placeBeehive();
       });
     })
     .catch((error) => console.error(`[shiitake] 載入失敗：${SHIITAKE_URL}`, error));
@@ -389,6 +545,7 @@ export function createShiitake({ groundRadius, up, front, envMap, layout = SHIIT
       fitModel(model);
       applyShape();
       applyCapColor();
+      placeBeehive();
     }
     applyPlacement();
   }
@@ -526,6 +683,11 @@ export function createShiitake({ groundRadius, up, front, envMap, layout = SHIIT
     setHighlight,
     dispose,
     getNormal: () => currentNormal(new THREE.Vector3()),
+    /** 蜜蜂巢洞口的世界座標；這顆沒有蜂巢（或模型還沒載入）回傳 null */
+    getBeehiveMouth: (target: THREE.Vector3) => {
+      if (!beehive || !settings.enabled) return null;
+      return beehive.mouth.getWorldPosition(target);
+    },
   };
 }
 
@@ -546,6 +708,13 @@ export function formatShiitakePlacementsForPaste(entries: Array<{ id: string; se
     `    swayDegrees: ${s.swayDegrees.toFixed(1)},\n` +
     `    swaySpeed: ${s.swaySpeed.toFixed(2)},\n` +
     `    capColor: '${s.capColor}',\n` +
+    (s.beehive
+      ? `    beehive: true,\n` +
+        `    hiveAngle: ${s.hiveAngle ?? 0},\n` +
+        `    hiveRadius: ${(s.hiveRadius ?? 0.5).toFixed(2)},\n` +
+        `    hiveLift: ${(s.hiveLift ?? 0).toFixed(2)},\n` +
+        `    hiveSize: ${(s.hiveSize ?? 1).toFixed(2)},\n`
+      : '') +
     `  },`,
   );
   return (
