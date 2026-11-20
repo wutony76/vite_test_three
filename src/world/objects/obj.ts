@@ -43,20 +43,12 @@ import {
   LEMON_SLICE_PLACEMENTS,
   type LemonSliceLayout,
 } from './lemonSliceLayout';
-import { createTreeStump, type TreeStumpSettings } from './treeStump';
-import { createTreeHouse, type TreeHouseSettings } from './treeHouse';
-import { createCandyJar, type CandyJarSettings } from './candyJar';
-import { CANDY_JAR_LAYOUT_DEFAULT, CANDY_JAR_PLACEMENTS, type CandyJarLayout } from './candyJarLayout';
+import { createPigHouse, type PigHouseSettings } from './pigHouse';
 import {
-  TREE_HOUSE_LAYOUT_DEFAULT,
-  TREE_HOUSE_PLACEMENTS,
-  type TreeHouseLayout,
-} from './treeHouseLayout';
-import {
-  TREE_STUMP_LAYOUT_DEFAULT,
-  TREE_STUMP_PLACEMENTS,
-  type TreeStumpLayout,
-} from './treeStumpLayout';
+  PIG_HOUSE_LAYOUT_DEFAULT,
+  PIG_HOUSE_PLACEMENTS,
+  type PigHouseLayout,
+} from './pigHouseLayout';
 import { createFrenchFries, type FrenchFriesSettings } from './frenchFries';
 import {
   FRENCH_FRIES_LAYOUT_DEFAULT,
@@ -388,162 +380,56 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     }
   }
 
-  // 樹墩（綠球上；拖曳選取後調整，可複製）——生成、複製、移除方式跟檸檬片一樣
-  type TreeStumpRuntime = ReturnType<typeof createTreeStump>;
-  const treeStumpEntries: Array<{ world: WorldTreeStump; runtime: TreeStumpRuntime }> = [];
-  const treeStumps: WorldTreeStump[] = [];
+  // 豬屋（綠球上；拖曳選取後調整，可複製）——生成、複製、移除方式跟檸檬片一樣
+  type PigHouseRuntime = ReturnType<typeof createPigHouse>;
+  const pigHouseEntries: Array<{ world: WorldPigHouse; runtime: PigHouseRuntime }> = [];
+  const pigHouses: WorldPigHouse[] = [];
 
-  function spawnTreeStump(id: string, layout: TreeStumpLayout, grown = false) {
+  function spawnPigHouse(id: string, layout: PigHouseLayout, grown = false) {
     if (!puddingAxes) return null;
-    const runtime = createTreeStump({ ...puddingAxes, layout: { ...layout } });
+    const runtime = createPigHouse({ ...puddingAxes, layout: { ...layout } });
     ground.add(runtime.object);
-    const world = exposeTreeStump(id, runtime);
-    treeStumpEntries.push({ world, runtime });
-    treeStumps.push(world);
+    const world = exposePigHouse(id, runtime);
+    pigHouseEntries.push({ world, runtime });
+    pigHouses.push(world);
     runtime.setIntroGrow(grown ? 1 : 0);
     return world;
   }
 
   if (puddingAxes) {
-    for (const placement of TREE_STUMP_PLACEMENTS) {
+    for (const placement of PIG_HOUSE_PLACEMENTS) {
       const { id, ...layout } = placement;
-      spawnTreeStump(id, layout);
+      spawnPigHouse(id, layout);
     }
   }
 
-  function nextTreeStumpId() {
-    let n = treeStumpEntries.length + 1;
-    let id = `tree_stump_${n}`;
-    while (treeStumps.some((item) => item.id === id)) {
+  function nextPigHouseId() {
+    let n = pigHouseEntries.length + 1;
+    let id = `pig_house_${n}`;
+    while (pigHouses.some((item) => item.id === id)) {
       n += 1;
-      id = `tree_stump_${n}`;
+      id = `pig_house_${n}`;
     }
     return id;
   }
 
   /** 複製時沿用選中那個的設定（seed），再往旁邊挪一點，不會疊在同一個位置 */
-  function addTreeStump(seed?: Partial<TreeStumpLayout>): WorldTreeStump | null {
+  function addPigHouse(seed?: Partial<PigHouseLayout>): WorldPigHouse | null {
     if (!puddingAxes) return null;
-    const base: TreeStumpLayout = { ...TREE_STUMP_LAYOUT_DEFAULT, ...seed };
-    const azimuth = seed?.azimuthDegrees ?? TREE_STUMP_LAYOUT_DEFAULT.azimuthDegrees;
-    base.azimuthDegrees = wrapDegrees(azimuth + 18);
-    return spawnTreeStump(nextTreeStumpId(), base, introDone);
-  }
-
-  function removeTreeStump(entry: WorldTreeStump) {
-    const index = treeStumpEntries.findIndex((item) => item.world === entry);
-    if (index < 0) return false;
-    const { runtime, world } = treeStumpEntries[index];
-    runtime.dispose();
-    treeStumpEntries.splice(index, 1);
-    const stumpIndex = treeStumps.indexOf(world);
-    if (stumpIndex >= 0) treeStumps.splice(stumpIndex, 1);
-    return true;
-  }
-
-  // 豬豬樹屋（綠球上；拖曳選取後調整，可複製）——生成、複製、移除方式跟檸檬片一樣
-  type TreeHouseRuntime = ReturnType<typeof createTreeHouse>;
-  const treeHouseEntries: Array<{ world: WorldTreeHouse; runtime: TreeHouseRuntime }> = [];
-  const treeHouses: WorldTreeHouse[] = [];
-
-  function spawnTreeHouse(id: string, layout: TreeHouseLayout, grown = false) {
-    if (!puddingAxes) return null;
-    const runtime = createTreeHouse({ ...puddingAxes, layout: { ...layout } });
-    ground.add(runtime.object);
-    const world = exposeTreeHouse(id, runtime);
-    treeHouseEntries.push({ world, runtime });
-    treeHouses.push(world);
-    runtime.setIntroGrow(grown ? 1 : 0);
-    return world;
-  }
-
-  if (puddingAxes) {
-    for (const placement of TREE_HOUSE_PLACEMENTS) {
-      const { id, ...layout } = placement;
-      spawnTreeHouse(id, layout);
-    }
-  }
-
-  function nextTreeHouseId() {
-    let n = treeHouseEntries.length + 1;
-    let id = `tree_house_${n}`;
-    while (treeHouses.some((item) => item.id === id)) {
-      n += 1;
-      id = `tree_house_${n}`;
-    }
-    return id;
-  }
-
-  /** 複製時沿用選中那個的設定（seed），再往旁邊挪一點，不會疊在同一個位置 */
-  function addTreeHouse(seed?: Partial<TreeHouseLayout>): WorldTreeHouse | null {
-    if (!puddingAxes) return null;
-    const base: TreeHouseLayout = { ...TREE_HOUSE_LAYOUT_DEFAULT, ...seed };
-    const azimuth = seed?.azimuthDegrees ?? TREE_HOUSE_LAYOUT_DEFAULT.azimuthDegrees;
+    const base: PigHouseLayout = { ...PIG_HOUSE_LAYOUT_DEFAULT, ...seed };
+    const azimuth = seed?.azimuthDegrees ?? PIG_HOUSE_LAYOUT_DEFAULT.azimuthDegrees;
     base.azimuthDegrees = wrapDegrees(azimuth + 30); // 院子比較大，挪遠一點
-    return spawnTreeHouse(nextTreeHouseId(), base, introDone);
+    return spawnPigHouse(nextPigHouseId(), base, introDone);
   }
 
-  function removeTreeHouse(entry: WorldTreeHouse) {
-    const index = treeHouseEntries.findIndex((item) => item.world === entry);
+  function removePigHouse(entry: WorldPigHouse) {
+    const index = pigHouseEntries.findIndex((item) => item.world === entry);
     if (index < 0) return false;
-    const { runtime, world } = treeHouseEntries[index];
+    const { runtime, world } = pigHouseEntries[index];
     runtime.dispose();
-    treeHouseEntries.splice(index, 1);
-    const houseIndex = treeHouses.indexOf(world);
-    if (houseIndex >= 0) treeHouses.splice(houseIndex, 1);
-    return true;
-  }
-
-  // 糖果罐（綠球上；拖曳選取後調整，可複製）——生成、複製、移除方式跟檸檬片一樣
-  type CandyJarRuntime = ReturnType<typeof createCandyJar>;
-  const candyJarEntries: Array<{ world: WorldCandyJar; runtime: CandyJarRuntime }> = [];
-  const candyJars: WorldCandyJar[] = [];
-
-  function spawnCandyJar(id: string, layout: CandyJarLayout, grown = false) {
-    if (!puddingAxes) return null;
-    const runtime = createCandyJar({ ...puddingAxes, layout: { ...layout } });
-    ground.add(runtime.object);
-    const world = exposeCandyJar(id, runtime);
-    candyJarEntries.push({ world, runtime });
-    candyJars.push(world);
-    runtime.setIntroGrow(grown ? 1 : 0);
-    return world;
-  }
-
-  if (puddingAxes) {
-    for (const placement of CANDY_JAR_PLACEMENTS) {
-      const { id, ...layout } = placement;
-      spawnCandyJar(id, layout);
-    }
-  }
-
-  function nextCandyJarId() {
-    let n = candyJarEntries.length + 1;
-    let id = `candy_jar_${n}`;
-    while (candyJars.some((item) => item.id === id)) {
-      n += 1;
-      id = `candy_jar_${n}`;
-    }
-    return id;
-  }
-
-  /** 複製時沿用選中那個的設定（seed），再往旁邊挪一點，不會疊在同一個位置 */
-  function addCandyJar(seed?: Partial<CandyJarLayout>): WorldCandyJar | null {
-    if (!puddingAxes) return null;
-    const base: CandyJarLayout = { ...CANDY_JAR_LAYOUT_DEFAULT, ...seed };
-    const azimuth = seed?.azimuthDegrees ?? CANDY_JAR_LAYOUT_DEFAULT.azimuthDegrees;
-    base.azimuthDegrees = wrapDegrees(azimuth + 18);
-    return spawnCandyJar(nextCandyJarId(), base, introDone);
-  }
-
-  function removeCandyJar(entry: WorldCandyJar) {
-    const index = candyJarEntries.findIndex((item) => item.world === entry);
-    if (index < 0) return false;
-    const { runtime, world } = candyJarEntries[index];
-    runtime.dispose();
-    candyJarEntries.splice(index, 1);
-    const jarIndex = candyJars.indexOf(world);
-    if (jarIndex >= 0) candyJars.splice(jarIndex, 1);
+    pigHouseEntries.splice(index, 1);
+    const houseIndex = pigHouses.indexOf(world);
+    if (houseIndex >= 0) pigHouses.splice(houseIndex, 1);
     return true;
   }
 
@@ -1189,9 +1075,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     for (const { world } of grilledCornEntries) roots.push(world.object);
     for (const { world } of salmonSteakEntries) roots.push(world.object);
     for (const { world } of lemonSliceEntries) roots.push(world.object);
-    for (const { world } of treeStumpEntries) roots.push(world.object);
-    for (const { world } of treeHouseEntries) roots.push(world.object);
-    for (const { world } of candyJarEntries) roots.push(world.object);
+    for (const { world } of pigHouseEntries) roots.push(world.object);
     for (const { world } of frenchFriesEntries) roots.push(world.object);
     for (const { world } of frenchFryStickEntries) roots.push(world.object);
     for (const { world } of friedEggEntries) {
@@ -1300,6 +1184,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     root.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh || !mesh.geometry) return;
+      if (mesh.userData.noFootprint) return; // 飛出去的特效（例如豬屋噴的冰塊）不算佔地
       // InstancedMesh：用所有 instance 合起來的包圍盒（只看 geometry 是單一顆原始大小、沒套縮放，會算成超大一圈）
       const instanced = mesh as THREE.InstancedMesh;
       let bb: THREE.Box3 | null;
@@ -1558,9 +1443,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
   for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
   for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
   for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
-  for (const { runtime } of treeStumpEntries) runtime.setIntroGrow(0);
-  for (const { runtime } of treeHouseEntries) runtime.setIntroGrow(0);
-  for (const { runtime } of candyJarEntries) runtime.setIntroGrow(0);
+  for (const { runtime } of pigHouseEntries) runtime.setIntroGrow(0);
   for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(0);
   for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(0);
   pigRuntime?.setIntroGrow(0);
@@ -1621,9 +1504,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(1);
         for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(1);
         for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(1);
-        for (const { runtime } of treeStumpEntries) runtime.setIntroGrow(1);
-        for (const { runtime } of treeHouseEntries) runtime.setIntroGrow(1);
-        for (const { runtime } of candyJarEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of pigHouseEntries) runtime.setIntroGrow(1);
         for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(1);
         for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(1);
         pigRuntime?.setIntroGrow(1);
@@ -1685,26 +1566,13 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       runtime.setIntroGrow(easeOutBack(lemonT, 2.0));
       runtime.update();
     });
-    treeStumpEntries.forEach(({ runtime }, index) => {
-      const stumpStart = housesIntroEnd + index * 0.08;
-      const stumpT = introDone
-        ? 1
-        : THREE.MathUtils.clamp((introElapsed - stumpStart) / 0.85, 0, 1);
-      runtime.setIntroGrow(easeOutBack(stumpT, 2.0));
-    });
-    candyJarEntries.forEach(({ runtime }, index) => {
-      const jarStart = housesIntroEnd + 0.1 + index * 0.08;
-      const jarT = introDone
-        ? 1
-        : THREE.MathUtils.clamp((introElapsed - jarStart) / 0.85, 0, 1);
-      runtime.setIntroGrow(easeOutBack(jarT, 2.0));
-    });
-    treeHouseEntries.forEach(({ runtime }, index) => {
+    pigHouseEntries.forEach(({ runtime }, index) => {
       const houseStart = housesIntroEnd + 0.1 + index * 0.1;
       const houseT = introDone
         ? 1
         : THREE.MathUtils.clamp((introElapsed - houseStart) / 0.9, 0, 1);
       runtime.setIntroGrow(easeOutBack(houseT, 1.8));
+      runtime.update(deltaTime); // 鼻子不定時噴冰塊
     });
     frenchFriesEntries.forEach(({ runtime }, index) => {
       const friesStart = housesIntroEnd + index * 0.08;
@@ -1910,9 +1778,7 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
     for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
     for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
-    for (const { runtime } of treeStumpEntries) runtime.setIntroGrow(0);
-    for (const { runtime } of treeHouseEntries) runtime.setIntroGrow(0);
-    for (const { runtime } of candyJarEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of pigHouseEntries) runtime.setIntroGrow(0);
     for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(0);
     for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(0);
     pigRuntime?.setIntroGrow(0);
@@ -1983,15 +1849,9 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     lemonSlices,
     addLemonSlice,
     removeLemonSlice,
-    treeStumps,
-    addTreeStump,
-    removeTreeStump,
-    treeHouses,
-    addTreeHouse,
-    removeTreeHouse,
-    candyJars,
-    addCandyJar,
-    removeCandyJar,
+    pigHouses,
+    addPigHouse,
+    removePigHouse,
     frenchFries,
     addFrenchFries,
     removeFrenchFries,
@@ -2144,40 +2004,18 @@ export type WorldLemonSlice = {
   setNormal: (normal: THREE.Vector3) => void;
 };
 
-export type WorldTreeStump = {
+export type WorldPigHouse = {
   id: string;
   label: string;
   object: THREE.Object3D;
-  settings: TreeStumpSettings;
+  settings: PigHouseSettings;
   apply: () => void;
   applyVisuals: () => void;
   setHighlighted: (value: boolean) => void;
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;
-};
-
-export type WorldTreeHouse = {
-  id: string;
-  label: string;
-  object: THREE.Object3D;
-  settings: TreeHouseSettings;
-  apply: () => void;
-  applyVisuals: () => void;
-  setHighlighted: (value: boolean) => void;
-  getNormal: () => THREE.Vector3;
-  setNormal: (normal: THREE.Vector3) => void;
-};
-
-export type WorldCandyJar = {
-  id: string;
-  label: string;
-  object: THREE.Object3D;
-  settings: CandyJarSettings;
-  apply: () => void;
-  applyVisuals: () => void;
-  setHighlighted: (value: boolean) => void;
-  getNormal: () => THREE.Vector3;
-  setNormal: (normal: THREE.Vector3) => void;
+  /** 立刻打一個噴嚏（噴冰塊） */
+  sneeze: () => void;
 };
 
 export type WorldFrenchFries = {
@@ -2428,21 +2266,7 @@ function exposeLemonSlice(id: string, slice: ReturnType<typeof createLemonSlice>
   };
 }
 
-function exposeTreeStump(id: string, stump: ReturnType<typeof createTreeStump>): WorldTreeStump {
-  return {
-    id,
-    label: id,
-    object: stump.object,
-    settings: stump.settings,
-    apply: stump.applySettings,
-    applyVisuals: stump.applyVisuals,
-    setHighlighted: stump.setHighlighted,
-    getNormal: stump.getNormal,
-    setNormal: stump.setNormal,
-  };
-}
-
-function exposeTreeHouse(id: string, house: ReturnType<typeof createTreeHouse>): WorldTreeHouse {
+function exposePigHouse(id: string, house: ReturnType<typeof createPigHouse>): WorldPigHouse {
   return {
     id,
     label: id,
@@ -2453,20 +2277,7 @@ function exposeTreeHouse(id: string, house: ReturnType<typeof createTreeHouse>):
     setHighlighted: house.setHighlighted,
     getNormal: house.getNormal,
     setNormal: house.setNormal,
-  };
-}
-
-function exposeCandyJar(id: string, jar: ReturnType<typeof createCandyJar>): WorldCandyJar {
-  return {
-    id,
-    label: id,
-    object: jar.object,
-    settings: jar.settings,
-    apply: jar.applySettings,
-    applyVisuals: jar.applyVisuals,
-    setHighlighted: jar.setHighlighted,
-    getNormal: jar.getNormal,
-    setNormal: jar.setNormal,
+    sneeze: house.sneeze,
   };
 }
 

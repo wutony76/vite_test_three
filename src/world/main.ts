@@ -24,9 +24,7 @@ import {
   type WorldHouse,
   type WorldPudding,
   type WorldLemonSlice,
-  type WorldTreeStump,
-  type WorldTreeHouse,
-  type WorldCandyJar,
+  type WorldPigHouse,
   type WorldCampfire,
   type WorldShiitake,
   type WorldTreasureChest,
@@ -44,9 +42,7 @@ import {
 import { whenGltfMountsIdle, whenGltfsReady } from './objects/sharedGltf';
 import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
-import { formatTreeStumpPlacementsForPaste } from './objects/treeStump';
-import { formatTreeHousePlacementsForPaste } from './objects/treeHouse';
-import { formatCandyJarPlacementsForPaste } from './objects/candyJar';
+import { formatPigHousePlacementsForPaste } from './objects/pigHouse';
 import { CAMPFIRE_CHICKEN_SPIN_AXES, formatCampfireSettingsForPaste } from './objects/campfire';
 import { formatShiitakePlacementsForPaste } from './objects/shiitake';
 import { formatTreasureChestSettingsForPaste } from './objects/treasureChest';
@@ -279,15 +275,9 @@ const {
   lemonSlices,
   addLemonSlice,
   removeLemonSlice,
-  treeStumps,
-  addTreeStump,
-  removeTreeStump,
-  treeHouses,
-  addTreeHouse,
-  removeTreeHouse,
-  candyJars,
-  addCandyJar,
-  removeCandyJar,
+  pigHouses,
+  addPigHouse,
+  removePigHouse,
   frenchFries,
   addFrenchFries,
   removeFrenchFries,
@@ -2985,291 +2975,101 @@ if (lemonFolder) {
   if (lemonSlices[0]) bindLemonPanel(lemonSlices[0]);
 }
 
-// 樹墩（綠球上；拖曳選取後調整，可複製）——選取、編輯方式跟檸檬片一樣
-// 已擺好（佈局寫在 treeStumpLayout.ts）：關閉編輯 → 不顯示面板、場景上不能點選或拖曳。
-// 要再調整時改成 true：面板、點選、拖曳都會回來
-const STUMP_SCENE_EDIT = false;
-const stumpFolder = gui.addFolder('樹墩');
-if (!STUMP_SCENE_EDIT) stumpFolder.hide();
-let selectedStump: WorldTreeStump | null = null;
+// 豬屋（綠球上；拖曳選取後調整，可複製）——選取、編輯方式跟檸檬片一樣
+const pigHouseFolder = gui.addFolder('豬屋');
+// 開關：false = 隱藏面板、不能拖曳（調好位置後關掉）
+const PIG_HOUSE_SCENE_EDIT = true;
+if (!PIG_HOUSE_SCENE_EDIT) pigHouseFolder.hide();
+let selectedPigHouse: WorldPigHouse | null = null;
 
 /** 選中的那個整個微微發亮，一眼看得出選了哪個；其他的還原 */
-function highlightStump(entry: WorldTreeStump | null) {
-  for (const stump of treeStumps) stump.setHighlighted(stump === entry);
+function highlightPigHouse(entry: WorldPigHouse | null) {
+  for (const house of pigHouses) house.setHighlighted(house === entry);
 }
 
-const STUMP_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+const PIG_HOUSE_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
 
-function clearStumpPanelSliders() {
-  stumpFolder.title('樹墩');
-  for (const controller of [...stumpFolder.controllers]) {
-    if (STUMP_PANEL_ACTIONS.has(String(controller.property))) continue;
+function clearPigHousePanelSliders() {
+  pigHouseFolder.title('豬屋');
+  for (const controller of [...pigHouseFolder.controllers]) {
+    if (PIG_HOUSE_PANEL_ACTIONS.has(String(controller.property))) continue;
     controller.destroy();
   }
 }
 
-function bindStumpPanel(entry: WorldTreeStump) {
-  const alreadyShowing = entry === selectedStump && stumpFolder.controllers.length > STUMP_PANEL_ACTIONS.size;
-  selectedStump = entry;
-  highlightStump(entry);
+function bindPigHousePanel(entry: WorldPigHouse) {
+  const alreadyShowing = entry === selectedPigHouse && pigHouseFolder.controllers.length > PIG_HOUSE_PANEL_ACTIONS.size;
+  selectedPigHouse = entry;
+  highlightPigHouse(entry);
   if (alreadyShowing) return;
 
-  clearStumpPanelSliders();
-  stumpFolder.title(`樹墩 · ${entry.label}`);
+  clearPigHousePanelSliders();
+  pigHouseFolder.title(`豬屋 · ${entry.label}`);
 
   const settings = entry.settings;
   const apply = () => entry.apply();
   const applyVisuals = () => entry.applyVisuals();
   type NumberKey = { [K in keyof typeof settings]: (typeof settings)[K] extends number ? K : never }[keyof typeof settings];
   const slider = (key: NumberKey, min: number, max: number, step: number, name: string, onChange = apply) =>
-    stumpFolder.add(settings, key, min, max, step).name(name).onChange(onChange).onFinishChange(logStumpPlacements);
-
-  slider('angleFromTopDegrees', 0, 90, 1, '離頂端 (°)');
-  slider('azimuthDegrees', -180, 180, 1, '方位 (°)');
-  slider('spinDegrees', -180, 180, 1, '自轉 (°)');
-  slider('tiltXDegrees', -60, 60, 1, '前傾 (°)');
-  slider('tiltZDegrees', -60, 60, 1, '側傾 (°)');
-  slider('sink', -0.1, 0.1, 0.001, '下沉（負值上浮）');
-  slider('placementScale', 0.15, 4, 0.01, '縮放');
-  slider('modelSize', 0.03, 0.5, 0.005, '大小 (m)');
-  // 寬、深、高各自拉：紋路是 shader 即時算的，拉多寬都不會糊、也不會被拉扁
-  slider('widthScale', 0.4, 4, 0.05, '變寬（左右）');
-  slider('depthScale', 0.4, 4, 0.05, '變厚（前後）');
-  slider('heightScale', 0.3, 4, 0.05, '變高');
-  slider('ringCount', 3, 30, 1, '年輪圈數');
-  slider('seed', 1, 99, 1, '造型（換一個）');
-  stumpFolder.add(settings, 'showBranch').name('小樹枝').onChange(apply).onFinishChange(logStumpPlacements);
-  slider('colorBoost', 0.6, 1.5, 0.01, '亮度', applyVisuals);
-  stumpFolder.addColor(settings, 'tintColor').name('顏色').onChange(applyVisuals).onFinishChange(logStumpPlacements);
-  slider('tintMix', 0, 1, 0.01, '顏色強度', applyVisuals);
-}
-
-function logStumpPlacements() {
-  if (treeStumps.length === 0) return;
-  const text = formatTreeStumpPlacementsForPaste(
-    treeStumps.map((stump) => ({ id: stump.id, settings: stump.settings })),
-  );
-  console.log(text);
-  return text;
-}
-
-{
-  const stumpControls = {
-    add() {
-      // 有選中就複製選中那個（大小、寬高、造型都一樣），沒有就用預設值
-      const created = addTreeStump(selectedStump ? { ...selectedStump.settings } : undefined);
-      if (!created) return;
-      bindStumpPanel(created);
-      refreshPuddingDragTargets();
-    },
-    remove() {
-      if (!selectedStump || treeStumps.length === 0) return;
-      if (!removeTreeStump(selectedStump)) return;
-      selectedStump = null;
-      clearStumpPanelSliders();
-      const next = treeStumps[treeStumps.length - 1];
-      if (next) bindStumpPanel(next);
-      else highlightStump(null);
-      refreshPuddingDragTargets();
-    },
-    log() {
-      logStumpPlacements();
-    },
-  };
-  stumpFolder.add(stumpControls, 'add').name('複製樹墩');
-  stumpFolder.add(stumpControls, 'remove').name('移除選中樹墩');
-  stumpFolder.add(stumpControls, 'log').name('印出全部佈局 (console)');
-  // 一開始不自動選取（不然開場就有一個在發亮）；拖曳或點一下樹墩才選取
-}
-
-// 豬豬樹屋（綠球上；拖曳選取後調整，可複製）——選取、編輯方式跟檸檬片一樣
-const treeHouseFolder = gui.addFolder('豬豬樹屋');
-// 開關：false = 隱藏面板、不能拖曳（調好位置後關掉，跟樹墩一樣）
-const TREE_HOUSE_SCENE_EDIT = true;
-if (!TREE_HOUSE_SCENE_EDIT) treeHouseFolder.hide();
-let selectedTreeHouse: WorldTreeHouse | null = null;
-
-/** 選中的那個整個微微發亮，一眼看得出選了哪個；其他的還原 */
-function highlightTreeHouse(entry: WorldTreeHouse | null) {
-  for (const house of treeHouses) house.setHighlighted(house === entry);
-}
-
-const TREE_HOUSE_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
-
-function clearTreeHousePanelSliders() {
-  treeHouseFolder.title('豬豬樹屋');
-  for (const controller of [...treeHouseFolder.controllers]) {
-    if (TREE_HOUSE_PANEL_ACTIONS.has(String(controller.property))) continue;
-    controller.destroy();
-  }
-  // 子資料夾（芭蕉葉）也要拆掉，不然每換選一棟就多一個
-  for (const folder of [...treeHouseFolder.folders]) folder.destroy();
-}
-
-function bindTreeHousePanel(entry: WorldTreeHouse) {
-  const alreadyShowing = entry === selectedTreeHouse && treeHouseFolder.controllers.length > TREE_HOUSE_PANEL_ACTIONS.size;
-  selectedTreeHouse = entry;
-  highlightTreeHouse(entry);
-  if (alreadyShowing) return;
-
-  clearTreeHousePanelSliders();
-  treeHouseFolder.title(`豬豬樹屋 · ${entry.label}`);
-
-  const settings = entry.settings;
-  const apply = () => entry.apply();
-  const applyVisuals = () => entry.applyVisuals();
-  type NumberKey = { [K in keyof typeof settings]: (typeof settings)[K] extends number ? K : never }[keyof typeof settings];
-  const slider = (key: NumberKey, min: number, max: number, step: number, name: string, onChange = apply) =>
-    treeHouseFolder.add(settings, key, min, max, step).name(name).onChange(onChange).onFinishChange(logTreeHousePlacements);
+    pigHouseFolder.add(settings, key, min, max, step).name(name).onChange(onChange).onFinishChange(logPigHousePlacements);
 
   slider('angleFromTopDegrees', 0, 90, 1, '離頂端 (°)');
   slider('azimuthDegrees', -180, 180, 1, '方位 (°)');
   slider('spinDegrees', -180, 180, 1, '自轉 (°)');
   slider('sink', -0.05, 0.05, 0.001, '下沉（負值上浮）');
-  slider('placementScale', 0.3, 3, 0.01, '縮放');
-  slider('size', 0.06, 0.5, 0.005, '平台寬度 (m)');
-  // 豬屋大小：豬屋＋芭蕉葉一起縮放，底部一直坐在木筏上（放很大時記得把「木筏大小」也調大）
-  slider('houseScale', 0.3, 2.5, 0.01, '豬屋大小（放大縮小）');
-  slider('supportHeight', 0.4, 2.5, 0.01, '樹幹支架高度');
-  slider('raftSize', 0.8, 2, 0.01, '木筏大小');
-  slider('trunkWidth', 0.5, 2, 0.01, '樹幹粗細');
-  slider('trunkSeed', 1, 99, 1, '樹幹造型（換一個）');
-  treeHouseFolder.addColor(settings, 'bodyColor').name('豬屋顏色').onChange(apply).onFinishChange(logTreeHousePlacements);
+  slider('placementScale', 0.2, 4, 0.01, '縮放');
+  slider('size', 0.03, 0.4, 0.001, '大小 (m)');
+  pigHouseFolder.addColor(settings, 'bodyColor').name('豬屋顏色').onChange(apply).onFinishChange(logPigHousePlacements);
   // 耳朵：左右鏡射對稱，一起調
   slider('earForward', -40, 40, 1, '耳朵前後 (°)');
   slider('earThickness', 0.3, 3, 0.05, '耳朵厚度');
   slider('earSize', 0.5, 1.8, 0.01, '耳朵大小');
-  // 豬屋在平台上的位置與朝向（只移動豬屋本體＋芭蕉葉，不用重建，拖滑桿很順）
-  slider('houseOffsetX', -0.6, 0.6, 0.005, '豬屋左右');
-  slider('houseOffsetZ', -0.6, 0.6, 0.005, '豬屋前後');
-  slider('houseYaw', -180, 180, 1, '豬屋旋轉 (°)');
+  // 鼻子噴冰塊（卡通冰塊＋星星閃光）
+  pigHouseFolder.add(settings, 'iceEnabled').name('噴冰塊').onFinishChange(logPigHousePlacements);
+  slider('iceInterval', 0.5, 15, 0.1, '平均間隔 (秒)');
+  slider('iceCount', 1, 30, 1, '每次幾顆');
+  slider('iceSpeed', 0.3, 2.5, 0.01, '噴的力道');
+  pigHouseFolder.add({ sneeze: () => entry.sneeze() }, 'sneeze').name('立刻打噴嚏（看效果）');
   slider('colorBoost', 0.6, 1.5, 0.01, '亮度', applyVisuals);
 
 }
 
-function logTreeHousePlacements() {
-  if (treeHouses.length === 0) return;
-  const text = formatTreeHousePlacementsForPaste(
-    treeHouses.map((house) => ({ id: house.id, settings: house.settings })),
+function logPigHousePlacements() {
+  if (pigHouses.length === 0) return;
+  const text = formatPigHousePlacementsForPaste(
+    pigHouses.map((house) => ({ id: house.id, settings: house.settings })),
   );
   console.log(text);
   return text;
 }
 
 {
-  const treeHouseControls = {
+  const pigHouseControls = {
     add() {
       // 有選中就複製選中那個（大小、造型都一樣），沒有就用預設值
-      const created = addTreeHouse(selectedTreeHouse ? { ...selectedTreeHouse.settings } : undefined);
+      const created = addPigHouse(selectedPigHouse ? { ...selectedPigHouse.settings } : undefined);
       if (!created) return;
-      bindTreeHousePanel(created);
+      bindPigHousePanel(created);
       refreshPuddingDragTargets();
     },
     remove() {
-      if (!selectedTreeHouse || treeHouses.length === 0) return;
-      if (!removeTreeHouse(selectedTreeHouse)) return;
-      selectedTreeHouse = null;
-      clearTreeHousePanelSliders();
-      const next = treeHouses[treeHouses.length - 1];
-      if (next) bindTreeHousePanel(next);
-      else highlightTreeHouse(null);
+      if (!selectedPigHouse || pigHouses.length === 0) return;
+      if (!removePigHouse(selectedPigHouse)) return;
+      selectedPigHouse = null;
+      clearPigHousePanelSliders();
+      const next = pigHouses[pigHouses.length - 1];
+      if (next) bindPigHousePanel(next);
+      else highlightPigHouse(null);
       refreshPuddingDragTargets();
     },
     log() {
-      logTreeHousePlacements();
+      logPigHousePlacements();
     },
   };
-  treeHouseFolder.add(treeHouseControls, 'add').name('複製樹屋');
-  treeHouseFolder.add(treeHouseControls, 'remove').name('移除選中樹屋');
-  treeHouseFolder.add(treeHouseControls, 'log').name('印出全部佈局 (console)');
-  // 一開始不自動選取（不然開場就有一個在發亮）；拖曳或點一下豬豬樹屋才選取
-}
-
-// 糖果罐（綠球上；拖曳選取後調整，可複製）——選取、編輯方式跟檸檬片一樣
-const candyJarFolder = gui.addFolder('糖果罐（柑仔店屋頂那罐的獨立版）');
-// 開關：false = 隱藏面板、不能拖曳（調好位置後關掉）
-const CANDY_JAR_SCENE_EDIT = true;
-if (!CANDY_JAR_SCENE_EDIT) candyJarFolder.hide();
-let selectedCandyJar: WorldCandyJar | null = null;
-
-/** 選中的那個整個微微發亮，一眼看得出選了哪個；其他的還原 */
-function highlightCandyJar(entry: WorldCandyJar | null) {
-  for (const jar of candyJars) jar.setHighlighted(jar === entry);
-}
-
-const CANDY_JAR_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
-
-function clearCandyJarPanelSliders() {
-  candyJarFolder.title('糖果罐（柑仔店屋頂那罐的獨立版）');
-  for (const controller of [...candyJarFolder.controllers]) {
-    if (CANDY_JAR_PANEL_ACTIONS.has(String(controller.property))) continue;
-    controller.destroy();
-  }
-}
-
-function bindCandyJarPanel(entry: WorldCandyJar) {
-  const alreadyShowing = entry === selectedCandyJar && candyJarFolder.controllers.length > CANDY_JAR_PANEL_ACTIONS.size;
-  selectedCandyJar = entry;
-  highlightCandyJar(entry);
-  if (alreadyShowing) return;
-
-  clearCandyJarPanelSliders();
-  candyJarFolder.title(`糖果罐 · ${entry.label}`);
-
-  const settings = entry.settings;
-  const apply = () => entry.apply();
-  const applyVisuals = () => entry.applyVisuals();
-  type NumberKey = { [K in keyof typeof settings]: (typeof settings)[K] extends number ? K : never }[keyof typeof settings];
-  const slider = (key: NumberKey, min: number, max: number, step: number, name: string, onChange = apply) =>
-    candyJarFolder.add(settings, key, min, max, step).name(name).onChange(onChange).onFinishChange(logCandyJarPlacements);
-
-  slider('angleFromTopDegrees', 0, 90, 1, '離頂端 (°)');
-  slider('azimuthDegrees', -180, 180, 1, '方位 (°)');
-  slider('spinDegrees', -180, 180, 1, '自轉 (°)');
-  slider('sink', -0.1, 0.1, 0.001, '下沉（負值上浮）');
-  slider('placementScale', 0.2, 4, 0.01, '縮放');
-  slider('size', 0.03, 0.5, 0.005, '大小 (m)');
-  slider('candyCount', 0, 200, 1, '糖球數量');
-  candyJarFolder.addColor(settings, 'lidColor').name('罐蓋顏色').onChange(applyVisuals).onFinishChange(logCandyJarPlacements);
-  slider('colorBoost', 0.6, 1.5, 0.01, '亮度', applyVisuals);
-}
-
-function logCandyJarPlacements() {
-  if (candyJars.length === 0) return;
-  const text = formatCandyJarPlacementsForPaste(
-    candyJars.map((jar) => ({ id: jar.id, settings: jar.settings })),
-  );
-  console.log(text);
-  return text;
-}
-
-{
-  const candyJarControls = {
-    add() {
-      // 有選中就複製選中那個（大小、顏色都一樣），沒有就用預設值
-      const created = addCandyJar(selectedCandyJar ? { ...selectedCandyJar.settings } : undefined);
-      if (!created) return;
-      bindCandyJarPanel(created);
-      refreshPuddingDragTargets();
-    },
-    remove() {
-      if (!selectedCandyJar || candyJars.length === 0) return;
-      if (!removeCandyJar(selectedCandyJar)) return;
-      selectedCandyJar = null;
-      clearCandyJarPanelSliders();
-      const next = candyJars[candyJars.length - 1];
-      if (next) bindCandyJarPanel(next);
-      else highlightCandyJar(null);
-      refreshPuddingDragTargets();
-    },
-    log() {
-      logCandyJarPlacements();
-    },
-  };
-  candyJarFolder.add(candyJarControls, 'add').name('複製糖果罐');
-  candyJarFolder.add(candyJarControls, 'remove').name('移除選中糖果罐');
-  candyJarFolder.add(candyJarControls, 'log').name('印出全部佈局 (console)');
-  // 一開始不自動選取（不然開場就有一個在發亮）；拖曳或點一下糖果罐才選取
+  pigHouseFolder.add(pigHouseControls, 'add').name('複製豬屋');
+  pigHouseFolder.add(pigHouseControls, 'remove').name('移除選中豬屋');
+  pigHouseFolder.add(pigHouseControls, 'log').name('印出全部佈局 (console)');
+  // 一開始不自動選取（不然開場就有一個在發亮）；拖曳或點一下豬屋才選取
 }
 
 // 薯條（綠球上；拖曳、複製、躺下）
@@ -3736,9 +3536,7 @@ let surfaceDragTargets: Array<
   | WorldFriedEgg
   | WorldSalmonSteak
   | WorldLemonSlice
-  | WorldTreeStump
-  | WorldTreeHouse
-  | WorldCandyJar
+  | WorldPigHouse
   | WorldFrenchFries
   | WorldFrenchFryStick
   | WorldCampfire
@@ -3768,9 +3566,7 @@ let surfaceDragTargets: Array<
   ...friedEggsOnSphere(),
   ...salmonSteaks,
   ...lemonSlices,
-  ...(STUMP_SCENE_EDIT ? treeStumps : []),
-  ...(TREE_HOUSE_SCENE_EDIT ? treeHouses : []),
-  ...(CANDY_JAR_SCENE_EDIT ? candyJars : []),
+  ...(PIG_HOUSE_SCENE_EDIT ? pigHouses : []),
   ...(foodVisibility.showFrenchFries ? frenchFries : []),
   ...(foodVisibility.showFrenchFryStick ? frenchFrySticks : []),
 ];
@@ -3792,9 +3588,7 @@ function refreshPuddingDragTargets() {
   if (CORN_SCENE_EDIT && foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
   if (foodVisibility.showSalmon) surfaceDragTargets.push(...salmonSteaks);
   if (foodVisibility.showLemon) surfaceDragTargets.push(...lemonSlices);
-  if (STUMP_SCENE_EDIT) surfaceDragTargets.push(...treeStumps);
-  if (TREE_HOUSE_SCENE_EDIT) surfaceDragTargets.push(...treeHouses);
-  if (CANDY_JAR_SCENE_EDIT) surfaceDragTargets.push(...candyJars);
+  if (PIG_HOUSE_SCENE_EDIT) surfaceDragTargets.push(...pigHouses);
   if (foodVisibility.showFrenchFries) surfaceDragTargets.push(...frenchFries);
   if (foodVisibility.showFrenchFryStick) surfaceDragTargets.push(...frenchFrySticks);
 }
@@ -3835,17 +3629,9 @@ if (HOUSE_DRAG_ENABLED) {
       if (shiitakeEntry) bindShiitakePanel(shiitakeEntry);
       const lemonEntry = lemonSlices.find((item) => item.object === target.object);
       if (lemonEntry) bindLemonPanel(lemonEntry);
-      if (STUMP_SCENE_EDIT) {
-        const stumpEntry = treeStumps.find((item) => item.object === target.object);
-        if (stumpEntry) bindStumpPanel(stumpEntry);
-      }
-      if (TREE_HOUSE_SCENE_EDIT) {
-        const treeHouseEntry = treeHouses.find((item) => item.object === target.object);
-        if (treeHouseEntry) bindTreeHousePanel(treeHouseEntry);
-      }
-      if (CANDY_JAR_SCENE_EDIT) {
-        const candyJarEntry = candyJars.find((item) => item.object === target.object);
-        if (candyJarEntry) bindCandyJarPanel(candyJarEntry);
+      if (PIG_HOUSE_SCENE_EDIT) {
+        const pigHouseEntry = pigHouses.find((item) => item.object === target.object);
+        if (pigHouseEntry) bindPigHousePanel(pigHouseEntry);
       }
       const friesEntry = frenchFries.find((item) => item.object === target.object);
       if (friesEntry) bindFriesPanel(friesEntry);
@@ -3859,9 +3645,7 @@ if (HOUSE_DRAG_ENABLED) {
       cornFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       salmonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       lemonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
-      stumpFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
-      treeHouseFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
-      candyJarFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      pigHouseFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       friesFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       fryStickFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       campfireFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
@@ -3902,9 +3686,7 @@ if (HOUSE_DRAG_ENABLED) {
       else if (CORN_SCENE_EDIT && grilledCorns.some((item) => item.object === target.object)) logCornPlacements();
       else if (salmonSteaks.some((item) => item.object === target.object)) logSalmonPlacements();
       else if (lemonSlices.some((item) => item.object === target.object)) logLemonPlacements();
-      else if (STUMP_SCENE_EDIT && treeStumps.some((item) => item.object === target.object)) logStumpPlacements();
-      else if (TREE_HOUSE_SCENE_EDIT && treeHouses.some((item) => item.object === target.object)) logTreeHousePlacements();
-      else if (CANDY_JAR_SCENE_EDIT && candyJars.some((item) => item.object === target.object)) logCandyJarPlacements();
+      else if (PIG_HOUSE_SCENE_EDIT && pigHouses.some((item) => item.object === target.object)) logPigHousePlacements();
       else if (frenchFries.some((item) => item.object === target.object)) logFrenchFriesPlacements();
       else if (frenchFrySticks.some((item) => item.object === target.object)) logFrenchFryStickPlacements();
     },
@@ -3930,17 +3712,9 @@ if (HOUSE_DRAG_ENABLED) {
       if (shiitakeEntry) bindShiitakePanel(shiitakeEntry);
       const lemonEntry = lemonSlices.find((item) => item.object === target.object);
       if (lemonEntry) bindLemonPanel(lemonEntry);
-      if (STUMP_SCENE_EDIT) {
-        const stumpEntry = treeStumps.find((item) => item.object === target.object);
-        if (stumpEntry) bindStumpPanel(stumpEntry);
-      }
-      if (TREE_HOUSE_SCENE_EDIT) {
-        const treeHouseEntry = treeHouses.find((item) => item.object === target.object);
-        if (treeHouseEntry) bindTreeHousePanel(treeHouseEntry);
-      }
-      if (CANDY_JAR_SCENE_EDIT) {
-        const candyJarEntry = candyJars.find((item) => item.object === target.object);
-        if (candyJarEntry) bindCandyJarPanel(candyJarEntry);
+      if (PIG_HOUSE_SCENE_EDIT) {
+        const pigHouseEntry = pigHouses.find((item) => item.object === target.object);
+        if (pigHouseEntry) bindPigHousePanel(pigHouseEntry);
       }
       const friesEntry = frenchFries.find((item) => item.object === target.object);
       if (friesEntry) bindFriesPanel(friesEntry);

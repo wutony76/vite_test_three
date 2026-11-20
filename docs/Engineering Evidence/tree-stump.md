@@ -24,3 +24,7 @@
 
 - [x] proposal / design / tasks / validation 完成
 - [x] Architecture README 已補上 treeStump
+
+## 後續
+
+- 使用者要求移除樹墩：`treeStump.ts`／`treeStumpLayout.ts` 與面板刪除（需要時可從 commit 443a2e3 取回）。
