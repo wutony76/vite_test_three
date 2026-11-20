@@ -24,6 +24,9 @@ import {
   type WorldHouse,
   type WorldPudding,
   type WorldLemonSlice,
+  type WorldTreeStump,
+  type WorldTreeHouse,
+  type WorldBananaLeafCluster,
   type WorldCampfire,
   type WorldShiitake,
   type WorldTreasureChest,
@@ -41,6 +44,9 @@ import {
 import { whenGltfMountsIdle, whenGltfsReady } from './objects/sharedGltf';
 import { formatGrilledCornPlacementsForPaste } from './objects/grilledCorn';
 import { formatLemonSlicePlacementsForPaste } from './objects/lemonSlice';
+import { formatTreeStumpPlacementsForPaste } from './objects/treeStump';
+import { formatTreeHousePlacementsForPaste } from './objects/treeHouse';
+import { formatBananaLeafClustersForPaste, type BananaLeaf } from './objects/bananaLeaves';
 import { CAMPFIRE_CHICKEN_SPIN_AXES, formatCampfireSettingsForPaste } from './objects/campfire';
 import { formatShiitakePlacementsForPaste } from './objects/shiitake';
 import { formatTreasureChestSettingsForPaste } from './objects/treasureChest';
@@ -273,6 +279,15 @@ const {
   lemonSlices,
   addLemonSlice,
   removeLemonSlice,
+  treeStumps,
+  addTreeStump,
+  removeTreeStump,
+  treeHouses,
+  addTreeHouse,
+  removeTreeHouse,
+  bananaClusters,
+  addBananaCluster,
+  removeBananaCluster,
   frenchFries,
   addFrenchFries,
   removeFrenchFries,
@@ -2970,6 +2985,461 @@ if (lemonFolder) {
   if (lemonSlices[0]) bindLemonPanel(lemonSlices[0]);
 }
 
+// 樹墩（綠球上；拖曳選取後調整，可複製）——選取、編輯方式跟檸檬片一樣
+// 已擺好（佈局寫在 treeStumpLayout.ts）：關閉編輯 → 不顯示面板、場景上不能點選或拖曳。
+// 要再調整時改成 true：面板、點選、拖曳都會回來
+const STUMP_SCENE_EDIT = false;
+const stumpFolder = gui.addFolder('樹墩');
+if (!STUMP_SCENE_EDIT) stumpFolder.hide();
+let selectedStump: WorldTreeStump | null = null;
+
+/** 選中的那個整個微微發亮，一眼看得出選了哪個；其他的還原 */
+function highlightStump(entry: WorldTreeStump | null) {
+  for (const stump of treeStumps) stump.setHighlighted(stump === entry);
+}
+
+const STUMP_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+
+function clearStumpPanelSliders() {
+  stumpFolder.title('樹墩');
+  for (const controller of [...stumpFolder.controllers]) {
+    if (STUMP_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+function bindStumpPanel(entry: WorldTreeStump) {
+  const alreadyShowing = entry === selectedStump && stumpFolder.controllers.length > STUMP_PANEL_ACTIONS.size;
+  selectedStump = entry;
+  highlightStump(entry);
+  if (alreadyShowing) return;
+
+  clearStumpPanelSliders();
+  stumpFolder.title(`樹墩 · ${entry.label}`);
+
+  const settings = entry.settings;
+  const apply = () => entry.apply();
+  const applyVisuals = () => entry.applyVisuals();
+  type NumberKey = { [K in keyof typeof settings]: (typeof settings)[K] extends number ? K : never }[keyof typeof settings];
+  const slider = (key: NumberKey, min: number, max: number, step: number, name: string, onChange = apply) =>
+    stumpFolder.add(settings, key, min, max, step).name(name).onChange(onChange).onFinishChange(logStumpPlacements);
+
+  slider('angleFromTopDegrees', 0, 90, 1, '離頂端 (°)');
+  slider('azimuthDegrees', -180, 180, 1, '方位 (°)');
+  slider('spinDegrees', -180, 180, 1, '自轉 (°)');
+  slider('tiltXDegrees', -60, 60, 1, '前傾 (°)');
+  slider('tiltZDegrees', -60, 60, 1, '側傾 (°)');
+  slider('sink', -0.1, 0.1, 0.001, '下沉（負值上浮）');
+  slider('placementScale', 0.15, 4, 0.01, '縮放');
+  slider('modelSize', 0.03, 0.5, 0.005, '大小 (m)');
+  // 寬、深、高各自拉：紋路是 shader 即時算的，拉多寬都不會糊、也不會被拉扁
+  slider('widthScale', 0.4, 4, 0.05, '變寬（左右）');
+  slider('depthScale', 0.4, 4, 0.05, '變厚（前後）');
+  slider('heightScale', 0.3, 4, 0.05, '變高');
+  slider('ringCount', 3, 30, 1, '年輪圈數');
+  slider('seed', 1, 99, 1, '造型（換一個）');
+  stumpFolder.add(settings, 'showBranch').name('小樹枝').onChange(apply).onFinishChange(logStumpPlacements);
+  slider('colorBoost', 0.6, 1.5, 0.01, '亮度', applyVisuals);
+  stumpFolder.addColor(settings, 'tintColor').name('顏色').onChange(applyVisuals).onFinishChange(logStumpPlacements);
+  slider('tintMix', 0, 1, 0.01, '顏色強度', applyVisuals);
+}
+
+function logStumpPlacements() {
+  if (treeStumps.length === 0) return;
+  const text = formatTreeStumpPlacementsForPaste(
+    treeStumps.map((stump) => ({ id: stump.id, settings: stump.settings })),
+  );
+  console.log(text);
+  return text;
+}
+
+{
+  const stumpControls = {
+    add() {
+      // 有選中就複製選中那個（大小、寬高、造型都一樣），沒有就用預設值
+      const created = addTreeStump(selectedStump ? { ...selectedStump.settings } : undefined);
+      if (!created) return;
+      bindStumpPanel(created);
+      refreshPuddingDragTargets();
+    },
+    remove() {
+      if (!selectedStump || treeStumps.length === 0) return;
+      if (!removeTreeStump(selectedStump)) return;
+      selectedStump = null;
+      clearStumpPanelSliders();
+      const next = treeStumps[treeStumps.length - 1];
+      if (next) bindStumpPanel(next);
+      else highlightStump(null);
+      refreshPuddingDragTargets();
+    },
+    log() {
+      logStumpPlacements();
+    },
+  };
+  stumpFolder.add(stumpControls, 'add').name('複製樹墩');
+  stumpFolder.add(stumpControls, 'remove').name('移除選中樹墩');
+  stumpFolder.add(stumpControls, 'log').name('印出全部佈局 (console)');
+  // 一開始不自動選取（不然開場就有一個在發亮）；拖曳或點一下樹墩才選取
+}
+
+// 豬豬樹屋（綠球上；拖曳選取後調整，可複製）——選取、編輯方式跟檸檬片一樣
+const treeHouseFolder = gui.addFolder('豬豬樹屋');
+// 開關：false = 隱藏面板、不能拖曳（調好位置後關掉，跟樹墩一樣）
+const TREE_HOUSE_SCENE_EDIT = true;
+if (!TREE_HOUSE_SCENE_EDIT) treeHouseFolder.hide();
+let selectedTreeHouse: WorldTreeHouse | null = null;
+
+/** 選中的那個整個微微發亮，一眼看得出選了哪個；其他的還原 */
+function highlightTreeHouse(entry: WorldTreeHouse | null) {
+  for (const house of treeHouses) house.setHighlighted(house === entry);
+}
+
+const TREE_HOUSE_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+
+function clearTreeHousePanelSliders() {
+  treeHouseFolder.title('豬豬樹屋');
+  for (const controller of [...treeHouseFolder.controllers]) {
+    if (TREE_HOUSE_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+  // 子資料夾（芭蕉葉）也要拆掉，不然每換選一棟就多一個
+  for (const folder of [...treeHouseFolder.folders]) folder.destroy();
+}
+
+function bindTreeHousePanel(entry: WorldTreeHouse) {
+  const alreadyShowing = entry === selectedTreeHouse && treeHouseFolder.controllers.length > TREE_HOUSE_PANEL_ACTIONS.size;
+  selectedTreeHouse = entry;
+  highlightTreeHouse(entry);
+  if (alreadyShowing) return;
+
+  clearTreeHousePanelSliders();
+  treeHouseFolder.title(`豬豬樹屋 · ${entry.label}`);
+
+  const settings = entry.settings;
+  const apply = () => entry.apply();
+  const applyVisuals = () => entry.applyVisuals();
+  type NumberKey = { [K in keyof typeof settings]: (typeof settings)[K] extends number ? K : never }[keyof typeof settings];
+  const slider = (key: NumberKey, min: number, max: number, step: number, name: string, onChange = apply) =>
+    treeHouseFolder.add(settings, key, min, max, step).name(name).onChange(onChange).onFinishChange(logTreeHousePlacements);
+
+  slider('angleFromTopDegrees', 0, 90, 1, '離頂端 (°)');
+  slider('azimuthDegrees', -180, 180, 1, '方位 (°)');
+  slider('spinDegrees', -180, 180, 1, '自轉 (°)');
+  slider('sink', -0.05, 0.05, 0.001, '下沉（負值上浮）');
+  slider('placementScale', 0.3, 3, 0.01, '縮放');
+  slider('size', 0.06, 0.5, 0.005, '平台寬度 (m)');
+  // 豬屋大小：豬屋＋芭蕉葉一起縮放，底部一直坐在木筏上（放很大時記得把「木筏大小」也調大）
+  slider('houseScale', 0.3, 2.5, 0.01, '豬屋大小（放大縮小）');
+  slider('supportHeight', 0.4, 2.5, 0.01, '樹幹支架高度');
+  slider('raftSize', 0.8, 2, 0.01, '木筏大小');
+  slider('trunkWidth', 0.5, 2, 0.01, '樹幹粗細');
+  slider('trunkSeed', 1, 99, 1, '樹幹造型（換一個）');
+  treeHouseFolder.addColor(settings, 'bodyColor').name('豬屋顏色').onChange(apply).onFinishChange(logTreeHousePlacements);
+  // 耳朵：左右鏡射對稱，一起調
+  slider('earForward', -40, 40, 1, '耳朵前後 (°)');
+  slider('earThickness', 0.3, 3, 0.05, '耳朵厚度');
+  slider('earSize', 0.5, 1.8, 0.01, '耳朵大小');
+  // 豬屋在平台上的位置與朝向（只移動豬屋本體＋芭蕉葉，不用重建，拖滑桿很順）
+  slider('houseOffsetX', -0.6, 0.6, 0.005, '豬屋左右');
+  slider('houseOffsetZ', -0.6, 0.6, 0.005, '豬屋前後');
+  slider('houseYaw', -180, 180, 1, '豬屋旋轉 (°)');
+  slider('colorBoost', 0.6, 1.5, 0.01, '亮度', applyVisuals);
+
+}
+
+function logTreeHousePlacements() {
+  if (treeHouses.length === 0) return;
+  const text = formatTreeHousePlacementsForPaste(
+    treeHouses.map((house) => ({ id: house.id, settings: house.settings })),
+  );
+  console.log(text);
+  return text;
+}
+
+{
+  const treeHouseControls = {
+    add() {
+      // 有選中就複製選中那個（大小、造型都一樣），沒有就用預設值
+      const created = addTreeHouse(selectedTreeHouse ? { ...selectedTreeHouse.settings } : undefined);
+      if (!created) return;
+      bindTreeHousePanel(created);
+      refreshPuddingDragTargets();
+    },
+    remove() {
+      if (!selectedTreeHouse || treeHouses.length === 0) return;
+      if (!removeTreeHouse(selectedTreeHouse)) return;
+      selectedTreeHouse = null;
+      clearTreeHousePanelSliders();
+      const next = treeHouses[treeHouses.length - 1];
+      if (next) bindTreeHousePanel(next);
+      else highlightTreeHouse(null);
+      refreshPuddingDragTargets();
+    },
+    log() {
+      logTreeHousePlacements();
+    },
+  };
+  treeHouseFolder.add(treeHouseControls, 'add').name('複製樹屋');
+  treeHouseFolder.add(treeHouseControls, 'remove').name('移除選中樹屋');
+  treeHouseFolder.add(treeHouseControls, 'log').name('印出全部佈局 (console)');
+  // 一開始不自動選取（不然開場就有一個在發亮）；拖曳或點一下豬豬樹屋才選取
+}
+
+// 芭蕉葉叢（綠球上的獨立物件；拖曳選取後調整，可複製）——跟檸檬片一樣
+// 操作：直接拖 = 整叢在綠球上移動；Alt（⌥）拖葉子 = 只移動那一片；Shift 上下拖 = 那一片上浮／下沉
+const BANANA_SCENE_EDIT = true;
+const bananaFolder = gui.addFolder('芭蕉葉叢');
+if (!BANANA_SCENE_EDIT) bananaFolder.hide();
+let selectedCluster: WorldBananaLeafCluster | null = null;
+const BANANA_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+
+function highlightCluster(entry: WorldBananaLeafCluster | null) {
+  for (const cluster of bananaClusters) cluster.setHighlighted(cluster === entry);
+}
+
+function logBananaClusters() {
+  if (bananaClusters.length === 0) return;
+  const text = formatBananaLeafClustersForPaste(bananaClusters.map((item) => ({ id: item.id, settings: item.settings })));
+  console.log(text);
+  return text;
+}
+
+function clearBananaPanelSliders() {
+  bananaFolder.title('芭蕉葉叢');
+  for (const controller of [...bananaFolder.controllers]) {
+    if (BANANA_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+function bindBananaPanel(entry: WorldBananaLeafCluster) {
+  const alreadyShowing = entry === selectedCluster && bananaFolder.controllers.length > BANANA_PANEL_ACTIONS.size;
+  selectedCluster = entry;
+  highlightCluster(entry);
+  if (alreadyShowing) return;
+  clearBananaPanelSliders();
+  bananaFolder.title(`芭蕉葉叢 · ${entry.label}`);
+  const settings = entry.settings;
+  const apply = () => entry.apply();
+  type NumberKey = { [K in keyof typeof settings]: (typeof settings)[K] extends number ? K : never }[keyof typeof settings];
+  const slider = (key: NumberKey, min: number, max: number, step: number, name: string, onChange = apply) =>
+    bananaFolder.add(settings, key, min, max, step).name(name).onChange(onChange).onFinishChange(logBananaClusters);
+  slider('angleFromTopDegrees', 0, 90, 1, '離頂端 (°)');
+  slider('azimuthDegrees', -180, 180, 1, '方位 (°)');
+  slider('spinDegrees', -180, 180, 1, '自轉 (°)');
+  slider('sink', -0.1, 0.1, 0.001, '下沉（負值上浮）');
+  slider('placementScale', 0.2, 4, 0.01, '縮放');
+  slider('size', 0.03, 0.5, 0.005, '大小 (m)');
+  slider('groupYaw', -180, 180, 1, '整組旋轉 (°)');
+  slider('groupTiltX', -90, 90, 1, '整組前後傾 (°)');
+  slider('groupTiltZ', -90, 90, 1, '整組左右傾 (°)');
+  slider('groupScale', 0.3, 3, 0.01, '整組放大');
+  slider('groupRise', -0.8, 1.5, 0.005, '整組上升／下降');
+  slider('colorBoost', 0.6, 1.5, 0.01, '亮度', () => entry.applyVisuals());
+}
+
+{
+  const bananaControls = {
+    add() {
+      const created = addBananaCluster(selectedCluster ? { ...selectedCluster.settings } : undefined);
+      if (!created) return;
+      bindBananaPanel(created);
+      refreshPuddingDragTargets();
+      logBananaClusters();
+    },
+    remove() {
+      if (!selectedCluster || bananaClusters.length === 0) return;
+      if (!removeBananaCluster(selectedCluster)) return;
+      selectedCluster = null;
+      selectedLeaf = null;
+      clearBananaPanelSliders();
+      clearLeafPanelSliders();
+      const next = bananaClusters[bananaClusters.length - 1];
+      if (next) bindBananaPanel(next);
+      else highlightCluster(null);
+      refreshPuddingDragTargets();
+      logBananaClusters();
+    },
+    log() {
+      logBananaClusters();
+    },
+  };
+  bananaFolder.add(bananaControls, 'add').name('複製芭蕉葉叢');
+  bananaFolder.add(bananaControls, 'remove').name('移除選中芭蕉葉叢');
+  bananaFolder.add(bananaControls, 'log').name('印出全部佈局 (console)');
+}
+
+// 單片芭蕉葉（點一下葉子就選到那一片）
+const leafFolder = gui.addFolder('芭蕉葉（單片）');
+if (!BANANA_SCENE_EDIT) leafFolder.hide();
+let selectedLeaf: BananaLeaf | null = null;
+const LEAF_PANEL_ACTIONS = new Set(['add', 'remove', 'log']);
+
+function allBananaLeaves() {
+  return bananaClusters.flatMap((cluster) => cluster.getLeaves());
+}
+
+function clusterOfLeaf(leaf: BananaLeaf) {
+  return bananaClusters.find((cluster) => cluster.getLeaves().includes(leaf)) ?? null;
+}
+
+function highlightLeaf(entry: BananaLeaf | null) {
+  for (const leaf of allBananaLeaves()) leaf.setHighlighted(leaf === entry);
+}
+
+function clearLeafPanelSliders() {
+  leafFolder.title('芭蕉葉（單片）');
+  for (const controller of [...leafFolder.controllers]) {
+    if (LEAF_PANEL_ACTIONS.has(String(controller.property))) continue;
+    controller.destroy();
+  }
+}
+
+function bindLeafPanel(entry: BananaLeaf) {
+  const alreadyShowing = entry === selectedLeaf && leafFolder.controllers.length > LEAF_PANEL_ACTIONS.size;
+  selectedLeaf = entry;
+  highlightLeaf(entry);
+  if (alreadyShowing) return;
+  clearLeafPanelSliders();
+  const cluster = clusterOfLeaf(entry);
+  leafFolder.title(`芭蕉葉 · ${cluster ? `${cluster.label} / ` : ''}${entry.label}`);
+  const settings = entry.settings;
+  const apply = () => entry.apply();
+  type LeafNumberKey = { [K in keyof typeof settings]: (typeof settings)[K] extends number ? K : never }[keyof typeof settings];
+  const slider = (key: LeafNumberKey, min: number, max: number, step: number, name: string) =>
+    leafFolder.add(settings, key, min, max, step).name(name).onChange(apply).onFinishChange(logBananaClusters);
+  slider('azimuth', -180, 180, 1, '位置：方位 (°)');
+  slider('elevation', -10, 88, 1, '位置：高度 (°)');
+  slider('lift', -0.2, 1.2, 0.005, '離中心距離');
+  slider('rise', -0.5, 1.5, 0.005, '上浮（垂直）');
+  slider('tilt', 0, 180, 1, '往外倒 (°)');
+  slider('yaw', -180, 180, 1, '左右轉 (°)');
+  slider('roll', -180, 180, 1, '葉面自轉 (°)');
+  slider('pitch', -180, 180, 1, '向下旋轉 (°)');
+  slider('length', 0.1, 2, 0.01, '長度');
+  slider('width', 0.05, 1, 0.01, '寬度');
+  slider('droop', 0, 1.2, 0.01, '下垂');
+  leafFolder.addColor(settings, 'color').name('顏色').onChange(apply).onFinishChange(logBananaClusters);
+}
+
+{
+  const leafControls = {
+    add() {
+      // 複製選中那片（同一叢）；沒選就加到第一叢
+      const cluster = (selectedLeaf && clusterOfLeaf(selectedLeaf)) || bananaClusters[0];
+      if (!cluster) return;
+      const created = cluster.addLeaf(selectedLeaf ? { ...selectedLeaf.settings } : undefined);
+      bindLeafPanel(created);
+      logBananaClusters();
+    },
+    remove() {
+      if (!selectedLeaf) return;
+      selectedLeaf.remove();
+      selectedLeaf = null;
+      clearLeafPanelSliders();
+      const next = allBananaLeaves().at(-1);
+      if (next) bindLeafPanel(next);
+      logBananaClusters();
+    },
+    log() {
+      logBananaClusters();
+    },
+  };
+  leafFolder.add(leafControls, 'add').name('複製這片葉子');
+  leafFolder.add(leafControls, 'remove').name('移除選中葉子');
+  leafFolder.add(leafControls, 'log').name('印出全部佈局 (console)');
+}
+
+/**
+ * 芭蕉葉的點選／單片拖曳。用「捕捉階段」(capture)，而且比 surfaceDrag 早註冊 → 先收到事件：
+ *   - 點到葉子：選取那一片（單片面板）和它那一叢（葉叢面板）
+ *   - 沒按 Alt／Shift：不攔截，讓 surfaceDrag 接手 → 整叢在綠球上拖
+ *   - 按住 Alt 或 Shift：stopImmediatePropagation 攔下來，只動那一片
+ */
+if (BANANA_SCENE_EDIT) {
+  const leafRaycaster = new THREE.Raycaster();
+  const leafPointer = new THREE.Vector2();
+  let draggingLeaf: BananaLeaf | null = null;
+  let leafMoved = false;
+  // Shift 上下拖 = 調「上浮」：按下 Shift 那一刻記下滑鼠高度與上浮值
+  let shiftActive = false;
+  let riseStartY = 0;
+  let riseStart = 0;
+  const updateLeafRay = (event: PointerEvent) => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    leafPointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+    leafRaycaster.setFromCamera(leafPointer, camera);
+  };
+  renderer.domElement.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (event.button !== 0) return;
+      updateLeafRay(event);
+      const leaves = allBananaLeaves().filter((leaf) => leaf.object.visible);
+      const hit = leafRaycaster.intersectObjects(leaves.map((leaf) => leaf.object), false)[0];
+      if (!hit) return;
+      const leaf = leaves.find((item) => item.object === hit.object);
+      if (!leaf) return;
+      bindLeafPanel(leaf);
+      const cluster = clusterOfLeaf(leaf);
+      if (cluster) bindBananaPanel(cluster);
+      highlightLeaf(leaf);
+      if (!event.altKey && !event.shiftKey) return; // 交給 surfaceDrag：整叢拖
+      event.stopImmediatePropagation();
+      leaf.beginDrag(leafRaycaster.ray);
+      shiftActive = false;
+      draggingLeaf = leaf;
+      leafMoved = false;
+      controls.enabled = false;
+      renderer.domElement.setPointerCapture(event.pointerId);
+    },
+    { capture: true },
+  );
+  renderer.domElement.addEventListener(
+    'pointermove',
+    (event) => {
+      if (!draggingLeaf) return;
+      event.stopImmediatePropagation();
+      updateLeafRay(event);
+      if (event.shiftKey) {
+        if (!shiftActive) {
+          shiftActive = true;
+          riseStartY = event.clientY;
+          riseStart = draggingLeaf.settings.rise;
+        }
+        // Shift：只往上浮／往下沉，不改位置。每 100 像素約 0.3（模型單位）
+        draggingLeaf.settings.rise = Math.round((riseStart + (riseStartY - event.clientY) * 0.003) * 1000) / 1000;
+        draggingLeaf.apply();
+        leafMoved = true;
+        leafFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
+        return;
+      }
+      // 放開 Shift 後回到 Alt 拖曳：以目前滑鼠位置重新當起點，葉子不會跳
+      if (shiftActive) {
+        shiftActive = false;
+        draggingLeaf.beginDrag(leafRaycaster.ray);
+      }
+      if (draggingLeaf.moveToRay(leafRaycaster.ray)) {
+        leafMoved = true;
+        leafFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      }
+    },
+    { capture: true },
+  );
+  renderer.domElement.addEventListener(
+    'pointerup',
+    (event) => {
+      if (!draggingLeaf) return;
+      event.stopImmediatePropagation();
+      draggingLeaf = null;
+      controls.enabled = true;
+      renderer.domElement.releasePointerCapture(event.pointerId);
+      if (leafMoved) logBananaClusters();
+    },
+    { capture: true },
+  );
+}
+
 // 薯條（綠球上；拖曳、複製、躺下）
 const friesFolder = gui.addFolder('薯條');
 let selectedFries: WorldFrenchFries | null = null;
@@ -3434,6 +3904,9 @@ let surfaceDragTargets: Array<
   | WorldFriedEgg
   | WorldSalmonSteak
   | WorldLemonSlice
+  | WorldTreeStump
+  | WorldTreeHouse
+  | WorldBananaLeafCluster
   | WorldFrenchFries
   | WorldFrenchFryStick
   | WorldCampfire
@@ -3463,6 +3936,9 @@ let surfaceDragTargets: Array<
   ...friedEggsOnSphere(),
   ...salmonSteaks,
   ...lemonSlices,
+  ...(STUMP_SCENE_EDIT ? treeStumps : []),
+  ...(TREE_HOUSE_SCENE_EDIT ? treeHouses : []),
+  ...(BANANA_SCENE_EDIT ? bananaClusters : []),
   ...(foodVisibility.showFrenchFries ? frenchFries : []),
   ...(foodVisibility.showFrenchFryStick ? frenchFrySticks : []),
 ];
@@ -3484,6 +3960,9 @@ function refreshPuddingDragTargets() {
   if (CORN_SCENE_EDIT && foodVisibility.showCorn) surfaceDragTargets.push(...grilledCorns);
   if (foodVisibility.showSalmon) surfaceDragTargets.push(...salmonSteaks);
   if (foodVisibility.showLemon) surfaceDragTargets.push(...lemonSlices);
+  if (STUMP_SCENE_EDIT) surfaceDragTargets.push(...treeStumps);
+  if (TREE_HOUSE_SCENE_EDIT) surfaceDragTargets.push(...treeHouses);
+  if (BANANA_SCENE_EDIT) surfaceDragTargets.push(...bananaClusters);
   if (foodVisibility.showFrenchFries) surfaceDragTargets.push(...frenchFries);
   if (foodVisibility.showFrenchFryStick) surfaceDragTargets.push(...frenchFrySticks);
 }
@@ -3524,6 +4003,18 @@ if (HOUSE_DRAG_ENABLED) {
       if (shiitakeEntry) bindShiitakePanel(shiitakeEntry);
       const lemonEntry = lemonSlices.find((item) => item.object === target.object);
       if (lemonEntry) bindLemonPanel(lemonEntry);
+      if (STUMP_SCENE_EDIT) {
+        const stumpEntry = treeStumps.find((item) => item.object === target.object);
+        if (stumpEntry) bindStumpPanel(stumpEntry);
+      }
+      if (TREE_HOUSE_SCENE_EDIT) {
+        const treeHouseEntry = treeHouses.find((item) => item.object === target.object);
+        if (treeHouseEntry) bindTreeHousePanel(treeHouseEntry);
+      }
+      if (BANANA_SCENE_EDIT) {
+        const clusterEntry = bananaClusters.find((item) => item.object === target.object);
+        if (clusterEntry) bindBananaPanel(clusterEntry);
+      }
       const friesEntry = frenchFries.find((item) => item.object === target.object);
       if (friesEntry) bindFriesPanel(friesEntry);
       const fryStickEntry = frenchFrySticks.find((item) => item.object === target.object);
@@ -3536,6 +4027,9 @@ if (HOUSE_DRAG_ENABLED) {
       cornFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       salmonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       lemonFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      stumpFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      treeHouseFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
+      bananaFolder.controllersRecursive().forEach((controller) => controller.updateDisplay());
       friesFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       fryStickFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
       campfireFolder?.controllersRecursive().forEach((controller) => controller.updateDisplay());
@@ -3576,6 +4070,9 @@ if (HOUSE_DRAG_ENABLED) {
       else if (CORN_SCENE_EDIT && grilledCorns.some((item) => item.object === target.object)) logCornPlacements();
       else if (salmonSteaks.some((item) => item.object === target.object)) logSalmonPlacements();
       else if (lemonSlices.some((item) => item.object === target.object)) logLemonPlacements();
+      else if (STUMP_SCENE_EDIT && treeStumps.some((item) => item.object === target.object)) logStumpPlacements();
+      else if (TREE_HOUSE_SCENE_EDIT && treeHouses.some((item) => item.object === target.object)) logTreeHousePlacements();
+      else if (BANANA_SCENE_EDIT && bananaClusters.some((item) => item.object === target.object)) logBananaClusters();
       else if (frenchFries.some((item) => item.object === target.object)) logFrenchFriesPlacements();
       else if (frenchFrySticks.some((item) => item.object === target.object)) logFrenchFryStickPlacements();
     },
@@ -3601,6 +4098,18 @@ if (HOUSE_DRAG_ENABLED) {
       if (shiitakeEntry) bindShiitakePanel(shiitakeEntry);
       const lemonEntry = lemonSlices.find((item) => item.object === target.object);
       if (lemonEntry) bindLemonPanel(lemonEntry);
+      if (STUMP_SCENE_EDIT) {
+        const stumpEntry = treeStumps.find((item) => item.object === target.object);
+        if (stumpEntry) bindStumpPanel(stumpEntry);
+      }
+      if (TREE_HOUSE_SCENE_EDIT) {
+        const treeHouseEntry = treeHouses.find((item) => item.object === target.object);
+        if (treeHouseEntry) bindTreeHousePanel(treeHouseEntry);
+      }
+      if (BANANA_SCENE_EDIT) {
+        const clusterEntry = bananaClusters.find((item) => item.object === target.object);
+        if (clusterEntry) bindBananaPanel(clusterEntry);
+      }
       const friesEntry = frenchFries.find((item) => item.object === target.object);
       if (friesEntry) bindFriesPanel(friesEntry);
       const fryStickEntry = frenchFrySticks.find((item) => item.object === target.object);

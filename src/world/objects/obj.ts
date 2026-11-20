@@ -43,6 +43,25 @@ import {
   LEMON_SLICE_PLACEMENTS,
   type LemonSliceLayout,
 } from './lemonSliceLayout';
+import { createTreeStump, type TreeStumpSettings } from './treeStump';
+import { createTreeHouse, type TreeHouseSettings } from './treeHouse';
+import { createBananaLeafCluster, type BananaLeaf, type BananaLeafClusterSettings } from './bananaLeaves';
+import {
+  BANANA_LEAF_CLUSTER_DEFAULT,
+  BANANA_LEAF_CLUSTER_PLACEMENTS,
+  type BananaLeafClusterLayout,
+  type BananaLeafLayout,
+} from './bananaLeavesLayout';
+import {
+  TREE_HOUSE_LAYOUT_DEFAULT,
+  TREE_HOUSE_PLACEMENTS,
+  type TreeHouseLayout,
+} from './treeHouseLayout';
+import {
+  TREE_STUMP_LAYOUT_DEFAULT,
+  TREE_STUMP_PLACEMENTS,
+  type TreeStumpLayout,
+} from './treeStumpLayout';
 import { createFrenchFries, type FrenchFriesSettings } from './frenchFries';
 import {
   FRENCH_FRIES_LAYOUT_DEFAULT,
@@ -372,6 +391,166 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
       const { id, ...layout } = placement;
       spawnLemonSlice(id, layout);
     }
+  }
+
+  // 樹墩（綠球上；拖曳選取後調整，可複製）——生成、複製、移除方式跟檸檬片一樣
+  type TreeStumpRuntime = ReturnType<typeof createTreeStump>;
+  const treeStumpEntries: Array<{ world: WorldTreeStump; runtime: TreeStumpRuntime }> = [];
+  const treeStumps: WorldTreeStump[] = [];
+
+  function spawnTreeStump(id: string, layout: TreeStumpLayout, grown = false) {
+    if (!puddingAxes) return null;
+    const runtime = createTreeStump({ ...puddingAxes, layout: { ...layout } });
+    ground.add(runtime.object);
+    const world = exposeTreeStump(id, runtime);
+    treeStumpEntries.push({ world, runtime });
+    treeStumps.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  if (puddingAxes) {
+    for (const placement of TREE_STUMP_PLACEMENTS) {
+      const { id, ...layout } = placement;
+      spawnTreeStump(id, layout);
+    }
+  }
+
+  function nextTreeStumpId() {
+    let n = treeStumpEntries.length + 1;
+    let id = `tree_stump_${n}`;
+    while (treeStumps.some((item) => item.id === id)) {
+      n += 1;
+      id = `tree_stump_${n}`;
+    }
+    return id;
+  }
+
+  /** 複製時沿用選中那個的設定（seed），再往旁邊挪一點，不會疊在同一個位置 */
+  function addTreeStump(seed?: Partial<TreeStumpLayout>): WorldTreeStump | null {
+    if (!puddingAxes) return null;
+    const base: TreeStumpLayout = { ...TREE_STUMP_LAYOUT_DEFAULT, ...seed };
+    const azimuth = seed?.azimuthDegrees ?? TREE_STUMP_LAYOUT_DEFAULT.azimuthDegrees;
+    base.azimuthDegrees = wrapDegrees(azimuth + 18);
+    return spawnTreeStump(nextTreeStumpId(), base, introDone);
+  }
+
+  function removeTreeStump(entry: WorldTreeStump) {
+    const index = treeStumpEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    const { runtime, world } = treeStumpEntries[index];
+    runtime.dispose();
+    treeStumpEntries.splice(index, 1);
+    const stumpIndex = treeStumps.indexOf(world);
+    if (stumpIndex >= 0) treeStumps.splice(stumpIndex, 1);
+    return true;
+  }
+
+  // 豬豬樹屋（綠球上；拖曳選取後調整，可複製）——生成、複製、移除方式跟檸檬片一樣
+  type TreeHouseRuntime = ReturnType<typeof createTreeHouse>;
+  const treeHouseEntries: Array<{ world: WorldTreeHouse; runtime: TreeHouseRuntime }> = [];
+  const treeHouses: WorldTreeHouse[] = [];
+
+  function spawnTreeHouse(id: string, layout: TreeHouseLayout, grown = false) {
+    if (!puddingAxes) return null;
+    const runtime = createTreeHouse({ ...puddingAxes, layout: { ...layout } });
+    ground.add(runtime.object);
+    const world = exposeTreeHouse(id, runtime);
+    treeHouseEntries.push({ world, runtime });
+    treeHouses.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  if (puddingAxes) {
+    for (const placement of TREE_HOUSE_PLACEMENTS) {
+      const { id, ...layout } = placement;
+      spawnTreeHouse(id, layout);
+    }
+  }
+
+  function nextTreeHouseId() {
+    let n = treeHouseEntries.length + 1;
+    let id = `tree_house_${n}`;
+    while (treeHouses.some((item) => item.id === id)) {
+      n += 1;
+      id = `tree_house_${n}`;
+    }
+    return id;
+  }
+
+  /** 複製時沿用選中那個的設定（seed），再往旁邊挪一點，不會疊在同一個位置 */
+  function addTreeHouse(seed?: Partial<TreeHouseLayout>): WorldTreeHouse | null {
+    if (!puddingAxes) return null;
+    const base: TreeHouseLayout = { ...TREE_HOUSE_LAYOUT_DEFAULT, ...seed };
+    const azimuth = seed?.azimuthDegrees ?? TREE_HOUSE_LAYOUT_DEFAULT.azimuthDegrees;
+    base.azimuthDegrees = wrapDegrees(azimuth + 30); // 院子比較大，挪遠一點
+    return spawnTreeHouse(nextTreeHouseId(), base, introDone);
+  }
+
+  function removeTreeHouse(entry: WorldTreeHouse) {
+    const index = treeHouseEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    const { runtime, world } = treeHouseEntries[index];
+    runtime.dispose();
+    treeHouseEntries.splice(index, 1);
+    const houseIndex = treeHouses.indexOf(world);
+    if (houseIndex >= 0) treeHouses.splice(houseIndex, 1);
+    return true;
+  }
+
+  // 芭蕉葉叢（綠球上；拖曳選取後調整，可複製）——生成、複製、移除方式跟檸檬片一樣
+  type BananaClusterRuntime = ReturnType<typeof createBananaLeafCluster>;
+  const bananaClusterEntries: Array<{ world: WorldBananaLeafCluster; runtime: BananaClusterRuntime }> = [];
+  const bananaClusters: WorldBananaLeafCluster[] = [];
+
+  function spawnBananaCluster(id: string, layout: BananaLeafClusterLayout, grown = false) {
+    if (!puddingAxes) return null;
+    const runtime = createBananaLeafCluster({ ...puddingAxes, layout: { ...layout } });
+    ground.add(runtime.object);
+    const world = exposeBananaLeafCluster(id, runtime);
+    bananaClusterEntries.push({ world, runtime });
+    bananaClusters.push(world);
+    runtime.setIntroGrow(grown ? 1 : 0);
+    return world;
+  }
+
+  if (puddingAxes) {
+    for (const placement of BANANA_LEAF_CLUSTER_PLACEMENTS) {
+      const { id, ...layout } = placement;
+      spawnBananaCluster(id, layout);
+    }
+  }
+
+  function nextBananaClusterId() {
+    let n = bananaClusterEntries.length + 1;
+    let id = `banana_leaves_${n}`;
+    while (bananaClusters.some((item) => item.id === id)) {
+      n += 1;
+      id = `banana_leaves_${n}`;
+    }
+    return id;
+  }
+
+  /** 複製時沿用選中那個的設定（seed），再往旁邊挪一點，不會疊在同一個位置 */
+  function addBananaCluster(seed?: Partial<BananaLeafClusterLayout>): WorldBananaLeafCluster | null {
+    if (!puddingAxes) return null;
+    // leaves 是陣列：深複製，複製出來的葉叢才不會跟原本的共用同一組葉子
+    const base: BananaLeafClusterLayout = { ...BANANA_LEAF_CLUSTER_DEFAULT, ...seed, leaves: (seed?.leaves ?? BANANA_LEAF_CLUSTER_DEFAULT.leaves).map((leaf) => ({ ...leaf })) };
+    const azimuth = seed?.azimuthDegrees ?? BANANA_LEAF_CLUSTER_DEFAULT.azimuthDegrees;
+    base.azimuthDegrees = wrapDegrees(azimuth + 18);
+    return spawnBananaCluster(nextBananaClusterId(), base, introDone);
+  }
+
+  function removeBananaCluster(entry: WorldBananaLeafCluster) {
+    const index = bananaClusterEntries.findIndex((item) => item.world === entry);
+    if (index < 0) return false;
+    const { runtime, world } = bananaClusterEntries[index];
+    runtime.dispose();
+    bananaClusterEntries.splice(index, 1);
+    const clusterIndex = bananaClusters.indexOf(world);
+    if (clusterIndex >= 0) bananaClusters.splice(clusterIndex, 1);
+    return true;
   }
 
   type FrenchFriesRuntime = ReturnType<typeof createFrenchFries>;
@@ -1016,6 +1195,9 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     for (const { world } of grilledCornEntries) roots.push(world.object);
     for (const { world } of salmonSteakEntries) roots.push(world.object);
     for (const { world } of lemonSliceEntries) roots.push(world.object);
+    for (const { world } of treeStumpEntries) roots.push(world.object);
+    for (const { world } of treeHouseEntries) roots.push(world.object);
+    for (const { world } of bananaClusterEntries) roots.push(world.object);
     for (const { world } of frenchFriesEntries) roots.push(world.object);
     for (const { world } of frenchFryStickEntries) roots.push(world.object);
     for (const { world } of friedEggEntries) {
@@ -1382,6 +1564,9 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
   for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
   for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
   for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
+  for (const { runtime } of treeStumpEntries) runtime.setIntroGrow(0);
+  for (const { runtime } of treeHouseEntries) runtime.setIntroGrow(0);
+  for (const { runtime } of bananaClusterEntries) runtime.setIntroGrow(0);
   for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(0);
   for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(0);
   pigRuntime?.setIntroGrow(0);
@@ -1442,6 +1627,9 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         for (const { runtime } of grilledCornEntries) runtime.setIntroGrow(1);
         for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(1);
         for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of treeStumpEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of treeHouseEntries) runtime.setIntroGrow(1);
+        for (const { runtime } of bananaClusterEntries) runtime.setIntroGrow(1);
         for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(1);
         for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(1);
         pigRuntime?.setIntroGrow(1);
@@ -1502,6 +1690,27 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
         : THREE.MathUtils.clamp((introElapsed - lemonStart) / 0.85, 0, 1);
       runtime.setIntroGrow(easeOutBack(lemonT, 2.0));
       runtime.update();
+    });
+    treeStumpEntries.forEach(({ runtime }, index) => {
+      const stumpStart = housesIntroEnd + index * 0.08;
+      const stumpT = introDone
+        ? 1
+        : THREE.MathUtils.clamp((introElapsed - stumpStart) / 0.85, 0, 1);
+      runtime.setIntroGrow(easeOutBack(stumpT, 2.0));
+    });
+    bananaClusterEntries.forEach(({ runtime }, index) => {
+      const clusterStart = housesIntroEnd + 0.15 + index * 0.08;
+      const clusterT = introDone
+        ? 1
+        : THREE.MathUtils.clamp((introElapsed - clusterStart) / 0.85, 0, 1);
+      runtime.setIntroGrow(easeOutBack(clusterT, 2.0));
+    });
+    treeHouseEntries.forEach(({ runtime }, index) => {
+      const houseStart = housesIntroEnd + 0.1 + index * 0.1;
+      const houseT = introDone
+        ? 1
+        : THREE.MathUtils.clamp((introElapsed - houseStart) / 0.9, 0, 1);
+      runtime.setIntroGrow(easeOutBack(houseT, 1.8));
     });
     frenchFriesEntries.forEach(({ runtime }, index) => {
       const friesStart = housesIntroEnd + index * 0.08;
@@ -1707,6 +1916,9 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     for (const { runtime } of friedEggEntries) runtime.setIntroGrow(0);
     for (const { runtime } of salmonSteakEntries) runtime.setIntroGrow(0);
     for (const { runtime } of lemonSliceEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of treeStumpEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of treeHouseEntries) runtime.setIntroGrow(0);
+    for (const { runtime } of bananaClusterEntries) runtime.setIntroGrow(0);
     for (const { runtime } of frenchFriesEntries) runtime.setIntroGrow(0);
     for (const { runtime } of frenchFryStickEntries) runtime.setIntroGrow(0);
     pigRuntime?.setIntroGrow(0);
@@ -1777,6 +1989,15 @@ export function createObjs({ envMap, eggEnvMap, camera }: CreateObjsOptions) {
     lemonSlices,
     addLemonSlice,
     removeLemonSlice,
+    treeStumps,
+    addTreeStump,
+    removeTreeStump,
+    treeHouses,
+    addTreeHouse,
+    removeTreeHouse,
+    bananaClusters,
+    addBananaCluster,
+    removeBananaCluster,
     frenchFries,
     addFrenchFries,
     removeFrenchFries,
@@ -1927,6 +2148,45 @@ export type WorldLemonSlice = {
   applyVisuals: () => void;
   getNormal: () => THREE.Vector3;
   setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldTreeStump = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: TreeStumpSettings;
+  apply: () => void;
+  applyVisuals: () => void;
+  setHighlighted: (value: boolean) => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldTreeHouse = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: TreeHouseSettings;
+  apply: () => void;
+  applyVisuals: () => void;
+  setHighlighted: (value: boolean) => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+};
+
+export type WorldBananaLeafCluster = {
+  id: string;
+  label: string;
+  object: THREE.Object3D;
+  settings: BananaLeafClusterSettings;
+  apply: () => void;
+  applyVisuals: () => void;
+  setHighlighted: (value: boolean) => void;
+  getNormal: () => THREE.Vector3;
+  setNormal: (normal: THREE.Vector3) => void;
+  /** 這叢的芭蕉葉（每片可獨立選取、編輯） */
+  getLeaves: () => BananaLeaf[];
+  addLeaf: (seed?: Partial<BananaLeafLayout>) => BananaLeaf;
 };
 
 export type WorldFrenchFries = {
@@ -2174,6 +2434,50 @@ function exposeLemonSlice(id: string, slice: ReturnType<typeof createLemonSlice>
     applyVisuals: slice.applyVisuals,
     getNormal: slice.getNormal,
     setNormal: slice.setNormal,
+  };
+}
+
+function exposeTreeStump(id: string, stump: ReturnType<typeof createTreeStump>): WorldTreeStump {
+  return {
+    id,
+    label: id,
+    object: stump.object,
+    settings: stump.settings,
+    apply: stump.applySettings,
+    applyVisuals: stump.applyVisuals,
+    setHighlighted: stump.setHighlighted,
+    getNormal: stump.getNormal,
+    setNormal: stump.setNormal,
+  };
+}
+
+function exposeTreeHouse(id: string, house: ReturnType<typeof createTreeHouse>): WorldTreeHouse {
+  return {
+    id,
+    label: id,
+    object: house.object,
+    settings: house.settings,
+    apply: house.applySettings,
+    applyVisuals: house.applyVisuals,
+    setHighlighted: house.setHighlighted,
+    getNormal: house.getNormal,
+    setNormal: house.setNormal,
+  };
+}
+
+function exposeBananaLeafCluster(id: string, cluster: ReturnType<typeof createBananaLeafCluster>): WorldBananaLeafCluster {
+  return {
+    id,
+    label: id,
+    object: cluster.object,
+    settings: cluster.settings,
+    apply: cluster.applySettings,
+    applyVisuals: cluster.applyVisuals,
+    setHighlighted: cluster.setHighlighted,
+    getNormal: cluster.getNormal,
+    setNormal: cluster.setNormal,
+    getLeaves: cluster.getLeaves,
+    addLeaf: cluster.addLeaf,
   };
 }
 
