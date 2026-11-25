@@ -131,3 +131,18 @@ body {
     background: var(--ed-ink);
   }
 }
+// 全頁火焰層：蓋在所有內容上面但不攔截滑鼠，連結、文字選取照常可用
+.page-fire {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+// 發射雷射眼時（按住拖動）禁止反白文字，不然拖過去會一路把字選起來
+.is-lasering,
+.is-lasering * {
+  user-select: none;
+}

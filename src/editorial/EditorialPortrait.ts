@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { eyeFragment, eyeVertex } from './shaders'
+import { baseFragment, eyeFragment, portraitVertex } from './shaders'
 import type { EyeManifest, PortraitLookLayout, PortraitManifest } from './types'
 
 const loader = new THREE.TextureLoader()
@@ -27,6 +27,10 @@ type EyeLayer = {
     uMask: { value: THREE.Texture }
     /** 虹膜貼圖的 UV 位移（mesh 本身不動） */
     uOffset: { value: THREE.Vector2 }
+    uCharge: { value: number }
+    uIrisUv: { value: THREE.Vector2 }
+    uRectPx: { value: THREE.Vector2 }
+    uTime: { value: number }
   }
 }
 
@@ -48,6 +52,10 @@ export class EditorialPortrait {
   private leftEye: EyeLayer | null = null
   private rightEye: EyeLayer | null = null
   private paused = false
+
+  /** 蓄力 0..1：眼睛發紅光的強度；firing = 正在噴火（紅光會閃爍） */
+  private charge = 0
+  private firing = false
 
   private lookLeft = new THREE.Vector2()
   private lookRight = new THREE.Vector2()
@@ -100,6 +108,7 @@ export class EditorialPortrait {
       this.lookSmoothedRight.lerp(this.lookRight, k)
       if (this.leftEye) this.applyLook(this.leftEye, this.lookSmoothedLeft)
       if (this.rightEye) this.applyLook(this.rightEye, this.lookSmoothedRight)
+      this.updateCharge()
       this.renderer.render(this.scene, this.camera)
     })
   }
@@ -122,26 +131,17 @@ export class EditorialPortrait {
     const planeW = this.aspect
     const planeH = manifest.planeHeight
 
+    // 底圖用自訂 shader：順便把 6% 暖暗調色混進去
     const base = new THREE.Mesh(
       new THREE.PlaneGeometry(planeW, planeH),
-      new THREE.MeshBasicMaterial({ map: baseMap, toneMapped: true }),
-    )
-    this.root.add(base)
-
-    const grade = new THREE.Mesh(
-      new THREE.PlaneGeometry(planeW, planeH),
-      new THREE.MeshBasicMaterial({
-        color: 0x1a1512,
-        transparent: true,
-        opacity: 0.06,
-        // 用一般混合疊 6% 暖暗色當調色。MultiplyBlending 需要 premultipliedAlpha，
-        // 沒開時 three 每一幀都會報錯且效果不正確
-        depthWrite: false,
+      new THREE.ShaderMaterial({
+        uniforms: { uMap: { value: baseMap } },
+        vertexShader: portraitVertex,
+        fragmentShader: baseFragment,
+        toneMapped: true,
       }),
     )
-    grade.position.z = 0.0005
-    grade.renderOrder = 1
-    this.root.add(grade)
+    this.root.add(base)
 
     this.leftEye = this.makeEyeLayer('left', leftMap, leftMask, manifest.leftEye, planeW, planeH)
     this.rightEye = this.makeEyeLayer('right', rightMap, rightMask, manifest.rightEye, planeW, planeH)
@@ -172,11 +172,21 @@ export class EditorialPortrait {
       uMap: { value: map },
       uMask: { value: mask },
       uOffset: { value: new THREE.Vector2() },
+      uCharge: { value: 0 },
+      // 貼圖 UV 的 v 向上、像素 y 向下，所以 v 要用 1 − …
+      uIrisUv: {
+        value: new THREE.Vector2(
+          (spec.iris.x - spec.rect.x) / spec.rect.w,
+          1 - (spec.iris.y - spec.rect.y) / spec.rect.h,
+        ),
+      },
+      uRectPx: { value: new THREE.Vector2(spec.rect.w, spec.rect.h) },
+      uTime: { value: 0 },
     }
 
     const mat = new THREE.ShaderMaterial({
       uniforms,
-      vertexShader: eyeVertex,
+      vertexShader: portraitVertex,
       fragmentShader: eyeFragment,
       // 跟底圖一樣套用 renderer 的 tone mapping，虹膜明暗才會一致
       toneMapped: true,
@@ -196,6 +206,57 @@ export class EditorialPortrait {
     mesh.name = `${side}-eye`
 
     return { mesh, spec, uniforms }
+  }
+
+  /** 噴火前的蓄力：0 = 正常，1 = 眼睛全紅 */
+  setCharge(value: number) {
+    this.charge = THREE.MathUtils.clamp(value, 0, 1)
+  }
+
+  setFiring(firing: boolean) {
+    this.firing = firing
+    this.charge = firing ? 1 : 0
+  }
+
+  /** 照片高度（CSS px）：全頁火焰層拿它當長度單位，火焰大小才會跟照片比例一致 */
+  get pxPerUnit() {
+    const r = this.domElement.getBoundingClientRect()
+    return r.height / (this.camera.top - this.camera.bottom)
+  }
+
+  /**
+   * 兩眼瞳孔目前的「頁面座標」（CSS px，含捲動，y 向下）：虹膜中心 ＋ 視線位移。
+   * 火要從「現在的瞳孔」射出；只用靜止時的虹膜中心 → 眼睛往旁邊看時火會從眼白冒出來。
+   */
+  getEyePagePositions() {
+    const m = this.manifest
+    if (!m) return []
+    const r = this.domElement.getBoundingClientRect()
+    const s = m.planeHeight / m.sourceSize.height
+    const pairs = [
+      [m.leftEye, this.lookSmoothedLeft],
+      [m.rightEye, this.lookSmoothedRight],
+    ] as const
+    return pairs.map(([spec, look]) => {
+      // 原圖像素 → 世界座標 → NDC → 螢幕 → 頁面
+      const wx = (spec.iris.x - m.sourceSize.width / 2) * s + look.x * s
+      const wy = (m.sourceSize.height / 2 - spec.iris.y) * s + look.y * s
+      return {
+        x: r.left + ((wx / this.camera.right + 1) / 2) * r.width + window.scrollX,
+        y: r.top + ((1 - wy / this.camera.top) / 2) * r.height + window.scrollY,
+      }
+    })
+  }
+
+  /** 每幀：把蓄力值（噴火時加上閃爍）寫進眼睛 shader */
+  private updateCharge() {
+    const time = this.timer.getElapsed()
+    const flick = this.firing ? 0.85 + 0.15 * Math.sin(time * 31) : 1
+    for (const eye of [this.leftEye, this.rightEye]) {
+      if (!eye) continue
+      eye.uniforms.uCharge.value = this.charge * flick
+      eye.uniforms.uTime.value = time
+    }
   }
 
   setLook(left: THREE.Vector2, right: THREE.Vector2) {
