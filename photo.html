@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="內建示範照片，開啟即產生 Three.js 3D 浮雕網格，可選視角旋轉。"
+    />
+    <meta name="theme-color" content="#07080c" />
+    <title>照片 3D 浮雕｜Photo Relief</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <header class="title">
+      <a href="/">← 練習首頁</a>
+      <h1>人像 · 3D 浮雕</h1>
+    </header>
+
+    <aside class="panel" data-ref="panel">
+      <p class="panel__lead">內建示範照，開頁即建模。選視角、效果或調參數即可，不必上傳。</p>
+
+      <div class="meta" data-ref="meta">
+        <span data-ref="photoLabel">載入中…</span>
+        <span data-ref="photoSize"></span>
+      </div>
+
+      <div class="controls" data-ref="controls">
+        <div class="field">
+          <span>旋轉視角</span>
+          <div class="views" data-ref="views" role="group" aria-label="旋轉視角"></div>
+        </div>
+        <div class="field">
+          <span>相片效果</span>
+          <div class="effects" data-ref="effects" role="group" aria-label="相片效果"></div>
+          <p class="effects__hint" data-ref="effectHint">頂點上色與場景氛圍</p>
+        </div>
+        <label class="field">
+          <span>浮雕深度 <em data-ref="reliefDepthVal">0.95</em></span>
+          <input type="range" min="0.2" max="2.2" step="0.05" value="0.95" data-ref="reliefDepth" />
+        </label>
+        <label class="field">
+          <span>模型細節 <em data-ref="reliefGridVal">280</em></span>
+          <input type="range" min="100" max="400" step="10" value="280" data-ref="reliefGrid" />
+        </label>
+        <label class="field">
+          <span>五官銳化 <em data-ref="edgeBoostVal">0.38</em></span>
+          <input type="range" min="0" max="1" step="0.02" value="0.38" data-ref="edgeBoost" />
+        </label>
+        <label class="field">
+          <span>透明度門檻 <em data-ref="alphaVal">20</em></span>
+          <input type="range" min="0" max="128" step="1" value="20" data-ref="alpha" />
+        </label>
+        <label class="field field--check">
+          <input type="checkbox" data-ref="wireframe" />
+          <span>線框預覽</span>
+        </label>
+        <label class="field field--check">
+          <input type="checkbox" data-ref="autoRotate" checked />
+          <span>自動旋轉展示</span>
+        </label>
+        <button type="button" class="btn" data-ref="rebuild">套用參數重建</button>
+        <button type="button" class="btn btn--ghost" data-ref="swapPhoto">更換照片（選填）</button>
+        <input type="file" accept="image/*" data-ref="file" hidden />
+      </div>
+
+      <p class="hint">點視角或拖曳畫面旋轉 · 滾輪縮放 · 雙擊斜視</p>
+      <p class="status" data-ref="status" hidden></p>
+    </aside>
+
+    <p class="error" data-ref="error" hidden>無法建立 WebGL 場景</p>
+
+    <script type="module" src="/src/photo/main.ts"></script>
+  </body>
+</html>

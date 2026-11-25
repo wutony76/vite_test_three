@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="時尚雜誌風互動人像：虹膜跟隨滑鼠，Three.js 分層合成。"
+    />
+    <meta name="theme-color" content="#f3efe8" />
+    <title>Editorial Portrait｜互動人像</title>
+  </head>
+  <body>
+    <div class="editorial">
+      <header class="editorial__mast">
+        <a class="editorial__back" href="/">← 練習首頁</a>
+
+        <div>
+          <p class="editorial__kicker">Fashion · Portrait · 01</p>
+          <h1 class="editorial__title">Editorial<br />Portrait</h1>
+          <div class="editorial__rule" aria-hidden="true"></div>
+          <p class="editorial__lede">
+            棚拍質感、留白與中性色調。雙眼虹膜獨立跟隨游標，素材可於
+            <code>public/images/portrait/</code> 整組替換。
+          </p>
+        </div>
+
+        <div>
+          <p class="editorial__meta">Interactive gaze · Three.js</p>
+          <p class="editorial__status" data-ref="status">載入中…</p>
+        </div>
+      </header>
+
+      <div class="editorial__stage-wrap">
+        <div class="editorial__stage" data-ref="stage" aria-label="互動人像"></div>
+        <p class="editorial__error" data-ref="error" hidden>無法顯示 WebGL 或素材載入失敗。</p>
+      </div>
+    </div>
+
+    <script type="module" src="/src/editorial/main.ts"></script>
+  </body>
+</html>

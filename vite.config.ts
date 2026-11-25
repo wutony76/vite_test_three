@@ -17,6 +17,8 @@ export default defineConfig({
         drive: 'drive.html',
         world: 'world.html',
         denpa: 'denpa.html',
+        photo: 'photo.html',
+        editorial: 'editorial.html',
       },
     },
   },

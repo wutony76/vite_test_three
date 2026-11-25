@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "sourceSize": {
+    "width": 576,
+    "height": 1024
+  },
+  "planeHeight": 1,
+  "leftEye": {
+    "centerU": 0.358,
+    "centerV": 0.428,
+    "radiusUv": 0.068,
+    "maxOffsetUv": 0.014
+  },
+  "rightEye": {
+    "centerU": 0.642,
+    "centerV": 0.428,
+    "radiusUv": 0.068,
+    "maxOffsetUv": 0.014
+  },
+  "look": {
+    "gain": 0.55,
+    "stereo": 0.94
+  }
+}

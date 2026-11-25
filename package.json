@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "bake:flowers": "tsx tools/bakeGroundFlowers.ts"
+    "bake:flowers": "tsx tools/bakeGroundFlowers.ts",
+    "bake:portrait": "tsx tools/bakePortraitLayers.ts"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",
