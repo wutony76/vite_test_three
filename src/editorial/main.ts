@@ -20,7 +20,7 @@ const portrait = new EditorialPortrait(stage)
 /** 全頁火焰層：噴火與燒痕畫在整頁最上層，標題、文字、照片都燒得到 */
 const pageFire = new PageFire()
 // 開發模式掛到 window，方便在 console／自動化測試裡看 coverage、isSpreading
-if (import.meta.env.DEV) Object.assign(window, { __pageFire: pageFire })
+if (import.meta.env.DEV) Object.assign(window, { __pageFire: pageFire, __portrait: portrait })
 /**
  * 燒穿後露出下一頁（product.html）：
  * 1. 發射期間：洞裡畫 product.html 的截圖（public/images/editorial/product-preview.webp），不多跑一個 3D 頁面

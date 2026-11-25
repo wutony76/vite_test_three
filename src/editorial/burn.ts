@@ -605,7 +605,7 @@ void main() {
     gl_FragColor = spark;
     return;
   }
-  if (nb < 0.2 && front < 0.3) discard;
+  if (nb < 0.2 && front < 0.18) discard;
   float aa = fwidth(nb) * 1.2 + 1e-4;
 
   vec3 OUTLINE = vec3(0.30, 0.16, 0.08);
@@ -632,6 +632,10 @@ void main() {
   col = mix(col, YELLOW, core);
 
   // 自燃火線：燒穿區域外面一圈 橘（外）＋黃（內）的卡通火邊，跟著擴散往外推
+  // 最外圈黑色焦邊（火線前方 12～24px，紙被烤黑的那段）；用雜訊讓邊緣一塊塊參差，不是一條平滑黑線
+  float charJitter = (fract(sin(dot(floor(q * 26.0), vec2(41.3, 289.1))) * 15731.7) - 0.5) * 0.1;
+  float fChar = band(front + charJitter, 0.2, 0.03) * (1.0 - hole);
+  col = mix(col, ${FIRE.rimChar}, fChar);
   float fOuter = band(front + jitter, 0.35, 0.03) * (1.0 - hole);
   float fInner = band(front + jitter, 0.8, 0.03) * (1.0 - hole);
   col = mix(col, ORANGE, fOuter);
@@ -641,9 +645,9 @@ void main() {
   // 下一頁 iframe 顯示後改成不透明：那圈底下已經是 iframe，透出來會看到下一頁的字
   float a = mix(1.0, mix(0.88, 1.0, uLive), band(nb, 0.27, aa) * (1.0 - band(nb, 0.55, aa)));
   // 洞：iframe 準備好後漸漸變透明，露出真的下一頁（火邊仍畫在上面）
-  a *= 1.0 - hole * uLive * (1.0 - max(rim, max(fOuter, fInner)));
+  a *= 1.0 - hole * uLive * (1.0 - max(rim, max(fChar, max(fOuter, fInner))));
   // 只有火線、還沒焦的地方：火線外的部分要透明（不然會畫出一圈深褐描邊色）
-  a = nb < 0.2 ? fOuter : a;
+  a = nb < 0.2 ? max(fChar, fOuter) : a;
   gl_FragColor = vec4(col, a);
 }
 `

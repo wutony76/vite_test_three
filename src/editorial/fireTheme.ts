@@ -27,6 +27,8 @@ type FirePalette = {
   /** 燒痕洞口的火邊與自燃火線：外圈、內圈 */
   rimOuter: Rgb
   rimInner: Rgb
+  /** 自燃火線最外圈（火還沒燒到、被烤黑的焦邊） */
+  rimChar: Rgb
   /** 雷射橫切面：亮芯、光束本體、本體上流動的亮紋、黑描邊、外圈光暈 */
   laserCore: Rgb
   laserBody: Rgb
@@ -42,6 +44,15 @@ type FirePalette = {
   /** 寫輪眼虹膜漸層：靠瞳孔（亮）→ 外圈（暗），線性值 */
   sharinganInner: Rgb
   sharinganOuter: Rgb
+  /** 人像發動效果（線性值，會經過 tone mapping）：眼周紋路、輪廓光、氣場火焰（內 → 外） */
+  veins: Rgb
+  rimLight: Rgb
+  auraInner: Rgb
+  auraOuter: Rgb
+  /** 發動時頭髮染色：暗部、亮部、流動光澤（線性值） */
+  hairDark: Rgb
+  hairLight: Rgb
+  hairSheen: Rgb
 }
 
 const PALETTES: Record<FireTheme, FirePalette> = {
@@ -55,6 +66,7 @@ const PALETTES: Record<FireTheme, FirePalette> = {
     sparkOuter: [1.0, 0.7, 0.2],
     rimOuter: [1.0, 0.46, 0.08],
     rimInner: [1.0, 0.85, 0.25],
+    rimChar: [0.1, 0.05, 0.03],
     laserCore: [1.0, 0.97, 0.95],
     laserBody: [0.86, 0.06, 0.05],
     laserFlow: [1.0, 0.5, 0.4],
@@ -66,6 +78,13 @@ const PALETTES: Record<FireTheme, FirePalette> = {
     ringEnd: [0.95, 0.12, 0.06],
     sharinganInner: [0.75, 0.02, 0.02],
     sharinganOuter: [0.28, 0.0, 0.0],
+    veins: [0.22, 0.01, 0.01],
+    rimLight: [0.9, 0.12, 0.05],
+    auraInner: [0.9, 0.25, 0.05],
+    auraOuter: [0.12, 0.01, 0.0],
+    hairDark: [0.07, 0.0, 0.0],
+    hairLight: [0.55, 0.06, 0.03],
+    hairSheen: [0.9, 0.3, 0.1],
   },
   black: {
     // 單色方塊、不描邊：每顆火苗整顆一個顏色，隨燃燒時間 暗紫紅 → 深紫 → 黑 漸變
@@ -74,10 +93,12 @@ const PALETTES: Record<FireTheme, FirePalette> = {
     flameOld: [0.01, 0.0, 0.015],
     flameEdge: [0, 0, 0],
     flameEdgeWidth: 0,
-    sparkInner: [0.48, 0.12, 0.52],
-    sparkOuter: [0.05, 0.0, 0.06],
-    rimOuter: [0.02, 0.0, 0.03],
-    rimInner: [0.42, 0.07, 0.38],
+    // 燒痕火邊、自燃火線與火花：要壓在焦黑色上，紫色得夠飽和、夠亮才看得出來
+    sparkInner: [0.82, 0.32, 1.0],
+    sparkOuter: [0.42, 0.04, 0.72],
+    rimOuter: [0.42, 0.04, 0.72],
+    rimInner: [0.8, 0.28, 1.0],
+    rimChar: [0.02, 0.0, 0.03],
     laserCore: [0.96, 0.9, 1.0],
     laserBody: [0.42, 0.08, 0.62],
     laserFlow: [0.78, 0.5, 1.0],
@@ -89,6 +110,13 @@ const PALETTES: Record<FireTheme, FirePalette> = {
     ringEnd: [0.42, 0.08, 0.62],
     sharinganInner: [0.42, 0.06, 0.72],
     sharinganOuter: [0.07, 0.0, 0.16],
+    veins: [0.09, 0.01, 0.14],
+    rimLight: [0.45, 0.12, 0.85],
+    auraInner: [0.3, 0.05, 0.5],
+    auraOuter: [0.01, 0.0, 0.02],
+    hairDark: [0.035, 0.0, 0.08],
+    hairLight: [0.34, 0.07, 0.6],
+    hairSheen: [0.55, 0.25, 0.95],
   },
 }
 

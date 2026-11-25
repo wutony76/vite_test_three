@@ -163,3 +163,12 @@
 - [x] 紫色寫輪眼 — `assets/editorial-purple-sharingan.png`；黑焰火苗 — `assets/editorial-black-flame.png`
 - [x] console 無錯誤；`npm run build` 通過
 - 問題：先做的「整頁上下切開」（View Transitions）改為使用者要求的「新黑幕切開」；黑幕淡出太快看不出破開 → 延後淡出、加大滑動距離；火苗描邊版使用者偏好單色漸層 → 移除描邊。
+
+## 第十八版：人像發動效果、紫色頭髮、燒痕紫色加強
+
+- [x] 蓄力／發射／放開：打光、紋路、眉毛、輪廓光、氣場（竄出方框）、紫髮，放開後全部退回 — `assets/editorial-portrait-power.png`
+- [x] 紫色頭髮兩幀比較（光澤位置流動）— `assets/editorial-purple-hair.png`
+- [x] 自燃火線：黑焦邊＋深紫＋亮紫 — `assets/editorial-spread-char-rim.png`
+- [x] console 無錯誤；`npm run build` 通過
+- 問題：氣場只有細帶 → 遮罩模糊 σ18→45、雜訊權重加大、三段色階；肩膀上方實心紫帶與放開殘留 → 取樣值上限 0.5、門檻隨強度提高
+- 問題：sharp 對單通道原始資料 blur 會輸出 3 通道 → 頭髮遮罩錯位橫紋 → `extractChannel(0)`

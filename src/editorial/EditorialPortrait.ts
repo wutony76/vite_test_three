@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { baseFragment, eyeFragment, portraitVertex } from './shaders'
+import { auraFragment, baseFragment, eyeFragment, portraitVertex } from './shaders'
 import type { EyeManifest, PortraitLookLayout, PortraitManifest } from './types'
 
 const loader = new THREE.TextureLoader()
@@ -14,6 +14,17 @@ const MOUTH_CORNER_L = new THREE.Vector2(192, 644)
 const MOUTH_CORNER_R = new THREE.Vector2(340, 640)
 /** 嘴角上揚／回復的時間常數（秒） */
 const SMIRK_TAU = 0.12
+/** 眉頭、眉尾（原圖像素）：發動時眉頭往下壓、眉尾往上挑 */
+const BROW_IN_L = new THREE.Vector2(205, 350)
+const BROW_IN_R = new THREE.Vector2(305, 350)
+const BROW_OUT_L = new THREE.Vector2(88, 345)
+const BROW_OUT_R = new THREE.Vector2(442, 345)
+/** 氣場在照片框外只畫到這個高度（原圖 y，約肩膀上緣）：再往下是延伸出去的隱形肩膀 */
+const AURA_OUTSIDE_CUT_Y = 840
+/** 發動強度（眉毛、紋路、打光、氣場）上升／退去的時間常數（秒）：上升快、退去慢一點 */
+const POWER_RISE_TAU = 0.15
+const POWER_FALL_TAU = 0.4
+
 
 const loadTex = (url: string, colorSpace: THREE.ColorSpace = THREE.SRGBColorSpace) =>
   new Promise<THREE.Texture>((resolve, reject) => {
@@ -61,7 +72,7 @@ export class EditorialPortrait {
 
   private manifest: PortraitManifest | null = null
   private aspect = 0.5625
-  private layout: PortraitLookLayout = { planeW: 0.5625, planeH: 1, halfW: 0.4, halfH: 0.55 }
+  private layout: PortraitLookLayout = { planeW: 0.5625, planeH: 1, halfW: 0.4, halfH: 0.55, centerX: 0, centerY: 0, zoom: 1 }
   private leftEye: EyeLayer | null = null
   private rightEye: EyeLayer | null = null
   private paused = false
@@ -73,7 +84,11 @@ export class EditorialPortrait {
   private spin = 0
   /** 壞笑程度（0..1，發射時往 1 靠、放開往 0 靠） */
   private smirk = 0
+  /** 發動強度（0..1）：蓄力時跟著上升、發射中 1、放開後退去 */
+  private power = 0
+  private readonly projectTmp = new THREE.Vector3()
   private baseMat: THREE.ShaderMaterial | null = null
+  private auraMat: THREE.ShaderMaterial | null = null
 
   private lookLeft = new THREE.Vector2()
   private lookRight = new THREE.Vector2()
@@ -134,15 +149,17 @@ export class EditorialPortrait {
   async loadAssets(manifest: PortraitManifest, assetBase: string) {
     this.disposeScene()
 
-    const [baseMap, leftMap, rightMap, leftMask, rightMask] = await Promise.all([
+    const [baseMap, leftMap, rightMap, leftMask, rightMask, silMask] = await Promise.all([
       loadTex(`${assetBase}/portrait-base.webp`),
       loadTex(`${assetBase}/left-eye.webp`),
       loadTex(`${assetBase}/right-eye.webp`),
       loadTex(`${assetBase}/left-eye-mask.webp`, THREE.NoColorSpace),
       loadTex(`${assetBase}/right-eye-mask.webp`, THREE.NoColorSpace),
+      // 人物輪廓遮罩是資料不是顏色 → NoColorSpace，數值才不會被轉換
+      loadTex(`${assetBase}/portrait-mask.webp`, THREE.NoColorSpace),
     ])
 
-    this.textures.push(baseMap, leftMap, rightMap, leftMask, rightMask)
+    this.textures.push(baseMap, leftMap, rightMap, leftMask, rightMask, silMask)
     this.manifest = manifest
     this.aspect = manifest.sourceSize.width / manifest.sourceSize.height
 
@@ -153,10 +170,20 @@ export class EditorialPortrait {
     this.baseMat = new THREE.ShaderMaterial({
       uniforms: {
         uMap: { value: baseMap },
+        uSil: { value: silMask },
+        uMaskPad: { value: manifest.maskPadding ?? 0 },
         uSmirk: { value: 0 },
+        uPower: { value: 0 },
+        uTime: { value: 0 },
         uTexSize: { value: new THREE.Vector2(manifest.sourceSize.width, manifest.sourceSize.height) },
         uCornerL: { value: MOUTH_CORNER_L },
         uCornerR: { value: MOUTH_CORNER_R },
+        uEyeL: { value: new THREE.Vector2(manifest.leftEye.iris.x, manifest.leftEye.iris.y) },
+        uEyeR: { value: new THREE.Vector2(manifest.rightEye.iris.x, manifest.rightEye.iris.y) },
+        uBrowInL: { value: BROW_IN_L },
+        uBrowInR: { value: BROW_IN_R },
+        uBrowOutL: { value: BROW_OUT_L },
+        uBrowOutR: { value: BROW_OUT_R },
       },
       vertexShader: portraitVertex,
       fragmentShader: baseFragment,
@@ -164,6 +191,35 @@ export class EditorialPortrait {
     })
     const base = new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), this.baseMat)
     this.root.add(base)
+
+    // 查克拉氣場：比照片四周各大 maskPadding 像素的平面，火焰才能竄出照片方框
+    const pad = manifest.maskPadding ?? 0
+    const { width: srcW, height: srcH } = manifest.sourceSize
+    this.auraMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uSil: { value: silMask },
+        uPower: { value: 0 },
+        uTime: { value: 0 },
+        uMaskSize: { value: new THREE.Vector2(srcW + pad * 2, srcH + pad * 2) },
+        uMaskPad: { value: pad },
+        uTexSize: { value: new THREE.Vector2(srcW, srcH) },
+        uOutsideCutY: { value: AURA_OUTSIDE_CUT_Y },
+      },
+      vertexShader: portraitVertex,
+      fragmentShader: auraFragment,
+      toneMapped: true,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+    })
+    const aura = new THREE.Mesh(
+      new THREE.PlaneGeometry((planeW * (srcW + pad * 2)) / srcW, (planeH * (srcH + pad * 2)) / srcH),
+      this.auraMat,
+    )
+    // 照片之上（底圖 0）、眼睛之下（5）
+    aura.position.z = 0.001
+    aura.renderOrder = 1
+    this.root.add(aura)
 
     this.leftEye = this.makeEyeLayer('left', leftMap, leftMask, manifest.leftEye, planeW, planeH)
     this.rightEye = this.makeEyeLayer('right', rightMap, rightMask, manifest.rightEye, planeW, planeH)
@@ -242,10 +298,10 @@ export class EditorialPortrait {
     this.charge = firing ? 1 : 0
   }
 
-  /** 照片高度（CSS px）：全頁火焰層拿它當長度單位，火焰大小才會跟照片比例一致 */
+  /** 照片高度（CSS px）：全頁火焰層拿它當長度單位，火焰大小才會跟照片比例一致（有算進相機 zoom） */
   get pxPerUnit() {
     const r = this.domElement.getBoundingClientRect()
-    return r.height / (this.camera.top - this.camera.bottom)
+    return (r.height * this.camera.zoom) / (this.camera.top - this.camera.bottom)
   }
 
   /**
@@ -262,12 +318,13 @@ export class EditorialPortrait {
       [m.rightEye, this.lookSmoothedRight],
     ] as const
     return pairs.map(([spec, look]) => {
-      // 原圖像素 → 世界座標 → NDC → 螢幕 → 頁面
+      // 原圖像素 → 世界座標 → 用相機投影成 NDC（相機的位置、zoom 都會算進去）→ 螢幕 → 頁面
       const wx = (spec.iris.x - m.sourceSize.width / 2) * s + look.x * s
       const wy = (m.sourceSize.height / 2 - spec.iris.y) * s + look.y * s
+      const ndc = this.projectTmp.set(wx, wy, 0).project(this.camera)
       return {
-        x: r.left + ((wx / this.camera.right + 1) / 2) * r.width + window.scrollX,
-        y: r.top + ((1 - wy / this.camera.top) / 2) * r.height + window.scrollY,
+        x: r.left + ((ndc.x + 1) / 2) * r.width + window.scrollX,
+        y: r.top + ((1 - ndc.y) / 2) * r.height + window.scrollY,
       }
     })
   }
@@ -283,7 +340,20 @@ export class EditorialPortrait {
     this.spin += dt * (SPIN_BASE + SPIN_BOOST * this.charge) * (this.firing ? 1.6 : 1)
     // 壞笑：發射中嘴角慢慢上揚，放開後慢慢放下（指數趨近，不會瞬間跳）
     this.smirk += ((this.firing ? 1 : 0) - this.smirk) * (1 - Math.exp(-dt / SMIRK_TAU))
-    if (this.baseMat) this.baseMat.uniforms.uSmirk.value = this.smirk
+    // 發動強度：蓄力時跟著蓄力值上升，發射中維持 1；上升快、退去慢
+    const powerGoal = this.firing ? 1 : this.charge
+    const tau = powerGoal > this.power ? POWER_RISE_TAU : POWER_FALL_TAU
+    this.power += (powerGoal - this.power) * (1 - Math.exp(-dt / tau))
+    if (this.baseMat) {
+      const u = this.baseMat.uniforms
+      u.uSmirk.value = this.smirk
+      u.uPower.value = this.power
+      u.uTime.value = time
+    }
+    if (this.auraMat) {
+      this.auraMat.uniforms.uPower.value = this.power
+      this.auraMat.uniforms.uTime.value = time
+    }
     for (const eye of [this.leftEye, this.rightEye]) {
       if (!eye) continue
       eye.uniforms.uCharge.value = this.charge
@@ -344,6 +414,9 @@ export class EditorialPortrait {
       planeH,
       halfW,
       halfH,
+      centerX: this.camera.position.x,
+      centerY: this.camera.position.y,
+      zoom: this.camera.zoom,
     }
   }
 

@@ -37,6 +37,7 @@
       "y": 3.5
     }
   },
+  "maskPadding": 96,
   "look": {
     "gain": 0.9,
     "stereo": 0.94

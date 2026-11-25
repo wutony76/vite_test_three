@@ -53,6 +53,8 @@
 
 - 第十七版：技能發動黑幕演出、雷射延遲到黑幕劃開才發射；雷射三層光束／流動紋／射出動畫／眼睛光芒／命中衝擊波／畫面震動；黑焰與紫色寫輪眼、紫色雷射（`fireTheme.ts` 可切回 classic）。
 
+- 第十八版：發動時人像加上戲劇化打光、眼周紋路、眉毛下壓、紫色頭髮飄動、查克拉氣場（可竄出照片方框）；自燃火線加黑色焦邊、燒痕紫色提高飽和度。
+
 ## 驗證佐證
 
 - 對應 `validation.md` 結論：通過。
@@ -78,6 +80,7 @@
 - 第十五版：自燃中洞內為真頁面／切換後整頁商品頁：`assets/editorial-soft-switch.png`；錄影切換前後最大幀差 1.8／255
 - 第十六版：寫輪眼各階段：`assets/editorial-sharingan.png`；壞笑前後：`assets/editorial-smirk.png`
 - 第十七版：黑幕 `assets/editorial-skill-curtain.png`、紫色雷射 `assets/editorial-purple-laser.png`、紫色寫輪眼 `assets/editorial-purple-sharingan.png`、黑焰 `assets/editorial-black-flame.png`
+- 第十八版：人像發動效果 `assets/editorial-portrait-power.png`、紫髮 `assets/editorial-purple-hair.png`、自燃焦邊 `assets/editorial-spread-char-rim.png`
 - 火焰層不攔截滑鼠（燒痕上 `elementFromPoint` 仍為標題元素）。
 - tsc、`npm run build` 通過；headless console 無錯誤。
 

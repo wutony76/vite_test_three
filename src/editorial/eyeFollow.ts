@@ -28,14 +28,17 @@ export function computeEyeOffsets(
 
   const gain = manifest.look?.gain ?? 0.9
   const stereo = manifest.look?.stereo ?? 0.94
-  const { planeW, planeH, halfW, halfH } = layout
+  const { planeW, planeH, centerX, centerY, zoom } = layout
+  // 相機若有放大（÷ zoom）或移動中心，錨點換算要跟著算，眼神才會對準滑鼠
+  const halfW = layout.halfW / zoom
+  const halfH = layout.halfH / zoom
   const { width: srcW, height: srcH } = manifest.sourceSize
 
   const fill = (eye: 'leftEye' | 'rightEye', out: THREE.Vector2) => {
     const spec = manifest[eye]
     // 原圖像素 → 世界座標 → 相機 NDC（正交相機：世界座標 / 半寬高）
-    const anchorX = ((spec.iris.x / srcW - 0.5) * planeW) / halfW
-    const anchorY = ((0.5 - spec.iris.y / srcH) * planeH) / halfH
+    const anchorX = ((spec.iris.x / srcW - 0.5) * planeW - centerX) / halfW
+    const anchorY = ((0.5 - spec.iris.y / srcH) * planeH - centerY) / halfH
     // 水平方向用畫面寬高比修正，讓「距離」在螢幕上是等比例的
     const dirX = (mx - anchorX) * (halfW / halfH)
     const dirY = my - anchorY

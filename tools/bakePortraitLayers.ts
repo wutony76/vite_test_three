@@ -304,7 +304,8 @@ async function writeDebug(src: Img, out: string) {
       <circle cx="${spec.iris.x}" cy="${spec.iris.y}" r="${spec.irisR}" fill="none" stroke="cyan" stroke-width="0.5"/>
       <rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="none" stroke="yellow" stroke-width="0.5"/>`
   }
-  const svg = `<svg width="${src.w}" height="${src.h}" xmlns="http://www.w3.org/2000/svg">${outline(LEFT)}${outline(RIGHT)}</svg>`
+  const sil = SILHOUETTE.map(([x, y]) => `${x},${y}`).join(' ')
+  const svg = `<svg width="${src.w}" height="${src.h}" xmlns="http://www.w3.org/2000/svg">${outline(LEFT)}${outline(RIGHT)}<polygon points="${sil}" fill="none" stroke="white" stroke-width="1.5"/></svg>`
   const marked = await sharp(src.data, { raw: { width: src.w, height: src.h, channels: 3 } })
     .composite([{ input: Buffer.from(svg) }])
     .png()
@@ -319,6 +320,96 @@ async function writeDebug(src: Img, out: string) {
 async function readRgb(file: string): Promise<Img> {
   const { data, info } = await sharp(file).rotate().removeAlpha().raw().toBuffer({ resolveWithObject: true })
   return { data, w: info.width, h: info.height }
+}
+
+/**
+ * 人物輪廓（原圖像素，順時針）：頭髮外緣 → 右耳 → 右臉頰／下巴 → 脖子 → 肩膀 → 左側回到頭頂。
+ * 照片背景跟皮膚都是米白色，用顏色自動去背很容易把臉也當成背景，所以手動描點最穩。
+ * 換照片時用 --debug 看疊圖（白線）調整這些點。
+ */
+const SILHOUETTE: [number, number][] = [
+  [75, 0], [505, 0], [532, 40], [553, 110], [566, 190], [572, 260], [568, 380], [562, 430],
+  [552, 480], [536, 532], [512, 552], [492, 585], [474, 640], [452, 700], [434, 745],
+  [428, 780], [446, 830], [500, 866], [560, 890], [576, 896], [576, 1024], [0, 1024],
+  [0, 905], [40, 896], [100, 876], [148, 856], [156, 800], [156, 760], [140, 726],
+  [116, 678], [92, 612], [72, 548], [48, 524], [28, 474], [15, 400], [12, 250],
+  [25, 130], [48, 50],
+]
+
+/**
+ * 頭髮大致範圍（原圖像素）：頭頂、髮際線以上、兩側到耳朵。
+ * 真正的頭髮 = 這個範圍內「夠暗」的像素 → 眉毛（在範圍外）、皮膚、耳環（太亮）都不會被算進去。
+ */
+const HAIR_REGION: [number, number][] = [
+  [0, 0], [576, 0], [576, 470], [534, 470], [505, 300], [452, 200], [380, 158],
+  [288, 148], [196, 158], [128, 200], [76, 300], [46, 470], [0, 470],
+]
+
+/**
+ * 頭髮遮罩（0..255，原圖尺寸）：範圍（邊緣柔化）× 暗度（亮度 60 以下全算、130 以上不算）。
+ * 發動時 shader 用它把頭髮染紫、讓頭髮飄動。
+ */
+async function buildHairMask(src: Img) {
+  const pts = HAIR_REGION.map(([x, y]) => `${x},${y}`).join(' ')
+  const svg = Buffer.from(
+    `<svg width="${src.w}" height="${src.h}" xmlns="http://www.w3.org/2000/svg"><rect width="${src.w}" height="${src.h}" fill="black"/><polygon points="${pts}" fill="white"/></svg>`,
+  )
+  const region = await sharp(svg).resize(src.w, src.h).blur(6).greyscale().raw().toBuffer()
+  const hair = Buffer.alloc(src.w * src.h)
+  for (let i = 0; i < src.w * src.h; i++) {
+    const lum = 0.299 * src.data[i * 3] + 0.587 * src.data[i * 3 + 1] + 0.114 * src.data[i * 3 + 2]
+    const dark = 1 - smoothstep(60, 130, lum)
+    hair[i] = Math.round((region[i] / 255) * dark * 255)
+  }
+  // 稍微柔化，染色邊緣才不會一顆顆像素很硬。
+  // extractChannel(0)：sharp 對單通道原始資料做 blur 會輸出 3 通道，不取回單通道的話長度變 3 倍、讀起來整張錯位
+  return sharp(hair, { raw: { width: src.w, height: src.h, channels: 1 } }).blur(1).extractChannel(0).raw().toBuffer()
+}
+
+/**
+ * 遮罩四周多留的邊（原圖像素）：氣場火焰要能竄出照片的方框，遮罩也得涵蓋照片外面一圈。
+ * 輪廓碰到照片左右下緣的點（肩膀、底部）會延伸到加大後的邊緣，那些地方才不會冒出一排火；
+ * 頭頂碰到照片上緣的地方則保留（人物在照片上方被切掉），火焰會從頭頂往上竄出方框。
+ */
+const MASK_PAD = 96
+
+/**
+ * 輪廓遮罩 portrait-mask.webp（尺寸 = 原圖 + 四周各 MASK_PAD；三個通道各有用途）：
+ * - R：人物＝白、背景＝黑（邊緣 1.5px 柔化）
+ * - G：大範圍模糊（σ 45）→ 背景區域「離人物多近」，氣場火焰用來決定往外延伸多遠
+ * - B：小範圍模糊（σ 5）→ 只有輪廓附近是中間值，用來畫貼著邊緣的輪廓光
+ * - A：頭髮遮罩（buildHairMask，放在照片範圍內；邊框區為 0）
+ */
+async function buildSilhouetteMask(srcW: number, srcH: number, hair: Buffer) {
+  const P = MASK_PAD
+  const w = srcW + P * 2
+  const h = srcH + P * 2
+  const pts = SILHOUETTE.map(([x, y]) => {
+    // 碰到照片左／右／下緣的點推到加大後的邊緣（人物在那些方向是延續出去的）
+    const px = x <= 0 ? -P : x >= srcW ? srcW + P : x
+    const py = y >= srcH ? srcH + P : y
+    return `${px + P},${py + P}`
+  }).join(' ')
+  const svg = Buffer.from(
+    `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg"><rect width="${w}" height="${h}" fill="black"/><polygon points="${pts}" fill="white"/></svg>`,
+  )
+  const gray = async (sigma: number) =>
+    sharp(svg).resize(w, h).blur(sigma).greyscale().raw().toBuffer()
+  const [r, g, b] = await Promise.all([gray(1.5), gray(45), gray(5)])
+  const rgba = Buffer.alloc(w * h * 4)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x
+      rgba[i * 4] = r[i]
+      rgba[i * 4 + 1] = g[i]
+      rgba[i * 4 + 2] = b[i]
+      const sx = x - P
+      const sy = y - P
+      rgba[i * 4 + 3] = sx >= 0 && sx < srcW && sy >= 0 && sy < srcH ? hair[sy * srcW + sx] : 0
+    }
+  }
+  // exact：保留 alpha 為 0 處的 RGB（預設會把全透明像素的顏色丟掉，R/G/B 資料就壞了）
+  return sharp(rgba, { raw: { width: w, height: h, channels: 4 } }).webp({ lossless: true, exact: true }).toBuffer()
 }
 
 async function main() {
@@ -350,11 +441,14 @@ async function main() {
     eyes[key] = { rect, iris: spec.iris, maxOffset: spec.maxOffset }
   }
 
+  writeFileSync(join(OUT_DIR, 'portrait-mask.webp'), await buildSilhouetteMask(src.w, src.h, await buildHairMask(src)))
+
   const manifest = {
     version: 2,
     sourceSize: { width: src.w, height: src.h },
     planeHeight: 1,
     ...eyes,
+    maskPadding: MASK_PAD,
     look: { gain: 0.9, stereo: 0.94 },
   }
   writeFileSync(join(OUT_DIR, 'portrait.manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
