@@ -2,6 +2,7 @@
 import './style.scss'
 import { ProductViewer } from './ProductViewer'
 import { loadProduct, type LoadedProduct } from './loadProduct'
+import { notifyEmbedReady } from '../shared/embed'
 import { product, type ProductVariant } from './products'
 
 // ── 1. 取得 DOM ──
@@ -176,6 +177,8 @@ const _actions = {
       state.errorMessage = '3D 模型載入失敗，請檢查網路連線後重試。'
     } finally {
       _handlers.render()
+      // 被 editorial 偷偷載進 iframe 時：模型畫好（或失敗）就通知上一層可以顯示了
+      notifyEmbedReady()
     }
   },
   async applyVariant(variant: ProductVariant) {
@@ -268,4 +271,5 @@ if (ProductViewer.isWebGLAvailable()) {
   state.canRetry = false
   state.errorMessage = '您的瀏覽器不支援 WebGL，無法顯示 3D 商品。請改用最新版 Chrome、Safari 或 Edge。'
   _handlers.render()
+  notifyEmbedReady()
 }

@@ -157,6 +157,32 @@ void main() {
 }
 `
 
+/**
+ * 露出範圍（給下一頁 iframe 的 clip-path 用）：跟顯示用同一套「雜訊扭曲＋門檻」。
+ * 範圍刻意比洞（nb ≥ 1）大：nb ≥ 0.3（已經有不透明焦痕蓋著）或自燃火線前緣（橘色火邊蓋著）。
+ * clip-path 是非同步讀回、晚 1～2 幀才更新，洞往外擴時才不會先露出底下的 editorial。
+ * 輸出的列由上到下（vUv.y = 0 對應視窗頂端），讀回 CPU 後不用再翻轉。
+ */
+const clipFragment = /* glsl */ `
+uniform sampler2D uMask;
+uniform sampler2D uNoise;
+uniform vec2 uMaskSize;
+uniform vec2 uScroll;
+uniform vec2 uView;
+uniform float uUnit;
+varying vec2 vUv;
+void main() {
+  vec2 page = vUv * uView + uScroll;
+  vec2 q = page / uUnit;
+  vec4 nz = texture2D(uNoise, q * 1.3);
+  vec2 warped = page + (nz.rg - 0.5) * 0.12 * uUnit;
+  vec4 m = texture2D(uMask, vec2(warped.x / uMaskSize.x, 1.0 - warped.y / uMaskSize.y));
+  float nb = m.r * (0.55 + 0.9 * nz.b);
+  float show = max(step(0.3, nb), step(0.35, m.b));
+  gl_FragColor = vec4(vec3(show), 1.0);
+}
+`
+
 const makeTarget = (w: number, h: number) =>
   new THREE.WebGLRenderTarget(w, h, {
     type: THREE.HalfFloatType,
@@ -186,6 +212,10 @@ export class BurnMask {
   private readonly probeTarget = new THREE.WebGLRenderTarget(2, 1, { depthBuffer: false })
   private readonly probeBuf = new Uint8Array(2 * 4)
   private probePending = false
+  private readonly clipMat: THREE.ShaderMaterial
+  private clipTarget = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false })
+  private clipBuf = new Uint8Array(4)
+  private clipPending = false
   private needsClear = true
   private empty = true
   /** 自燃擴散中（一旦開始就一路燒到整頁，只有 clear 能停） */
@@ -237,6 +267,18 @@ export class BurnMask {
       },
       vertexShader: fullscreenVertex,
       fragmentShader: probeFragment,
+    })
+    this.clipMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uMask: { value: null },
+        uNoise: { value: null },
+        uMaskSize: { value: this.size },
+        uScroll: { value: new THREE.Vector2() },
+        uView: { value: new THREE.Vector2() },
+        uUnit: { value: 800 },
+      },
+      vertexShader: fullscreenVertex,
+      fragmentShader: clipFragment,
     })
     this.quad = new THREE.Mesh(tri, this.stampMat)
     this.quad.frustumCulled = false
@@ -354,6 +396,44 @@ export class BurnMask {
     }
   }
 
+  /**
+   * 產生目前視窗範圍的露出格子圖（每格 cell × cell CSS px），非同步讀回。
+   * 回傳 { data, w, h }，data 為 RGBA、列由上到下。
+   */
+  async renderClip(
+    renderer: THREE.WebGLRenderer,
+    noise: THREE.Texture,
+    scroll: THREE.Vector2,
+    view: THREE.Vector2,
+    unit: number,
+    cell: number,
+  ): Promise<{ data: Uint8Array; w: number; h: number } | null> {
+    if (this.clipPending || this.empty) return null
+    this.clipPending = true
+    try {
+      const w = Math.max(1, Math.ceil(view.x / cell))
+      const h = Math.max(1, Math.ceil(view.y / cell))
+      if (this.clipTarget.width !== w || this.clipTarget.height !== h) {
+        this.clipTarget.dispose()
+        this.clipTarget = new THREE.WebGLRenderTarget(w, h, { depthBuffer: false })
+        this.clipBuf = new Uint8Array(w * h * 4)
+      }
+      const u = this.clipMat.uniforms
+      u.uMask.value = this.read.texture
+      u.uNoise.value = noise
+      u.uScroll.value.copy(scroll)
+      // 格子數 × cell 可能比視窗略大：用格子涵蓋的實際大小，座標才對得上
+      u.uView.value.set(w * cell, h * cell)
+      u.uUnit.value = unit
+      this.renderWith(renderer, this.clipMat, this.clipTarget)
+      const buf = this.clipBuf
+      await renderer.readRenderTargetPixelsAsync(this.clipTarget, 0, 0, w, h, buf)
+      return { data: buf, w, h }
+    } finally {
+      this.clipPending = false
+    }
+  }
+
   private renderWith(renderer: THREE.WebGLRenderer, mat: THREE.ShaderMaterial, rt: THREE.WebGLRenderTarget) {
     this.quad.material = mat
     renderer.setRenderTarget(rt)
@@ -368,6 +448,9 @@ export class BurnMask {
     this.coverageTarget.dispose()
     this.probeTarget.dispose()
     this.probeMat.dispose()
+    this.clipTarget.dispose()
+    this.clipMat.dispose()
+
     this.quad.geometry.dispose()
     this.stampMat.dispose()
     this.copyMat.dispose()
@@ -448,6 +531,29 @@ uniform float uDpr;
 uniform float uViewH;
 /** 1 = 自燃中：火線上冒火花 */
 uniform float uSparks;
+/**
+ * 燒穿處露出的下一頁截圖（固定鋪滿視窗，object-fit: cover、靠上對齊）。
+ * 直接在這個 shader 裡畫，跟燒痕同一幀 → 洞跟截圖永遠對齊、沒有延遲，也不用額外的 DOM 圖層。
+ */
+uniform sampler2D uReveal;
+uniform vec2 uRevealSize;
+uniform float uHasReveal;
+uniform vec2 uView;
+/**
+ * 0..1：下一頁（真的 iframe）已經準備好 → 洞改成透明，直接看到底下的 iframe。
+ * 0 時洞裡畫截圖（iframe 還在載入）；中間值 = 截圖淡出中。
+ */
+uniform float uLive;
+
+vec3 revealColor(vec2 page) {
+  vec2 client = page - uScroll;
+  float scale = max(uView.x / uRevealSize.x, uView.y / uRevealSize.y);
+  vec2 drawn = uRevealSize * scale;
+  vec2 offset = vec2((uView.x - drawn.x) * 0.5, 0.0);
+  vec2 uv = (client - offset) / drawn;
+  // 貼圖 v 軸向上、畫面 y 向下 → 翻轉
+  return texture2D(uReveal, vec2(uv.x, 1.0 - uv.y)).rgb;
+}
 
 float band(float x, float edge, float aa) { return smoothstep(edge - aa, edge + aa, x); }
 float sHash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 15731.743); }
@@ -512,7 +618,8 @@ void main() {
   col = mix(col, SCORCH, band(nb, 0.27, aa));
   col = mix(col, CHAR, band(nb, 0.55, aa));
   float hole = band(nb, 1.0, aa);
-  col = mix(col, VOID, hole);
+  vec3 under = uHasReveal > 0.5 ? revealColor(page) : VOID;
+  col = mix(col, under, hole);
 
   // 火邊：還熱的洞口一圈 橘（外）＋黃（內）；每 1/8 秒在小區塊間跳動一次，像卡通火焰的逐格動畫
   float hot = step(0.3, m.g);
@@ -528,8 +635,11 @@ void main() {
   col = mix(col, ORANGE, fOuter);
   col = mix(col, YELLOW, fInner);
 
-  // 焦褐那圈留一點點透，底下的字隱約看得到；其他色塊都是不透明的平塗
-  float a = mix(1.0, 0.88, band(nb, 0.27, aa) * (1.0 - band(nb, 0.55, aa)));
+  // 焦褐那圈留一點點透，底下的字隱約看得到；其他色塊都是不透明的平塗。
+  // 下一頁 iframe 顯示後改成不透明：那圈底下已經是 iframe，透出來會看到下一頁的字
+  float a = mix(1.0, mix(0.88, 1.0, uLive), band(nb, 0.27, aa) * (1.0 - band(nb, 0.55, aa)));
+  // 洞：iframe 準備好後漸漸變透明，露出真的下一頁（火邊仍畫在上面）
+  a *= 1.0 - hole * uLive * (1.0 - max(rim, max(fOuter, fInner)));
   // 只有火線、還沒焦的地方：火線外的部分要透明（不然會畫出一圈深褐描邊色）
   a = nb < 0.2 ? fOuter : a;
   gl_FragColor = vec4(col, a);

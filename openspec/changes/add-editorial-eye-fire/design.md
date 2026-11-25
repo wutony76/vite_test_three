@@ -120,3 +120,36 @@ prefers-reduced-motion → 不噴火
 - 發射後放開時瀏覽器補送的 click 在 capture 階段吞掉（按著連結 3 秒放開不跳頁）；任何新的 pointerdown 會清掉這個旗標，避免誤吞正常點擊。
 - 發射中 `html.is-lasering { user-select: none }` 並清除選取；蓄力／發射中 `dragstart` preventDefault（拖動連結不會變原生拖放）。
 - 自燃中按住無效；雙擊還原不變。
+
+## 第十二版：燒穿露出 product.html
+
+- `RevealFrame.ts`：全螢幕 iframe（`/product.html`），z-index 40（editorial 內容之上、火焰層 50 之下），`pointer-events: none`，背景焦黑色。
+- 遮罩：`BurnMask.renderReveal()` 以顯示相同的雜訊扭曲＋門檻 0.7 畫出「燒穿」區（視窗 ÷ 4 解析度，列由上到下），`readRenderTargetPixelsAsync` 讀回 → 2D canvas → PNG blob → 先 `decode()` 再設 `mask-image`（避免換圖瞬間閃爍），舊 URL 延遲釋放。
+- 更新頻率約 15 fps，只在發射中、自燃中與停火後 0.6 秒更新；燒痕不動時不更新。
+- 火焰層燒穿處改透明（`uReveal`），焦黑圈與火邊仍畫在上面並蓋住遮罩模糊邊；遮罩門檻 0.7 比洞（1.0）寬，洞擴大時不會因遮罩延遲先露出 editorial。
+- iframe 在第一次發射時才建立（product 頁也跑 WebGL），雙擊還原時移除。
+
+## 第十三版：截圖取代 iframe、燒光後跳轉
+
+- 燒穿處改顯示 product.html 的靜態截圖 `public/images/editorial/product-preview.webp`（1440×900），自燃燒光後 0.8 秒 `location.assign('/product.html')`（`PageFire.onSpreadDone`）。
+- 截圖直接當貼圖畫在燒痕 shader 的洞裡（object-fit: cover、靠上對齊，貼圖 NoColorSpace 原值輸出），與燒痕同幀、無延遲；移除 iframe、CSS mask、遮罩讀回與 PNG 轉檔（`RevealFrame` / `RevealLayer` 皆刪除）。
+- 曾嘗試「截圖 + CSS mask-image 動態遮罩」：自燃時遮罩更新頻繁，瀏覽器每換一次 blob 圖都要重新載入，載入期間整層不可見，洞裡反而看到原本頁面 → 改為 shader 內繪製。
+
+## 第十四版：跳轉不閃爍（頁面交接）
+
+- 閃爍原因：跳到 product.html 時第一個畫面是「3D 模型還沒出來」的半成品（甚至空白），模型載完才冒出來。
+- `src/shared/pageHandoff.ts`：
+  - editorial 跳轉前 `markHandoff(截圖)` 寫入 sessionStorage
+  - product.html `<head>` 內嵌 script＋style：有標記 → `html.is-handoff::after` 第一個畫面就用同一張截圖蓋滿（cover、靠上，與 editorial 最後一刻相同）
+  - product 模型 `ready`／`error`（或不支援 WebGL）後 `finishHandoff()`：等兩個 animation frame 再淡出（0.6s ease-in-out）；6 秒保險（僅在蓋板仍存在時觸發）
+- 開始自燃時（`onSpreadStart`）prefetch product.html 與 shoe.glb，跳過去多半已在快取。
+- 直接開啟 product.html 不受影響（沒有標記就不加蓋板）。
+
+## 第十五版：軟跳轉（取代截圖蓋板交接）
+
+- 開始自燃（`onSpreadStart`）→ `NextPage`：全螢幕同源 iframe 載入 product.html（z 40，editorial 之上、火焰層之下），`clip-path: path(...)` 只露出燒穿區。
+- `BurnMask.renderClip()`：視窗 ÷ 4 格子圖（nb ≥ 0.3 或火線前緣 ≥ 0.35，比洞大、落在不透明焦痕／火邊下），約 20 fps 非同步讀回 → 每列連續格合成矩形 → path 字串。clip-path 是文字、設定即生效，不像 mask-image 要載入圖片。
+- product 頁模型 ready／error 時 `notifyEmbedReady()`（postMessage，`src/shared/embed.ts`）→ `PageFire.showLive()`：洞裡截圖 0.3 秒淡成透明，看到真的 iframe；焦褐圈在 live 後改不透明（避免透出下一頁的字）。
+- 燒光（`onSpreadDone`）＋ 0.6 秒 → `NextPage.activate()`：clip none、開放操作、`history.pushState` 換網址、換 document.title；editorial 人像與火焰層 dispose、`.editorial` display none。
+- iframe 載入後插入 `<base target="_top">`：裡面的連結整個分頁跳轉。上一頁（popstate）→ 重新載入 editorial。
+- 移除上一版的 `pageHandoff.ts` 與 product.html 內嵌蓋板、prefetch。

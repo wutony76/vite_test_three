@@ -43,6 +43,12 @@
 
 - 第十一版：改為按住左鍵 3 秒發射雷射眼，需持續按住、拖動跟隨，放開即停止並立即做自燃判定；取代停留觸發與點擊停火。
 
+- 第十二版：燒穿的地方露出 product.html（iframe ＋ 動態 CSS mask）。
+- 第十三版：改用 product.html 截圖畫在燒痕 shader 的洞裡（不再跑第二個 WebGL 頁面、無 mask 延遲），自燃燒光 0.8 秒後跳轉到 product.html。
+
+- 第十四版：跳轉不閃爍——截圖蓋板交接（已由第十五版取代）。
+- 第十五版：軟跳轉——自燃期間偷偷載入真的 product.html（iframe ＋ clip-path 只露出燒穿處，模型好了洞裡就改看真頁面），燒光時直接切成全畫面並 pushState 換網址，不重新載入。
+
 ## 驗證佐證
 
 - 對應 `validation.md` 結論：通過。
@@ -64,12 +70,17 @@
 - 第九版：雷射：`assets/editorial-laser.png`；移除雷射後繼續燃燒：`assets/editorial-laser-removed.png`
 - 第十版：燒到眼睛自動取消雷射（左：只燒左眼；右：兩眼都燒掉）：`assets/editorial-laser-auto-off.png`
 - 第十一版：按住拖動發射：`assets/editorial-hold-laser.png`；放開 222ms 內自燃判定生效
+- 第十三版：洞內露出商品頁截圖（發射中／自燃中）→ 燒光跳轉 product.html：`assets/editorial-reveal-product.png`
+- 第十五版：自燃中洞內為真頁面／切換後整頁商品頁：`assets/editorial-soft-switch.png`；錄影切換前後最大幀差 1.8／255
 - 火焰層不攔截滑鼠（燒痕上 `elementFromPoint` 仍為標題元素）。
 - tsc、`npm run build` 通過；headless console 無錯誤。
 
 ## 風險與後續追蹤
 
 - 觸控裝置沒有停留觸發（可考慮長按）。
+- 發射期間洞內是 product.html 的靜態截圖（自燃後才換成真頁面），product.html 改版時需重新截圖。
+- 自燃那十幾秒會同時跑 editorial 與 product 兩個 WebGL；切換後 editorial 的資源即釋放。
+- 切換後 product 頁內的網址變化（例如 ?variant=）發生在 iframe 內，不會反映到分頁網址；重新整理會載入真的 product.html。
 - overlay 只能「蓋」不能真的移除 DOM：被燒掉的連結看不見但仍可點（刻意保留，避免整頁失去互動）。
 - 換照片需手動調整 `LEFT` / `RIGHT` 眼眶參數並用 `--debug` 對位。
 

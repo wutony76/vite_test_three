@@ -24,6 +24,12 @@ const SPREAD_DONE = 0.97
 const EYE_PROBE_INTERVAL = 0.25
 /** 眼睛位置燒灼量超過這個值就算「眼睛被燒掉了」 */
 const EYE_BURNED_LEVEL = 0.9
+/** 下一頁 iframe 的露出範圍（clip-path）更新間隔（秒）與格子大小（CSS px） */
+const CLIP_INTERVAL = 1 / 20
+const CLIP_CELL = 4
+/** 下一頁準備好後，洞裡的截圖淡出時間（秒） */
+const LIVE_FADE = 0.3
+
 
 /**
  * 全頁火焰層：一張蓋在整個頁面最上面的透明畫布（pointer-events: none）。
@@ -69,6 +75,17 @@ export class PageFire {
   /** 每隻眼睛是否已經被燒掉（噴火時每 0.25 秒檢查；燒掉就一直記住，直到還原） */
   readonly eyeBurned = [false, false]
   private eyeProbeTimer = 0
+  /** 燒穿後露出的下一頁截圖（貼圖），在燒痕 shader 裡畫進洞裡 */
+  private revealTex: THREE.Texture | null = null
+  /**
+   * 下一頁 iframe 的露出範圍回呼：有設定時，燒的期間定期把「要露出的格子圖」交出去
+   * （由外層轉成 iframe 的 clip-path）
+   */
+  onClip: ((data: Uint8Array, w: number, h: number, cell: number) => void) | null = null
+  private clipTimer = 0
+  /** 洞裡從截圖淡到透明（露出真的下一頁）的進度：0 → 1 */
+  private live = 0
+  private liveTarget = 0
   private readonly eyePage = [new THREE.Vector2(), new THREE.Vector2()]
 
   constructor() {
@@ -90,6 +107,11 @@ export class PageFire {
           uMask: { value: null },
           uNoise: { value: this.noise },
           uSparks: { value: 0 },
+          uReveal: { value: null },
+          uRevealSize: { value: new THREE.Vector2(1, 1) },
+          uHasReveal: { value: 0 },
+          uView: { value: new THREE.Vector2(1, 1) },
+          uLive: { value: 0 },
           uMaskSize: { value: this.mask.size },
           uTime: { value: 0 },
           uUnit: { value: 800 },
@@ -113,6 +135,32 @@ export class PageFire {
     window.addEventListener('resize', this.resize)
     this.renderer.setAnimationLoop(this.tick)
   }
+
+  /** 設定燒穿後要露出的截圖；不設定（或還沒載入完）則燒穿處是焦黑空洞 */
+  setRevealImage(src: string) {
+    new THREE.TextureLoader().load(src, (tex) => {
+      // 這個 shader 不做色彩空間轉換，直接輸出貼圖原本的 sRGB 數值；
+      // 標成 sRGB 的話取樣時會被轉成線性值，畫出來偏暗
+      tex.colorSpace = THREE.NoColorSpace
+      tex.minFilter = THREE.LinearFilter
+      tex.generateMipmaps = false
+      this.revealTex = tex
+      const u = this.burnMesh.material.uniforms
+      u.uReveal.value = tex
+      u.uRevealSize.value.set(tex.image.width, tex.image.height)
+      u.uHasReveal.value = 1
+    })
+  }
+
+  /** 下一頁準備好了：洞裡的截圖淡出，改成透明露出底下真的 iframe */
+  showLive() {
+    this.liveTarget = 1
+  }
+
+  /** 開始自燃時呼叫一次（例如偷偷載入下一頁） */
+  onSpreadStart: (() => void) | null = null
+  /** 自燃把整頁燒光時呼叫一次（例如跳轉到下一頁） */
+  onSpreadDone: (() => void) | null = null
 
   /** 由人像提供：兩眼瞳孔目前的頁面座標、照片高度（px） */
   bindPortrait(getEyes: () => PagePoint[], getUnit: () => number) {
@@ -155,6 +203,9 @@ export class PageFire {
   clear() {
     this.mask.clear()
     this.coverage = 0
+    this.live = 0
+    this.liveTarget = 0
+    this.onClip = null
     this.spreadDone = false
     this.eyeBurned[0] = false
     this.eyeBurned[1] = false
@@ -216,6 +267,8 @@ export class PageFire {
     this.lastTarget.copy(this.target)
     this.checkSpread(dt, firing)
     this.checkEyes(dt, firing, eyes.length === 2)
+    this.updateClip(dt, firing)
+    if (this.live < this.liveTarget) this.live = Math.min(this.liveTarget, this.live + dt / LIVE_FADE)
 
     // 粒子在火圈邊緣冒火（火圈小時就在中心冒）
     this.fire.update(dt, time, this.eyes.slice(0, eyes.length), firing ? radius * 0.7 : 0, this.unit)
@@ -239,6 +292,8 @@ export class PageFire {
     u.uUnit.value = this.unit
     u.uScroll.value.set(sx, sy)
     u.uSparks.value = this.mask.spreading ? 1 : 0
+    u.uView.value.set(window.innerWidth, window.innerHeight)
+    u.uLive.value = this.live
     // 遮罩是空的時候不要畫燒痕層（避免讀到還沒清的貼圖）
     this.burnMesh.visible = !this.mask.isEmpty
 
@@ -262,10 +317,30 @@ export class PageFire {
       if (value === null || gen !== this.generation) return
       this.coverage = value
       if (this.mask.spreading) {
-        if (value >= SPREAD_DONE) this.spreadDone = true
+        if (value >= SPREAD_DONE && !this.spreadDone) {
+          this.spreadDone = true
+          this.onSpreadDone?.()
+        }
       } else if (!firing && !this.fire.isActive && value > SPREAD_THRESHOLD) {
         this.mask.spreading = true
+        this.onSpreadStart?.()
       }
+    })
+  }
+
+  /** 燒的期間（發射中、自燃中）定期產生露出格子圖，交給 onClip 轉成 iframe 的 clip-path */
+  private updateClip(dt: number, firing: boolean) {
+    if (!this.onClip || this.mask.isEmpty) return
+    if (!firing && !(this.mask.spreading && !this.spreadDone)) return
+    this.clipTimer += dt
+    if (this.clipTimer < CLIP_INTERVAL) return
+    this.clipTimer = 0
+    const gen = this.generation
+    const scroll = new THREE.Vector2(window.scrollX, window.scrollY)
+    const view = new THREE.Vector2(window.innerWidth, window.innerHeight)
+    void this.mask.renderClip(this.renderer, this.noise, scroll, view, this.unit, CLIP_CELL).then((res) => {
+      if (!res || gen !== this.generation || !this.onClip) return
+      this.onClip(res.data, res.w, res.h, CLIP_CELL)
     })
   }
 
@@ -296,6 +371,7 @@ export class PageFire {
     this.burnMesh.geometry.dispose()
     this.burnMesh.material.dispose()
     this.mask.dispose()
+    this.revealTex?.dispose()
     this.fire.dispose()
     this.renderer.dispose()
     this.domElement.remove()

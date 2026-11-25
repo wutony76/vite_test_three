@@ -146,3 +146,16 @@ body {
 .is-lasering * {
   user-select: none;
 }
+
+
+// 下一頁（軟跳轉用的 iframe）：疊在 editorial 內容之上、火焰層（z 50）之下。
+// 燒的期間用 clip-path 只露出燒穿的地方、不接收滑鼠；燒光後由 NextPage.activate() 開放操作
+.next-page {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  pointer-events: none;
+}

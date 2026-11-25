@@ -2,6 +2,7 @@ import './style.scss'
 import { EditorialPortrait } from './EditorialPortrait'
 import { computeEyeOffsets } from './eyeFollow'
 import { PageFire } from './PageFire'
+import { NextPage } from './NextPage'
 import type { PortraitManifest } from './types'
 import { PORTRAIT_ASSET_BASE } from './types'
 
@@ -19,6 +20,45 @@ const portrait = new EditorialPortrait(stage)
 const pageFire = new PageFire()
 // 開發模式掛到 window，方便在 console／自動化測試裡看 coverage、isSpreading
 if (import.meta.env.DEV) Object.assign(window, { __pageFire: pageFire })
+/**
+ * 燒穿後露出下一頁（product.html）：
+ * 1. 發射期間：洞裡畫 product.html 的截圖（public/images/editorial/product-preview.webp），不多跑一個 3D 頁面
+ * 2. 開始自燃：偷偷把真的 product.html 載進 iframe（clip-path 只露出燒穿的地方）；
+ *    它的 3D 模型畫好後，洞裡的截圖淡出、改看真的頁面
+ * 3. 燒光：iframe 直接切成全畫面、網址換成 product.html（pushState，不重新載入）→ 沒有閃爍也沒有版面落差
+ */
+const NEXT_PAGE = `${import.meta.env.BASE_URL}product.html`
+const SWITCH_DELAY_MS = 600
+pageFire.setRevealImage(`${import.meta.env.BASE_URL}images/editorial/product-preview.webp`)
+
+let nextPage: NextPage | null = null
+
+pageFire.onSpreadStart = () => {
+  const next = new NextPage(NEXT_PAGE)
+  nextPage = next
+  pageFire.onClip = (data, w, h, cell) => next.setClip(data, w, h, cell)
+  void next.ready.then(() => {
+    if (nextPage === next) pageFire.showLive()
+  })
+}
+
+pageFire.onSpreadDone = () => {
+  const next = nextPage
+  if (!next) return
+  // 等下一頁真的準備好（通常早就好了），再多等一下讓最後的角落燒完
+  void next.ready.then(() =>
+    setTimeout(() => {
+      next.activate()
+      // editorial 的 3D 人像與火焰層都用不到了：停掉並釋放 GPU 資源，editorial 內容也隱藏
+      portrait.dispose()
+      pageFire.dispose()
+      // 用 style 而不是 hidden 屬性：.editorial 有 display: grid，會蓋掉 [hidden] 的 display: none
+      const editorial = document.querySelector<HTMLElement>('.editorial')
+      if (editorial) editorial.style.display = 'none'
+    }, SWITCH_DELAY_MS),
+  )
+}
+
 pageFire.bindPortrait(
   () => portrait.getEyePagePositions(),
   () => portrait.pxPerUnit,
@@ -199,6 +239,8 @@ document.addEventListener('dblclick', (event) => {
   // 自燃中雙擊也無效；整頁燒光之後才能雙擊還原
   if (isLocked()) return swallow(event)
   pageFire.clear()
+  nextPage?.dispose()
+  nextPage = null
   // 雙擊會順便反白文字，還原時一起取消
   window.getSelection()?.removeAllRanges()
 })

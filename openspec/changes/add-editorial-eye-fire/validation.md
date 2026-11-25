@@ -113,3 +113,37 @@
 - [x] 放開 → 立即停止；URL 未改變（連結 click 被吞掉）
 - [x] 燒 14.3% 後放開 → 222ms 內開始自燃；自燃中按住 4 秒不發射
 - [x] console 無錯誤；`npm run build` 通過
+
+## 第十二版：燒穿露出 product.html
+
+- [x] 發射燒出的洞內顯示 product.html（藍鞋、尺寸按鈕），外圈焦黑邊正常 — `assets/editorial-reveal-product.png`（左）
+- [x] 自燃燒光（97.6%）→ 整頁顯示 product.html 商品頁 — 同圖（中）
+- [x] 雙擊還原 → iframe 移除、回到 editorial — 同圖（右）
+- [x] console 無錯誤（含 iframe 內頁面）；`npm run build` 通過
+- 備註：headless 軟體渲染下兩個 WebGL 頁面同時跑，幀率大降、同樣按住時間燒得較少（8～9%），自燃驗證以除錯介面直接啟動；真實 GPU 不受此影響。
+
+## 第十三版：截圖取代 iframe、燒光後跳轉
+
+- [x] 發射燒出的洞內顯示商品頁截圖 — `assets/editorial-reveal-product.png`（左）
+- [x] 放開時 17.5% → 自燃，火線內顯示商品頁截圖 — 同圖（中）
+- [x] 燒光（95%+）後自動跳轉 `/product.html` — 同圖（右）
+- [x] 全流程自然觸發（不需除錯介面）；console 無錯誤；`npm run build` 通過
+- 問題：CSS mask 版本自燃中洞內看到原本頁面（mask 圖反覆重新載入）→ 改 shader 內繪製截圖。
+
+## 第十四版：跳轉不閃爍
+
+- [x] 直接開 product.html：`<html>` 無 handoff class
+- [x] 錄影逐幀分析（Chromium 播放錄影、requestVideoFrameCallback 取樣）：跳轉前後平均亮度穩定（227.5），無白屏／空白幀
+- [x] 跳轉後第一張截圖與 editorial 最後一張差異 0.9／255（蓋板與上一頁一致）
+- [x] 蓋板淡出那一幀可見版面落差：截圖 1440×900 以 cover 放到 1400×1000 視窗，與真實排版不同 — `assets/editorial-handoff-frames.png`；改為 0.6s ease-in-out 淡出讓落差變柔和
+- [x] console 無錯誤；`npm run build` 通過
+- 已知限制：視窗尺寸 ≠ 1440×900 時，蓋板與真實頁面版面略有差異（淡出時看得到漸變）。
+
+## 第十五版：軟跳轉
+
+- [x] 自燃中洞內為真的 product.html（依目前視窗排版）— `assets/editorial-soft-switch.png`（左）
+- [x] 燒光後網址 `/product.html`、標題換成商品頁、editorial 未重新載入（同一 document：`.editorial` display none、火焰層已移除）— 同圖（右）
+- [x] 切換後 iframe 可操作：點第二個配色 → 標籤變「珊瑚粉」
+- [x] 錄影逐幀：切換前後最大幀差 1.8／255、平均亮度 225～230，無閃白、無版面跳動
+- [x] console 無錯誤；`npm run build` 通過
+- 備註：headless 同時跑兩個 WebGL 很慢，測試需按住較久才超過 10% 門檻。
