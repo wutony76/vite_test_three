@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { FIRE } from './fireTheme'
 
 /**
  * 粒子池大小。用環狀覆寫（最舊的先被重用），所以要大於「每秒產生數 × 最長壽命」。
@@ -10,18 +11,23 @@ const MAX = 600
 const FLAME = 1
 const SPARK = 2
 
-/** 每秒產生數 */
+/** 每秒產生數（火星加量：命中時要看起來「打得很用力」） */
 const FLAME_RATE = 60
-const SPARK_RATE = 18
+const SPARK_RATE = 45
 
-/** 雷射線寬（unit = 照片高度）：約 12px */
-const LASER_WIDTH = 0.014
+/** 雷射整條長方形的厚度（含外圈光暈，unit = 照片高度）：約 43px，紅色光束本體約 13px */
+const LASER_WIDTH = 0.05
+/** 發射時光束從眼睛「伸」到目標的時間（秒） */
+const LASER_EXTEND = 0.1
+/** 眼睛光芒大小（unit） */
+const FLARE_SIZE = 0.075
+/** 命中衝擊波：多久擴散一個、每個活多久（秒）、最大尺寸（unit） */
+const RING_INTERVAL = 0.12
+const RING_LIFE = 0.4
+const RING_MAX = 0.24
+const RING_POOL = 8
 
-/**
- * 雷射：一個 1×1 的長方形，每幀縮放成「眼睛到目標的長度 × 線寬」並旋轉過去。
- * vUv.x：0 = 眼睛端、1 = 目標端 → 顏色沿線漸變 白 → 橘 → 橘紅。
- */
-const laserVertex = /* glsl */ `
+const quadVertex = /* glsl */ `
 varying vec2 vUv;
 void main() {
   vUv = uv;
@@ -29,17 +35,88 @@ void main() {
 }
 `
 
+/**
+ * 雷射（配色見 fireTheme.ts）：一個 1×1 長方形，每幀縮放成「眼睛到目標的長度 × 厚度」並旋轉過去。
+ * 橫切面（y = 離中心線的比例，0 = 中心、1 = 長方形邊緣）由內到外：
+ *   白色亮芯（< 0.13）→ 紅色光束（< 0.30，上面有往目標流動的亮紋）→ 黑色描邊（< 0.36）→ 紅色光暈（漸淡）
+ * uExtend：發射瞬間光束從眼睛伸到目標（0 → 1），前端有一顆白色亮點。
+ */
 const laserFragment = /* glsl */ `
+uniform float uLength;
+uniform float uTime;
+uniform float uExtend;
+varying vec2 vUv;
+
+float edge(float y, float at, float aa) { return 1.0 - smoothstep(at - aa, at + aa, y); }
+
+void main() {
+  float xPx = vUv.x * uLength;
+  float headPx = uExtend * uLength;
+  if (xPx > headPx) discard;
+
+  float y = abs(vUv.y - 0.5) * 2.0;
+  // 硬邊色塊用 fwidth 做約 1px 反鋸齒（火焰層沒開 antialias、又是 1 倍解析度）
+  float aa = fwidth(y) * 1.2 + 1e-4;
+
+  // 能量流動：每 70px 一段亮紋，以每秒 900px 往目標方向跑
+  float flow = step(0.55, fract((xPx - uTime * 900.0) / 70.0));
+  vec3 bodyCol = mix(${FIRE.laserBody}, ${FIRE.laserFlow}, flow);
+
+  float core = edge(y, 0.13, aa);
+  float body = edge(y, 0.30, aa);
+  float outline = edge(y, 0.36, aa);
+  float glow = pow(1.0 - clamp((y - 0.36) / 0.64, 0.0, 1.0), 2.0) * 0.45;
+
+  vec3 col = ${FIRE.laserGlow};
+  float a = glow * (1.0 - outline);
+  col = mix(col, ${FIRE.laserOutline}, outline);
+  a = max(a, outline);
+  col = mix(col, bodyCol, body);
+  col = mix(col, ${FIRE.laserCore}, core);
+
+  // 伸出去的過程中，前端 14px 是白色亮點
+  float tip = (1.0 - smoothstep(0.0, 14.0, headPx - xPx)) * step(uExtend, 0.999);
+  col = mix(col, ${FIRE.laserCore}, tip * body);
+
+  gl_FragColor = vec4(col, a);
+}
+`
+
+/**
+ * 眼睛光芒：四道長尖刺（上下左右）＋四道短尖刺（斜角）＋中間方塊，紅邊白芯，硬邊卡通風。
+ * 尖刺 = 從中心往外越來越細的菱形條。
+ */
+const flareFragment = /* glsl */ `
+varying vec2 vUv;
+
+float spike(vec2 p, float len, float w) {
+  float t = abs(p.x) / len;
+  return step(t, 1.0) * step(abs(p.y), w * (1.0 - t));
+}
+
+void main() {
+  vec2 p = (vUv - 0.5) * 2.0;
+  vec2 r = mat2(0.7071, -0.7071, 0.7071, 0.7071) * p;
+  float s = max(max(spike(p, 1.0, 0.16), spike(p.yx, 1.0, 0.16)), max(spike(r, 0.55, 0.12), spike(r.yx, 0.55, 0.12)));
+  float square = step(max(abs(p.x), abs(p.y)), 0.22);
+  if (s < 0.5 && square < 0.5) discard;
+  float inner = max(square, step(length(p), 0.42));
+  gl_FragColor = vec4(mix(${FIRE.flareOuter}, ${FIRE.flareInner}, inner), 1.0);
+}
+`
+
+/** 命中衝擊波：方形外框（mesh 轉 45° 變菱形），越擴越細、白轉紅、淡出 */
+const ringFragment = /* glsl */ `
+uniform float uAge;
 varying vec2 vUv;
 void main() {
-  vec3 white = vec3(1.0);
-  vec3 orange = vec3(1.0, 0.62, 0.18);
-  vec3 orangeRed = vec3(0.96, 0.3, 0.12);
-  vec3 col = vUv.x < 0.5 ? mix(white, orange, vUv.x / 0.5) : mix(orange, orangeRed, (vUv.x - 0.5) / 0.5);
-  // 上下邊緣 1px 反鋸齒：火焰層沒開 antialias、又是 1 倍解析度，斜線不處理會有明顯鋸齒
-  float edge = 0.5 - abs(vUv.y - 0.5);
-  float a = clamp(edge / max(fwidth(vUv.y), 1e-4), 0.0, 1.0);
-  gl_FragColor = vec4(col, a);
+  vec2 p = abs(vUv - 0.5) * 2.0;
+  float d = max(p.x, p.y);
+  float th = mix(0.2, 0.05, uAge);
+  float aa = fwidth(d) * 1.2 + 1e-4;
+  float ring = smoothstep(1.0 - th - aa, 1.0 - th + aa, d) * (1.0 - smoothstep(1.0 - aa, 1.0, d));
+  if (ring < 0.01) discard;
+  gl_FragColor = vec4(mix(${FIRE.ringStart}, ${FIRE.ringEnd}, uAge), ring * (1.0 - uAge));
 }
 `
 
@@ -81,7 +158,11 @@ void main() {
   if (vAge < 0.0) discard;
 
   if (vKind < 1.5) {
-    gl_FragColor = vec4(ramp(vec3(1.0, 0.95, 0.62), vec3(1.0, 0.58, 0.15), vec3(0.85, 0.2, 0.08), vAge), 1.0);
+    vec3 fill = ramp(${FIRE.flameYoung}, ${FIRE.flameMid}, ${FIRE.flameOld}, vAge);
+    // 描邊：方塊外圈一圈（max(|x|,|y|) 接近 0.5 的地方）換成邊框色，越老邊框越淡
+    vec2 sq = abs(gl_PointCoord - 0.5);
+    float rim = step(0.5 - ${FIRE.flameEdgeWidth}, max(sq.x, sq.y)) * step(0.001, ${FIRE.flameEdgeWidth});
+    gl_FragColor = vec4(mix(fill, ${FIRE.flameEdge}, rim * (1.0 - vAge * 0.6)), 1.0);
     return;
   }
 
@@ -89,7 +170,7 @@ void main() {
   vec2 c = gl_PointCoord - 0.5;
   float s = (abs(c.x) + abs(c.y)) / 0.5;
   if (s > 1.0) discard;
-  gl_FragColor = vec4(s < 0.6 ? vec3(1.0, 0.95, 0.6) : vec3(1.0, 0.7, 0.2), 1.0);
+  gl_FragColor = vec4(s < 0.6 ? ${FIRE.sparkInner} : ${FIRE.sparkOuter}, 1.0);
 }
 `
 
@@ -100,10 +181,16 @@ void main() {
  * 混合模式不用 Additive：這張照片背景很亮，Additive 會把火疊成一片死白；卡通色塊本來就是不透明的。
  */
 export class EyeFire {
-  /** 加進場景的根節點：火苗粒子＋兩條雷射 */
+  /** 加進場景的根節點：火苗粒子＋兩條雷射＋眼睛光芒＋命中衝擊波 */
   readonly object = new THREE.Group()
   readonly points: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>
   private readonly lasers: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>[]
+  /** 每條雷射「伸出去」的進度 0..1（剛出現時從 0 開始） */
+  private readonly extend = [0, 0]
+  private readonly flares: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>[]
+  private readonly rings: { mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>; age: number }[]
+  private ringTimer = 0
+  private ringCursor = 0
 
   private readonly pos = new Float32Array(MAX * 3)
   private readonly vel = new Float32Array(MAX * 3)
@@ -151,23 +238,36 @@ export class EyeFire {
     this.points.frustumCulled = false
     this.points.renderOrder = 10
 
-    // 兩條雷射共用幾何與材質；畫在燒痕之上、火苗之下
-    const laserGeo = new THREE.PlaneGeometry(1, 1)
-    const laserMat = new THREE.ShaderMaterial({
-      vertexShader: laserVertex,
-      fragmentShader: laserFragment,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-    })
-    this.lasers = [0, 1].map(() => {
-      const m = new THREE.Mesh(laserGeo, laserMat)
+    // 雷射、光芒、衝擊波都是 1×1 長方形（共用幾何），每幀用位置／旋轉／縮放擺到定位。
+    // 每個都有自己的材質：uniform（長度、伸出進度、年齡）各自不同
+    const quad = new THREE.PlaneGeometry(1, 1)
+    const makeMesh = (fragmentShader: string, uniforms: Record<string, THREE.IUniform>, order: number) => {
+      const m = new THREE.Mesh(
+        quad,
+        new THREE.ShaderMaterial({
+          uniforms,
+          vertexShader: quadVertex,
+          fragmentShader,
+          transparent: true,
+          depthTest: false,
+          depthWrite: false,
+        }),
+      )
       m.frustumCulled = false
-      m.renderOrder = 9
+      m.renderOrder = order
       m.visible = false
       return m
-    })
-    this.object.add(...this.lasers, this.points)
+    }
+    // 畫的順序：衝擊波 8 → 雷射 9 → 火苗粒子 10 → 眼睛光芒 11
+    this.lasers = [0, 1].map(() =>
+      makeMesh(laserFragment, { uLength: { value: 1 }, uTime: { value: 0 }, uExtend: { value: 0 } }, 9),
+    )
+    this.flares = [0, 1].map(() => makeMesh(flareFragment, {}, 11))
+    this.rings = Array.from({ length: RING_POOL }, () => ({
+      mesh: makeMesh(ringFragment, { uAge: { value: 0 } }, 8),
+      age: 1,
+    }))
+    this.object.add(...this.rings.map((r) => r.mesh), ...this.lasers, this.points, ...this.flares)
   }
 
   setPxPerWorld(px: number) {
@@ -225,7 +325,8 @@ export class EyeFire {
     this.u = unit
     const u = unit
     if (this.active) this.emit(dt, burnRadius)
-    this.updateLasers(time)
+    this.updateLasers(dt, time)
+    this.updateRings(dt)
 
     this.live = 0
     for (let i = 0; i < MAX; i++) {
@@ -264,20 +365,72 @@ export class EyeFire {
    * 直接把它往前推進那段時間 → 同一幀生的粒子會沿路平均分布。
    * 少了這步，每幀生的粒子擠在同一點，幀率低時火柱會變成一串斷開的點點。
    */
-  /** 雷射：中點放在眼睛與目標中間、轉到兩點連線的角度、x 縮放成長度、y 縮放成線寬 */
-  private updateLasers(time: number) {
+  /**
+   * 雷射：中點放在眼睛與目標中間、轉到兩點連線的角度、x 縮放成長度、y 縮放成厚度。
+   * 同時更新眼睛光芒（跟著瞳孔、脈動＋慢慢轉）。
+   */
+  private updateLasers(dt: number, time: number) {
     this.lasers.forEach((laser, i) => {
       const eye = this.eyes[i]
-      laser.visible = this.active && this.eyeBeam[i] && !!eye
-      if (!laser.visible || !eye) return
+      const on = this.active && this.eyeBeam[i] && !!eye
+      laser.visible = on
+      this.flares[i].visible = on
+      if (!on || !eye) {
+        // 下次出現時重新「伸出去」
+        this.extend[i] = 0
+        return
+      }
+      this.extend[i] = Math.min(1, this.extend[i] + dt / LASER_EXTEND)
       const dx = this.target.x - eye.x
       const dy = this.target.y - eye.y
-      // 線寬微微閃動，雷射才有「能量在跑」的感覺
-      const width = LASER_WIDTH * this.u * (0.85 + 0.15 * Math.sin(time * 40 + i * 1.7))
+      const length = Math.max(Math.hypot(dx, dy), 1e-3)
+      // 厚度微微閃動，雷射才有「能量在跑」的感覺
+      const width = LASER_WIDTH * this.u * (0.9 + 0.1 * Math.sin(time * 40 + i * 1.7))
       laser.position.set((eye.x + this.target.x) / 2, (eye.y + this.target.y) / 2, 0.005)
       laser.rotation.z = Math.atan2(dy, dx)
-      laser.scale.set(Math.max(Math.hypot(dx, dy), 1e-3), width, 1)
+      laser.scale.set(length, width, 1)
+      const u = laser.material.uniforms
+      u.uLength.value = length
+      u.uTime.value = time
+      u.uExtend.value = this.extend[i]
+
+      // 光芒：剛發射時從小放大（跟著伸出進度），之後快速脈動、慢慢旋轉
+      const flare = this.flares[i]
+      const pulse = 0.85 + 0.2 * Math.sin(time * 18 + i)
+      const grow = Math.min(1, this.extend[i] * 2)
+      const size = FLARE_SIZE * this.u * pulse * grow
+      flare.position.set(eye.x, eye.y, 0.02)
+      flare.rotation.z = time * 1.5 * (i === 0 ? 1 : -1)
+      flare.scale.set(size, size, 1)
     })
+  }
+
+  /** 命中衝擊波：發射中每 0.12 秒在目標點放一個，往外擴散、變細、淡出 */
+  private updateRings(dt: number) {
+    if (this.active && (this.eyeBeam[0] || this.eyeBeam[1])) {
+      this.ringTimer += dt
+      if (this.ringTimer >= RING_INTERVAL) {
+        this.ringTimer = 0
+        const ring = this.rings[this.ringCursor]
+        this.ringCursor = (this.ringCursor + 1) % RING_POOL
+        ring.age = 0
+        ring.mesh.position.set(this.target.x, this.target.y, 0.004)
+      }
+    }
+    for (const ring of this.rings) {
+      if (ring.age >= 1) {
+        ring.mesh.visible = false
+        continue
+      }
+      ring.age = Math.min(1, ring.age + dt / RING_LIFE)
+      // 先快後慢地擴散（ease-out）
+      const k = 1 - (1 - ring.age) * (1 - ring.age)
+      const size = (0.03 + (RING_MAX - 0.03) * k) * this.u
+      ring.mesh.visible = true
+      ring.mesh.rotation.z = Math.PI / 4
+      ring.mesh.scale.set(size, size, 1)
+      ring.mesh.material.uniforms.uAge.value = ring.age
+    }
   }
 
   private spawn(kind: number, x: number, y: number, vx: number, vy: number, life: number, size: number, preAge = 0) {
@@ -323,15 +476,16 @@ export class EyeFire {
     const sparks = this.take('spark', SPARK_RATE, dt)
     for (let k = 0; k < sparks; k++) {
       const ang = Math.PI * (0.1 + rand() * 0.8)
-      const sp = (0.25 + rand() * 0.35) * u
-      this.spawn(SPARK, tx, ty, Math.cos(ang) * sp, Math.sin(ang) * sp, 0.5 + rand() * 0.5, (0.012 + rand() * 0.008) * u, rand() * dt)
+      const sp = (0.3 + rand() * 0.45) * u
+      this.spawn(SPARK, tx, ty, Math.cos(ang) * sp, Math.sin(ang) * sp, 0.5 + rand() * 0.5, (0.016 + rand() * 0.01) * u, rand() * dt)
     }
   }
 
   dispose() {
     this.points.geometry.dispose()
     this.points.material.dispose()
+    // 長方形幾何是共用的，丟一次就好；材質每個都要丟
     this.lasers[0].geometry.dispose()
-    this.lasers[0].material.dispose()
+    for (const m of [...this.lasers, ...this.flares, ...this.rings.map((r) => r.mesh)]) m.material.dispose()
   }
 }

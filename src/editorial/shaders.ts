@@ -1,3 +1,5 @@
+import { FIRE } from './fireTheme'
+
 /** 底圖與眼睛層共用 */
 export const portraitVertex = /* glsl */ `
 varying vec2 vUv;
@@ -116,8 +118,8 @@ void main() {
     vec2 q = (irisUv - uIrisUv) * uRectPx / uIrisR;
     float r = length(q);
     float ink = sharinganInk(q, uSpin);
-    // 紅色虹膜：中間亮、往外變暗，看起來有立體感（線性色值，之後交給 tone mapping）
-    vec3 red = mix(vec3(0.75, 0.02, 0.02), vec3(0.28, 0.0, 0.0), smoothstep(0.25, 0.9, r));
+    // 虹膜漸層（fireTheme.ts：紅或紫）：中間亮、往外變暗，看起來有立體感（線性色值，之後交給 tone mapping）
+    vec3 red = mix(${FIRE.sharinganInner}, ${FIRE.sharinganOuter}, smoothstep(0.25, 0.9, r));
     vec3 sharingan = mix(red, vec3(0.012, 0.004, 0.004), ink);
     // 保留原本眼睛的反光，才不會像一張平貼上去的圖
     float lum = dot(col.rgb, vec3(0.299, 0.587, 0.114));

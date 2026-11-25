@@ -3,6 +3,7 @@ import { EditorialPortrait } from './EditorialPortrait'
 import { computeEyeOffsets } from './eyeFollow'
 import { PageFire } from './PageFire'
 import { NextPage } from './NextPage'
+import { playSkillSplash } from './skillSplash'
 import type { PortraitManifest } from './types'
 import { PORTRAIT_ASSET_BASE } from './types'
 
@@ -133,14 +134,41 @@ const toPage = (clientX: number, clientY: number) => ({ x: clientX + window.scro
 /** 自燃中、還沒燒光：這段期間所有點擊無效，也不能發射（火停不下來） */
 const isLocked = () => pageFire.isSpreading && !pageFire.spreadDone
 
+/**
+ * 黑幕被劃開、裂縫開始露出畫面的時間點（毫秒，對應 style.scss 的 skill-half 動畫 18%＋一點點）。
+ * 雷射等到這時才發射 → 雷射從裂縫裡透出來，演出比較有層次。
+ */
+const LASER_DELAY_MS = 180
+let laserTimer = 0
+
+/**
+ * 畫面震動：雷射射出時整頁輕震約 0.25 秒（CSS 動畫，見 style.scss .is-shaking）。
+ * 先移除 class、強制瀏覽器重新計算一次樣式（讀 offsetWidth），再加回去 → 連續觸發也會重播動畫。
+ */
+const shakeScreen = () => {
+  const body = document.body
+  body.classList.remove('is-shaking')
+  void body.offsetWidth
+  body.classList.add('is-shaking')
+  window.setTimeout(() => body.classList.remove('is-shaking'), 300)
+}
+
 const startFire = () => {
+  // 技能發動演出：黑幕從中間劃開、閃一下
+  playSkillSplash()
+  // 先進入「發動中」狀態：之後的放開、拖動都照發射中處理（放開會取消還沒射出的雷射）
   hold.firing = true
   hold.swallowNextClick = true
   portrait.setFiring(true)
-  pageFire.start(toPage(hold.x, hold.y))
   // 發射中禁止反白文字：拖動時不然會一路把文字選起來
   document.documentElement.classList.add('is-lasering')
   window.getSelection()?.removeAllRanges()
+  // 黑幕劃開後才真的發射雷射；從「那時候」的指標位置開始
+  laserTimer = window.setTimeout(() => {
+    if (!hold.firing) return
+    pageFire.start(toPage(hold.x, hold.y))
+    shakeScreen()
+  }, LASER_DELAY_MS)
 }
 
 /** 放開（或視窗失焦、指標被取消）：停止發射、取消蓄力，並馬上做一次自燃判定 */
@@ -149,6 +177,8 @@ const release = () => {
   portrait.setCharge(0)
   if (!hold.firing) return
   hold.firing = false
+  // 黑幕演出中就放開：還沒射出的雷射直接取消
+  clearTimeout(laserTimer)
   pageFire.stop()
   portrait.setFiring(false)
   document.documentElement.classList.remove('is-lasering')

@@ -51,6 +51,8 @@
 
 - 第十六版：蓄力紅光改為寫輪眼（shader 繪製、勾玉旋轉、跟著虹膜轉向）；發射時嘴角不對稱上揚成壞笑。
 
+- 第十七版：技能發動黑幕演出、雷射延遲到黑幕劃開才發射；雷射三層光束／流動紋／射出動畫／眼睛光芒／命中衝擊波／畫面震動；黑焰與紫色寫輪眼、紫色雷射（`fireTheme.ts` 可切回 classic）。
+
 ## 驗證佐證
 
 - 對應 `validation.md` 結論：通過。
@@ -75,6 +77,7 @@
 - 第十三版：洞內露出商品頁截圖（發射中／自燃中）→ 燒光跳轉 product.html：`assets/editorial-reveal-product.png`
 - 第十五版：自燃中洞內為真頁面／切換後整頁商品頁：`assets/editorial-soft-switch.png`；錄影切換前後最大幀差 1.8／255
 - 第十六版：寫輪眼各階段：`assets/editorial-sharingan.png`；壞笑前後：`assets/editorial-smirk.png`
+- 第十七版：黑幕 `assets/editorial-skill-curtain.png`、紫色雷射 `assets/editorial-purple-laser.png`、紫色寫輪眼 `assets/editorial-purple-sharingan.png`、黑焰 `assets/editorial-black-flame.png`
 - 火焰層不攔截滑鼠（燒痕上 `elementFromPoint` 仍為標題元素）。
 - tsc、`npm run build` 通過；headless console 無錯誤。
 

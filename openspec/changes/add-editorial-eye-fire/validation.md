@@ -154,3 +154,12 @@
 - [x] 壞笑：發射前（上）與發射中（下）嘴角比較 — `assets/editorial-smirk.png`
 - [x] console 無錯誤；`npm run build` 通過
 - 問題：第一版右嘴角只上 6px 幾乎看不出 → 加大為 10px＋笑紋陰影加深。
+
+## 第十七版：技能發動黑幕、雷射加強、黑焰與紫色配色
+
+- [x] 黑幕各階段（暫停動畫截圖 0／90／180／300／450／590ms）— `assets/editorial-skill-curtain.png`
+- [x] 雷射在黑幕出現後才發射；黑幕中放開 → 不發射
+- [x] 紫色雷射（三層＋流動紋）、眼睛光芒、衝擊波、畫面震動觸發 — `assets/editorial-purple-laser.png`
+- [x] 紫色寫輪眼 — `assets/editorial-purple-sharingan.png`；黑焰火苗 — `assets/editorial-black-flame.png`
+- [x] console 無錯誤；`npm run build` 通過
+- 問題：先做的「整頁上下切開」（View Transitions）改為使用者要求的「新黑幕切開」；黑幕淡出太快看不出破開 → 延後淡出、加大滑動距離；火苗描邊版使用者偏好單色漸層 → 移除描邊。

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { FIRE } from './fireTheme'
 
 /**
  * 燒灼遮罩（burn mask）：一張覆蓋整個頁面的浮點貼圖，記錄「每個位置被燒了多少」。
@@ -581,7 +582,7 @@ vec4 sparkAt(vec2 page) {
     float size = mix(6.0, 1.0, t);
     vec2 d = abs(page - pos);
     if (d.x + d.y < size) {
-      return vec4(t < 0.45 ? vec3(1.0, 0.92, 0.5) : vec3(1.0, 0.55, 0.12), 1.0);
+      return vec4(t < 0.45 ? ${FIRE.sparkInner} : ${FIRE.sparkOuter}, 1.0);
     }
   }
   return vec4(0.0);
@@ -611,8 +612,9 @@ void main() {
   vec3 SCORCH = vec3(0.62, 0.38, 0.18);
   vec3 CHAR = vec3(0.17, 0.10, 0.07);
   vec3 VOID = vec3(0.09, 0.06, 0.05);
-  vec3 ORANGE = vec3(1.0, 0.46, 0.08);
-  vec3 YELLOW = vec3(1.0, 0.85, 0.25);
+  // 火邊／火線的外圈與內圈顏色（fireTheme.ts：橘紅火或黑焰）
+  vec3 ORANGE = ${FIRE.rimOuter};
+  vec3 YELLOW = ${FIRE.rimInner};
 
   vec3 col = OUTLINE;
   col = mix(col, SCORCH, band(nb, 0.27, aa));

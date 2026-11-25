@@ -159,3 +159,133 @@ body {
   border: 0;
   pointer-events: none;
 }
+
+// 技能發動演出（skillSplash.ts）：目前畫面上蓋一層黑幕，從中間被白光劃開，
+// 上下兩片往外滑開並淡出（0.6 秒）。全部只動 transform / opacity，不影響底下頁面
+.skill-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  pointer-events: none;
+
+  &__half {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 50%;
+    background: #050505;
+    animation: 0.6s linear both;
+
+    &--top {
+      top: 0;
+      animation-name: skill-half-top;
+    }
+
+    &--bottom {
+      bottom: 0;
+      animation-name: skill-half-bottom;
+    }
+  }
+
+  // 中間的白光：先是一道細線閃一下，再往上下撐開變寬、淡掉
+  &__flash {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 18vh;
+    margin-top: -9vh;
+    background: linear-gradient(transparent, #fff 42%, #fff 58%, transparent);
+    box-shadow: 0 0 40px 10px rgb(255 255 255 / 60%);
+    transform: scaleY(0.02);
+    animation: skill-flash-line 0.6s ease-out both;
+  }
+}
+
+// 黑幕：先整片蓋住停一下（0 → 18%，約 0.1 秒），快速往外滑開（到 60% 還幾乎不透明，
+// 「破開」才看得出來），最後才淡掉
+@keyframes skill-half-top {
+  0%,
+  18% {
+    opacity: 1;
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.3, 0.8, 0.3, 1);
+  }
+  60% {
+    opacity: 0.85;
+    transform: translateY(-26vh);
+    animation-timing-function: ease-in;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40vh);
+  }
+}
+
+@keyframes skill-half-bottom {
+  0%,
+  18% {
+    opacity: 1;
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.3, 0.8, 0.3, 1);
+  }
+  60% {
+    opacity: 0.85;
+    transform: translateY(26vh);
+    animation-timing-function: ease-in;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(40vh);
+  }
+}
+
+@keyframes skill-flash-line {
+  0% {
+    opacity: 1;
+    transform: scaleY(0.02);
+  }
+  18% {
+    opacity: 1;
+    transform: scaleY(0.06);
+  }
+  40% {
+    opacity: 0.85;
+    transform: scaleY(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleY(1.3);
+  }
+}
+
+// 雷射射出時的畫面震動（main.ts shakeScreen）：0.26 秒內幾下越來越小的位移。
+// 只動 transform，不會重新排版；body 上的 fixed 圖層（火焰層、下一頁）會一起震
+.is-shaking {
+  animation: laser-shake 0.26s linear;
+}
+
+@keyframes laser-shake {
+  0% {
+    transform: translate(0, 0);
+  }
+  15% {
+    transform: translate(-7px, 4px);
+  }
+  30% {
+    transform: translate(6px, -5px);
+  }
+  45% {
+    transform: translate(-4px, -3px);
+  }
+  60% {
+    transform: translate(3px, 3px);
+  }
+  80% {
+    transform: translate(-1px, 1px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
