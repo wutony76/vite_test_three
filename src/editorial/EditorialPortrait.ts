@@ -22,10 +22,11 @@ const loadTex = (url: string, colorSpace: THREE.ColorSpace = THREE.SRGBColorSpac
 type EyeLayer = {
   mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>
   spec: EyeManifest
-  home: THREE.Vector3
   uniforms: {
     uMap: { value: THREE.Texture }
     uMask: { value: THREE.Texture }
+    /** 虹膜貼圖的 UV 位移（mesh 本身不動） */
+    uOffset: { value: THREE.Vector2 }
   }
 }
 
@@ -97,14 +98,8 @@ export class EditorialPortrait {
       const k = 1 - Math.exp(-12 * this.timer.getDelta())
       this.lookSmoothedLeft.lerp(this.lookLeft, k)
       this.lookSmoothedRight.lerp(this.lookRight, k)
-      if (this.leftEye) {
-        this.leftEye.mesh.position.x = this.leftEye.home.x + this.lookSmoothedLeft.x
-        this.leftEye.mesh.position.y = this.leftEye.home.y + this.lookSmoothedLeft.y
-      }
-      if (this.rightEye) {
-        this.rightEye.mesh.position.x = this.rightEye.home.x + this.lookSmoothedRight.x
-        this.rightEye.mesh.position.y = this.rightEye.home.y + this.lookSmoothedRight.y
-      }
+      if (this.leftEye) this.applyLook(this.leftEye, this.lookSmoothedLeft)
+      if (this.rightEye) this.applyLook(this.rightEye, this.lookSmoothedRight)
       this.renderer.render(this.scene, this.camera)
     })
   }
@@ -139,7 +134,8 @@ export class EditorialPortrait {
         color: 0x1a1512,
         transparent: true,
         opacity: 0.06,
-        blending: THREE.MultiplyBlending,
+        // 用一般混合疊 6% 暖暗色當調色。MultiplyBlending 需要 premultipliedAlpha，
+        // 沒開時 three 每一幀都會報錯且效果不正確
         depthWrite: false,
       }),
     )
@@ -154,6 +150,15 @@ export class EditorialPortrait {
     this.resize()
   }
 
+  /** 像素位移 → 貼圖 UV 位移（貼圖就是 rect 大小，所以除以 rect 寬高即可） */
+  private applyLook(eye: EyeLayer, offsetPx: THREE.Vector2) {
+    eye.uniforms.uOffset.value.set(offsetPx.x / eye.spec.rect.w, offsetPx.y / eye.spec.rect.h)
+  }
+
+  /**
+   * 眼睛層 mesh 精準蓋在 manifest.rect 上（原圖像素 → 世界座標）。
+   * 位置錯了 → 虹膜層和底圖錯開，就會出現「眼睛沒對準」的雙影。
+   */
   private makeEyeLayer(
     side: 'left' | 'right',
     map: THREE.Texture,
@@ -162,29 +167,35 @@ export class EditorialPortrait {
     planeW: number,
     planeH: number,
   ): EyeLayer {
-    const size = spec.radiusUv * planeW * 2
+    const { width: srcW, height: srcH } = this.manifest!.sourceSize
     const uniforms = {
       uMap: { value: map },
       uMask: { value: mask },
+      uOffset: { value: new THREE.Vector2() },
     }
 
     const mat = new THREE.ShaderMaterial({
       uniforms,
       vertexShader: eyeVertex,
       fragmentShader: eyeFragment,
+      // 跟底圖一樣套用 renderer 的 tone mapping，虹膜明暗才會一致
+      toneMapped: true,
       transparent: true,
       depthWrite: false,
       depthTest: false,
     })
 
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size * 0.76), mat)
-    const x = (spec.centerU - 0.5) * planeW
-    const y = (0.5 - spec.centerV) * planeH
-    mesh.position.set(x, y, side === 'left' ? 0.002 : 0.0021)
+    const w = (spec.rect.w / srcW) * planeW
+    const h = (spec.rect.h / srcH) * planeH
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat)
+    // 矩形中心（像素）→ 世界座標；影像 y 向下、世界 y 向上，所以要用 0.5 - v
+    const cu = (spec.rect.x + spec.rect.w / 2) / srcW
+    const cv = (spec.rect.y + spec.rect.h / 2) / srcH
+    mesh.position.set((cu - 0.5) * planeW, (0.5 - cv) * planeH, 0.002)
     mesh.renderOrder = 5
     mesh.name = `${side}-eye`
 
-    return { mesh, spec, home: mesh.position.clone(), uniforms }
+    return { mesh, spec, uniforms }
   }
 
   setLook(left: THREE.Vector2, right: THREE.Vector2) {

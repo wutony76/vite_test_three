@@ -1,24 +1,44 @@
 {
-  "version": 1,
+  "version": 2,
   "sourceSize": {
     "width": 576,
     "height": 1024
   },
   "planeHeight": 1,
   "leftEye": {
-    "centerU": 0.358,
-    "centerV": 0.428,
-    "radiusUv": 0.068,
-    "maxOffsetUv": 0.014
+    "rect": {
+      "x": 100,
+      "y": 368,
+      "w": 122,
+      "h": 76
+    },
+    "iris": {
+      "x": 158,
+      "y": 406
+    },
+    "maxOffset": {
+      "x": 10,
+      "y": 3.5
+    }
   },
   "rightEye": {
-    "centerU": 0.642,
-    "centerV": 0.428,
-    "radiusUv": 0.068,
-    "maxOffsetUv": 0.014
+    "rect": {
+      "x": 310,
+      "y": 366,
+      "w": 148,
+      "h": 77
+    },
+    "iris": {
+      "x": 370,
+      "y": 405
+    },
+    "maxOffset": {
+      "x": 10,
+      "y": 3.5
+    }
   },
   "look": {
-    "gain": 0.55,
+    "gain": 0.9,
     "stereo": 0.94
   }
 }
