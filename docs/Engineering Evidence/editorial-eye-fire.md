@@ -49,6 +49,8 @@
 - 第十四版：跳轉不閃爍——截圖蓋板交接（已由第十五版取代）。
 - 第十五版：軟跳轉——自燃期間偷偷載入真的 product.html（iframe ＋ clip-path 只露出燒穿處，模型好了洞裡就改看真頁面），燒光時直接切成全畫面並 pushState 換網址，不重新載入。
 
+- 第十六版：蓄力紅光改為寫輪眼（shader 繪製、勾玉旋轉、跟著虹膜轉向）；發射時嘴角不對稱上揚成壞笑。
+
 ## 驗證佐證
 
 - 對應 `validation.md` 結論：通過。
@@ -72,6 +74,7 @@
 - 第十一版：按住拖動發射：`assets/editorial-hold-laser.png`；放開 222ms 內自燃判定生效
 - 第十三版：洞內露出商品頁截圖（發射中／自燃中）→ 燒光跳轉 product.html：`assets/editorial-reveal-product.png`
 - 第十五版：自燃中洞內為真頁面／切換後整頁商品頁：`assets/editorial-soft-switch.png`；錄影切換前後最大幀差 1.8／255
+- 第十六版：寫輪眼各階段：`assets/editorial-sharingan.png`；壞笑前後：`assets/editorial-smirk.png`
 - 火焰層不攔截滑鼠（燒痕上 `elementFromPoint` 仍為標題元素）。
 - tsc、`npm run build` 通過；headless console 無錯誤。
 

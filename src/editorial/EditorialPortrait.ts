@@ -4,6 +4,17 @@ import type { EyeManifest, PortraitLookLayout, PortraitManifest } from './types'
 
 const loader = new THREE.TextureLoader()
 
+/** 寫輪眼圖案半徑（原圖像素）：虹膜半徑約 21px，略小一點讓外圈保留原本虹膜的邊 */
+const SHARINGAN_RADIUS_PX = 20
+/** 勾玉轉速（弧度／秒）：平常慢轉，蓄力滿時加速，發射中再快一點 */
+const SPIN_BASE = 1.2
+const SPIN_BOOST = 5
+/** 左右嘴角（原圖像素）：壞笑時從這兩點往上拉 */
+const MOUTH_CORNER_L = new THREE.Vector2(192, 644)
+const MOUTH_CORNER_R = new THREE.Vector2(340, 640)
+/** 嘴角上揚／回復的時間常數（秒） */
+const SMIRK_TAU = 0.12
+
 const loadTex = (url: string, colorSpace: THREE.ColorSpace = THREE.SRGBColorSpace) =>
   new Promise<THREE.Texture>((resolve, reject) => {
     loader.load(
@@ -31,6 +42,8 @@ type EyeLayer = {
     uIrisUv: { value: THREE.Vector2 }
     uRectPx: { value: THREE.Vector2 }
     uTime: { value: number }
+    uSpin: { value: number }
+    uIrisR: { value: number }
   }
 }
 
@@ -56,6 +69,11 @@ export class EditorialPortrait {
   /** 蓄力 0..1：眼睛發紅光的強度；firing = 正在噴火（紅光會閃爍） */
   private charge = 0
   private firing = false
+  /** 寫輪眼勾玉目前的旋轉角度（弧度） */
+  private spin = 0
+  /** 壞笑程度（0..1，發射時往 1 靠、放開往 0 靠） */
+  private smirk = 0
+  private baseMat: THREE.ShaderMaterial | null = null
 
   private lookLeft = new THREE.Vector2()
   private lookRight = new THREE.Vector2()
@@ -132,15 +150,19 @@ export class EditorialPortrait {
     const planeH = manifest.planeHeight
 
     // 底圖用自訂 shader：順便把 6% 暖暗調色混進去
-    const base = new THREE.Mesh(
-      new THREE.PlaneGeometry(planeW, planeH),
-      new THREE.ShaderMaterial({
-        uniforms: { uMap: { value: baseMap } },
-        vertexShader: portraitVertex,
-        fragmentShader: baseFragment,
-        toneMapped: true,
-      }),
-    )
+    this.baseMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uMap: { value: baseMap },
+        uSmirk: { value: 0 },
+        uTexSize: { value: new THREE.Vector2(manifest.sourceSize.width, manifest.sourceSize.height) },
+        uCornerL: { value: MOUTH_CORNER_L },
+        uCornerR: { value: MOUTH_CORNER_R },
+      },
+      vertexShader: portraitVertex,
+      fragmentShader: baseFragment,
+      toneMapped: true,
+    })
+    const base = new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), this.baseMat)
     this.root.add(base)
 
     this.leftEye = this.makeEyeLayer('left', leftMap, leftMask, manifest.leftEye, planeW, planeH)
@@ -182,6 +204,8 @@ export class EditorialPortrait {
       },
       uRectPx: { value: new THREE.Vector2(spec.rect.w, spec.rect.h) },
       uTime: { value: 0 },
+      uSpin: { value: 0 },
+      uIrisR: { value: SHARINGAN_RADIUS_PX },
     }
 
     const mat = new THREE.ShaderMaterial({
@@ -248,14 +272,23 @@ export class EditorialPortrait {
     })
   }
 
-  /** 每幀：把蓄力值（噴火時加上閃爍）寫進眼睛 shader */
+  /**
+   * 每幀：蓄力值與勾玉旋轉角度寫進眼睛 shader。
+   * 角度在 CPU 累加（轉速 = 基本 + 蓄力 × 加速）：若在 shader 用「時間 × 轉速」，
+   * 轉速一變，角度會整個跳到別的位置。
+   */
   private updateCharge() {
     const time = this.timer.getElapsed()
-    const flick = this.firing ? 0.85 + 0.15 * Math.sin(time * 31) : 1
+    const dt = Math.min(this.timer.getDelta(), 0.05)
+    this.spin += dt * (SPIN_BASE + SPIN_BOOST * this.charge) * (this.firing ? 1.6 : 1)
+    // 壞笑：發射中嘴角慢慢上揚，放開後慢慢放下（指數趨近，不會瞬間跳）
+    this.smirk += ((this.firing ? 1 : 0) - this.smirk) * (1 - Math.exp(-dt / SMIRK_TAU))
+    if (this.baseMat) this.baseMat.uniforms.uSmirk.value = this.smirk
     for (const eye of [this.leftEye, this.rightEye]) {
       if (!eye) continue
-      eye.uniforms.uCharge.value = this.charge * flick
+      eye.uniforms.uCharge.value = this.charge
       eye.uniforms.uTime.value = time
+      eye.uniforms.uSpin.value = this.spin
     }
   }
 

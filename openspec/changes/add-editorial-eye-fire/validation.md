@@ -147,3 +147,10 @@
 - [x] 錄影逐幀：切換前後最大幀差 1.8／255、平均亮度 225～230，無閃白、無版面跳動
 - [x] console 無錯誤；`npm run build` 通過
 - 備註：headless 同時跑兩個 WebGL 很慢，測試需按住較久才超過 10% 門檻。
+
+## 第十六版：寫輪眼＋壞笑
+
+- [x] 寫輪眼：平常／蓄力中／蓄力滿／發射中／轉向右上／放開恢復 — `assets/editorial-sharingan.png`
+- [x] 壞笑：發射前（上）與發射中（下）嘴角比較 — `assets/editorial-smirk.png`
+- [x] console 無錯誤；`npm run build` 通過
+- 問題：第一版右嘴角只上 6px 幾乎看不出 → 加大為 10px＋笑紋陰影加深。

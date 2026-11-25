@@ -153,3 +153,8 @@ prefers-reduced-motion → 不噴火
 - 燒光（`onSpreadDone`）＋ 0.6 秒 → `NextPage.activate()`：clip none、開放操作、`history.pushState` 換網址、換 document.title；editorial 人像與火焰層 dispose、`.editorial` display none。
 - iframe 載入後插入 `<base target="_top">`：裡面的連結整個分頁跳轉。上一頁（popstate）→ 重新載入 editorial。
 - 移除上一版的 `pageHandoff.ts` 與 product.html 內嵌蓋板、prefetch。
+
+## 第十六版：寫輪眼＋壞笑
+
+- 寫輪眼（取代蓄力紅光）：眼睛 shader 以距離函式畫紅色虹膜、黑瞳孔、外環、勾玉軌道與三個勾玉（頭為圓點、尾巴沿軌道收尖）；座標用扣掉視線位移的 irisUv，圖案跟著虹膜轉向。`uCharge` 0→1 漸變出現，保留原眼反光；勾玉角度在 CPU 累加（基本 1.2 rad/s ＋ 蓄力 ×5，發射中 ×1.6）避免轉速改變時跳格。
+- 壞笑：底圖 shader 以嘴角為中心的橢圓高斯反向取樣扭曲——右嘴角上 10px／外 3px、左嘴角上 3px（不對稱才像壞笑），右嘴角外上方淡笑紋陰影；發射中 `uSmirk` 以 τ 0.12s 趨近 1，放開回 0。嘴角座標（原圖像素）左 (192, 644)、右 (340, 640)。
